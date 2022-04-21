@@ -7,7 +7,10 @@ CREATE TABLE producers (
 );
 CREATE TABLE products (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
+    producer_id UUID NOT NULL,
     name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    package TEXT NOT NULL,
     price INT NOT NULL
 );
 CREATE TABLE customers (
@@ -33,6 +36,8 @@ CREATE TABLE ordered_products (
 );
 CREATE INDEX ordered_products_order_id_index ON ordered_products (order_id);
 CREATE INDEX ordered_products_product_id_index ON ordered_products (product_id);
+CREATE INDEX products_producer_id_index ON products (producer_id);
 ALTER TABLE ordered_products ADD CONSTRAINT ordered_products_ref_order_id FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE NO ACTION;
 ALTER TABLE ordered_products ADD CONSTRAINT ordered_products_ref_product_id FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE NO ACTION;
 ALTER TABLE orders ADD CONSTRAINT orders_ref_customer_id FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE NO ACTION;
+ALTER TABLE products ADD CONSTRAINT products_ref_producer_id FOREIGN KEY (producer_id) REFERENCES producers (id) ON DELETE NO ACTION;

@@ -1,0 +1,50 @@
+module Admin.Types where
+
+import IHP.Prelude
+import IHP.ModelSupport
+import Generated.Types
+
+data AdminApplication = AdminApplication deriving (Eq, Show)
+
+
+data StaticController = WelcomeAction deriving (Eq, Show, Data)
+
+data ProducersController
+    = ProducersAction
+    | NewProducerAction
+    | ShowProducerAction { producerId :: !(Id Producer) }
+    | CreateProducerAction
+    | EditProducerAction { producerId :: !(Id Producer) }
+    | UpdateProducerAction { producerId :: !(Id Producer) }
+    | DeleteProducerAction { producerId :: !(Id Producer) }
+    deriving (Eq, Show, Data)
+
+data ProductsController
+    = ProductsAction
+    | NewProductAction
+    | ShowProductAction { productId :: !(Id Product) }
+    | CreateProductAction
+    | EditProductAction { productId :: !(Id Product) }
+    | UpdateProductAction { productId :: !(Id Product) }
+    | DeleteProductAction { productId :: !(Id Product) }
+    deriving (Eq, Show, Data)
+
+data CustomersController
+    = CustomersAction
+    | NewCustomerAction
+    | ShowCustomerAction { customerId :: !(Id Customer) }
+    | CreateCustomerAction
+    | EditCustomerAction { customerId :: !(Id Customer) }
+    | UpdateCustomerAction { customerId :: !(Id Customer) }
+    | DeleteCustomerAction { customerId :: !(Id Customer) }
+    deriving (Eq, Show, Data)
+
+data OrdersController
+    = OrdersAction
+    | NewOrderAction
+    | ShowOrderAction { orderId :: !(Id Order) }
+    | CreateOrderAction
+    | EditOrderAction { orderId :: !(Id Order) }
+    | UpdateOrderAction { orderId :: !(Id Order) }
+    | DeleteOrderAction { orderId :: !(Id Order) }
+    deriving (Eq, Show, Data)
