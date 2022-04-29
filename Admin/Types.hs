@@ -48,3 +48,13 @@ data OrdersController
     | UpdateOrderAction { orderId :: !(Id Order) }
     | DeleteOrderAction { orderId :: !(Id Order) }
     deriving (Eq, Show, Data)
+
+data WelcomeMessagesController
+    = WelcomeMessagesAction
+    | NewWelcomeMessageAction
+    | ShowWelcomeMessageAction { welcomeMessageId :: !(Id WelcomeMessage) }
+    | CreateWelcomeMessageAction
+    | EditWelcomeMessageAction { welcomeMessageId :: !(Id WelcomeMessage) }
+    | UpdateWelcomeMessageAction { welcomeMessageId :: !(Id WelcomeMessage) }
+    | DeleteWelcomeMessageAction { welcomeMessageId :: !(Id WelcomeMessage) }
+    deriving (Eq, Show, Data)

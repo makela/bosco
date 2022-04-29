@@ -6,5 +6,12 @@ import Generated.Types
 
 data WebApplication = WebApplication deriving (Eq, Show)
 
-
-data StaticController = WelcomeAction deriving (Eq, Show, Data)
+data OrdersController
+    = OrdersAction
+    | NewOrderAction
+    | ShowOrderAction { orderId :: !(Id Order) }
+    | CreateOrderAction
+    | EditOrderAction { orderId :: !(Id Order) }
+    | UpdateOrderAction { orderId :: !(Id Order) }
+    | DeleteOrderAction { orderId :: !(Id Order) }
+    deriving (Eq, Show, Data)

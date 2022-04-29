@@ -5,12 +5,13 @@ import Web.Controller.Prelude
 import Web.View.Layout (defaultLayout)
 
 -- Controller Imports
-import Web.Controller.Static
+import Web.Controller.Orders
 
 instance FrontController WebApplication where
     controllers = 
-        [ startPage WelcomeAction
+        [ startPage OrdersAction
         -- Generator Marker
+        , parseRoute @OrdersController
         ]
 
 instance InitControllerContext WebApplication where

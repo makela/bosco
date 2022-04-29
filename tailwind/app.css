@@ -2,8 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-  .btn {
-    @apply px-4 py-2 bg-blue-600 text-white rounded;
-  }
+a {
+  @apply text-blue-600;
+}
+
+body {
+  @apply mx-auto w-full max-w-2xl;
+}
+
+h1 {
+  @apply text-xl py-2;
+}
+
+p {
+  @apply py-2;
+}
+
+.container {
+  @apply pt-8;
+}
+
+table {
+  @apply my-2;
+}
+
+table th, table td {
+  @apply py-2 text-left align-top;
 }
