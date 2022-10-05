@@ -11,7 +11,5 @@ data OrdersController
     | NewOrderAction
     | ShowOrderAction { orderId :: !(Id Order) }
     | CreateOrderAction
-    | EditOrderAction { orderId :: !(Id Order) }
-    | UpdateOrderAction { orderId :: !(Id Order) }
-    | DeleteOrderAction { orderId :: !(Id Order) }
+    | CancelOrderAction { orderId :: !(Id Order) }
     deriving (Eq, Show, Data)

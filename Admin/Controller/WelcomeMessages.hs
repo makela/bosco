@@ -40,7 +40,7 @@ instance Controller WelcomeMessagesController where
         welcomeMessage
             |> buildWelcomeMessage
             |> ifValid \case
-                Left welcomeMessage -> render NewView { .. } 
+                Left welcomeMessage -> render NewView { .. }
                 Right welcomeMessage -> do
                     welcomeMessage <- welcomeMessage |> createRecord
                     setSuccessMessage "WelcomeMessage created"

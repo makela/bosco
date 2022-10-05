@@ -11,11 +11,15 @@ body {
 }
 
 h1 {
-  @apply text-xl py-2;
+  @apply text-3xl;
+}
+
+h2 {
+  @apply text-2xl p-2;
 }
 
 p {
-  @apply py-2;
+  @apply px-4 my-4;
 }
 
 .container {
@@ -23,9 +27,52 @@ p {
 }
 
 table {
-  @apply my-2;
+  @apply my-2 w-full;
 }
 
 table th, table td {
-  @apply py-2 text-left align-top;
+  @apply py-1 px-4;
+}
+table td span {
+  @apply px-2;
+}
+
+input[type=number] {
+  @apply w-24 h-8 border-gray-300 rounded-md;
+}
+
+input[type=submit], a.btn {
+  @apply rounded m-8 px-4 py-2 bg-blue-500 text-white cursor-pointer;
+}
+
+input[type=text] {
+  @apply focus:ring-blue-500 focus:border-blue-500 block w-full border-gray-300 rounded-md;
+}
+
+form {
+  @apply w-full;
+}
+
+form input[type=submit] {
+  @apply float-right mr-4 my-8 ;
+}
+
+fieldset {
+  @apply rounded border-2 my-4;
+}
+
+a.back-button {
+  @apply text-red-500;
+}
+
+input.is-invalid {
+  @apply border-red-500;
+}
+
+div.invalid-feedback {
+  @apply text-red-500;
+}
+
+ul {
+  @apply px-10 list-disc;
 }

@@ -8,7 +8,9 @@ import Admin.View.Customers.Show
 
 instance Controller CustomersController where
     action CustomersAction = do
-        (customersQ, pagination) <- query @Customer |> paginate
+        (customersQ, pagination) <- query @Customer
+            |> orderBy #name
+            |> paginate
         customers <- customersQ |> fetch
         render IndexView { .. }
 
@@ -40,7 +42,7 @@ instance Controller CustomersController where
         customer
             |> buildCustomer
             |> ifValid \case
-                Left customer -> render NewView { .. } 
+                Left customer -> render NewView { .. }
                 Right customer -> do
                     customer <- customer |> createRecord
                     setSuccessMessage "Customer created"

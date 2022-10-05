@@ -8,7 +8,9 @@ import Admin.View.Producers.Show
 
 instance Controller ProducersController where
     action ProducersAction = do
-        (producersQ, pagination) <- query @Producer |> paginate
+        (producersQ, pagination) <- query @Producer
+            |> orderBy #name
+            |> paginate
         producers <- producersQ |> fetch
         render IndexView { .. }
 
@@ -40,7 +42,7 @@ instance Controller ProducersController where
         producer
             |> buildProducer
             |> ifValid \case
-                Left producer -> render NewView { .. } 
+                Left producer -> render NewView { .. }
                 Right producer -> do
                     producer <- producer |> createRecord
                     setSuccessMessage "Producer created"

@@ -24,6 +24,7 @@ eval "$(direnv export bash)"
 
 # You can define custom env vars here:
 # export CUSTOM_ENV_VAR=".."
+export IHP_BROWSER=echo
 
 # Finally start the dev server
 RunDevServer

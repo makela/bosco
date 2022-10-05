@@ -7,7 +7,7 @@ instance View IndexView where
     html IndexView { .. } = [hsx|
         {breadcrumb}
 
-        <h1><a href={pathTo NewCustomerAction}>+ New</a></h1>
+        <a href={pathTo NewCustomerAction}>+ New</a>
         <div class="table-responsive">
             <table class="table">
                 <thead>

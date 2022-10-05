@@ -18,7 +18,7 @@ defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
     {stylesheets}
     {scripts}
 
-    <title>{pageTitleOrDefault "App"}</title>
+    <title>{pageTitleOrDefault "Manage Bosco Falconeria"}</title>
 </head>
 <body>
     <div class="container">

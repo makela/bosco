@@ -1,10 +1,16 @@
 module Web.Controller.Orders where
 
+import qualified Network.URI.Encode as E
+import qualified Data.Map as Map
+import qualified Data.Text as T
+
 import Web.Controller.Prelude
 import Web.View.Orders.Index
 import Web.View.Orders.New
-import Web.View.Orders.Edit
 import Web.View.Orders.Show
+
+isBosco :: Producer -> Bool
+isBosco x = x.name == "Bosco Falconeria"
 
 instance Controller OrdersController where
     action OrdersAction = do
@@ -16,47 +22,104 @@ instance Controller OrdersController where
         render IndexView { .. }
 
     action NewOrderAction = do
-        let order = newRecord
-        products <- query @Product |> fetch
+        xs <- query @Producer
+            |> orderBy #name
+            |> fetch
+        let producers = filter isBosco xs ++ filter (not . isBosco) xs
+        products <- query @Product
+            |> orderByDesc #name
+            |> fetch
+        let orders = mempty
+        let productsByProducers = groupProducts products
+        let customer = newRecord @Customer
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
         order <- fetch orderId
+        customer <- fetch order.customerId
+        xs <- query @OrderedProduct
+            |> filterWhere (#orderId, orderId)
+            |> fetch
+            >>= collectionFetchRelated #productId
+        -- TODO We should fix total price at ordering, because prices can change
+        let totalSum = xs
+                |> map (\x -> x.productId.price * x.quantity)
+                |> sum
+        let orderedProducts = sortOn (\x -> x.productId.name) xs
         render ShowView { .. }
 
-    action EditOrderAction { orderId } = do
-        order <- fetch orderId
-        render EditView { .. }
-
-    action UpdateOrderAction { orderId } = do
-        order <- fetch orderId
-        order
-            |> buildOrder
-            |> ifValid \case
-                Left order -> render EditView { .. }
-                Right order -> do
-                    order <- order |> updateRecord
-                    setSuccessMessage "Order updated"
-                    redirectTo EditOrderAction { .. }
-
     action CreateOrderAction = do
-        let order = newRecord @Order
-        order
-            |> buildOrder
+        producers <- query @Producer
+            |> orderBy #name
+            |> fetch
+        products <- query @Product
+            |> orderByDesc #name
+            |> fetch
+        let params = products
+                |> map (\x -> (x.id, paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)))
+                |> filter (\(_, i) -> i > 0)
+        let orders = Map.fromList params
+        let productsByProducers = groupProducts products
+        -- TODO if Map.isEmpty orders then render NewView { .. } else
+        -- TODO save valid customer information for later use
+        -- TODO match existing customer
+        let customer = newRecord @Customer
+        customer
+            |> buildCustomer
             |> ifValid \case
-                Left order -> do
-                    products <- query @Product |> fetch
+                Left customer -> do
                     render NewView { .. }
-                Right order -> do
-                    order <- order |> createRecord
-                    setSuccessMessage "Order created"
-                    redirectTo OrdersAction
+                Right customer -> do
+                    let order = newRecord @Order
+                    order
+                        |> buildOrder
+                        |> ifValid \case
+                            Left order -> do
+                                render NewView { .. }
+                            Right order -> do
+                                -- TODO transaction
+                                customer <- customer |> createRecord
+                                order <- order
+                                    |> set #customerId customer.id
+                                    |> createRecord
+                                let orders = params
+                                        |> map (\(pid, count) ->
+                                              newRecord @OrderedProduct
+                                                  |> set #orderId order.id
+                                                  |> set #productId pid
+                                                  |> set #quantity count)
+                                forM_ orders createRecord
+                                setSuccessMessage "Tilaus tallennettu"
+                                redirectTo ShowOrderAction { orderId = order.id }
 
-    action DeleteOrderAction { orderId } = do
+    action CancelOrderAction { orderId } = do
         order <- fetch orderId
-        deleteRecord order
-        setSuccessMessage "Order deleted"
+        now <- getCurrentTime
+        order |> setJust #cancelledAt now |> updateRecord
+        setSuccessMessage "Tilaus peruttu"
         redirectTo OrdersAction
+
+buildCustomer customer = customer
+    |> fill @["name","email","phone"]
+    |> validateField #email isEmail'
+    |> validateField #phone isPhone
+
+isEmail' :: Text -> ValidatorResult
+isEmail' text = case isEmail text of
+    Success -> Success
+    Failure _ -> Failure "Sähköposti on virheellinen"
+    FailureHtml x -> FailureHtml x
+
+isPhone :: Text -> ValidatorResult
+isPhone text | ("+" `isPrefixOf` text) && (T.length text) == 13 = Success
+isPhone text | ("0" `isPrefixOf` text) && (T.length text) == 10 = Success
+isPhone text = Failure "Puhelinnumero on virheellinen"
 
 buildOrder order = order
     |> fill @'["customerId"]
+    -- TODO validate the order, empty orders are worth of nothing
+
+groupProducts :: [Product] -> ProductsByProducers
+groupProducts products = go products mempty
+    where go [] m = m
+          go (x:xs) m = go xs (Map.insertWith (++) (get #producerId x) [x] m)

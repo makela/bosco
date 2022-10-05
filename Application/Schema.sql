@@ -25,7 +25,8 @@ CREATE TABLE orders (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
     customer_id UUID NOT NULL,
     ordered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    paid_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
+    paid_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    cancelled_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
 CREATE INDEX orders_customer_id_index ON orders (customer_id);
 CREATE TABLE ordered_products (
