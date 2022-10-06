@@ -6,6 +6,7 @@ data WelcomeView = WelcomeView
 instance View WelcomeView where
     html WelcomeView = [hsx|
         <ul class="my-4">
+            <li><a href={OrdersAction}>Orders</a></li>
             <li><a href={CustomersAction}>Customers</a></li>
             <li><a href={ProducersAction}>Producers</a></li>
             <li><a href={ProductsAction}>Products</a></li>

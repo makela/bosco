@@ -3,6 +3,7 @@ import Web.View.Prelude
 import Numeric
 
 import qualified Data.Map as Map
+import qualified Data.Text as T
 
 import Web.View.Orders.Index (renderMarkdown)
 
@@ -21,10 +22,9 @@ data NewView = NewView
 instance View NewView where
     html NewView { .. } = [hsx|
         <h1>Tilauslomake</h1>
-        <a href="/" class="float-right back-button">Palaa alkuun</a>
         <form method="POST" action={CreateOrderAction}>
-            {renderCustomerForm customer}
             {forEach producers (renderProducer orders productsByProducers)}
+            {renderCustomerForm customer}
             <input type="submit" value="Tilaa" />
         </form>
     |]
@@ -33,7 +33,7 @@ renderCustomerForm :: Customer -> Html
 renderCustomerForm customer = [hsx|
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_name">
         <label class="font-medium text-gray-700 " for="customer_name">Nimi</label>
-        <input type="text" name="name" placeholder="" id="customer_name" required="required" autofocus="autofocus" value={customer.name}>
+        <input type="text" name="name" placeholder="" id="customer_name" required="required" value={customer.name}>
     </div>
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_email">
         <label class="font-medium text-gray-700 " for="customer_email">Sähköposti</label>
@@ -84,9 +84,12 @@ renderProduct orders product = [hsx|
         price = formatMoney product.price
         count = maybe "" show $ Map.lookup product.id orders
 
-formatMoney :: (Integral a, Num a) => a -> String
+formatMoney :: (Integral a, Num a) => a -> Text
 formatMoney amount =
     fromIntegral amount
         |> (/100)
         |> \x -> showFFloat (Just 2) x " €"
-        |> map (\c -> if c == '.' then ',' else c)
+        |> T.pack
+        |> T.replace "." ","
+        |> T.replace ",00" ""
+        -- |> map (\c -> if c == '.' then ',' else c)
