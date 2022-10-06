@@ -7,6 +7,8 @@ import Admin.View.WelcomeMessages.Edit
 import Admin.View.WelcomeMessages.Show
 
 instance Controller WelcomeMessagesController where
+    beforeAction = ensureIsUser
+
     action WelcomeMessagesAction = do
         (welcomeMessagesQ, pagination) <- query @WelcomeMessage |> paginate
         welcomeMessages <- welcomeMessagesQ |> fetch

@@ -5,6 +5,7 @@ import Admin.Types
 
 -- Generator Marker
 instance AutoRoute StaticController
+instance AutoRoute SessionsController
 instance AutoRoute ProducersController
 instance AutoRoute ProductsController
 instance AutoRoute CustomersController

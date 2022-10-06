@@ -7,6 +7,8 @@ import Admin.View.Products.Edit
 import Admin.View.Products.Show
 
 instance Controller ProductsController where
+    beforeAction = ensureIsUser
+
     action ProductsAction = do
         (productsQ, pagination) <- query @Product
             |> paginate

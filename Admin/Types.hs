@@ -2,12 +2,24 @@ module Admin.Types where
 
 import IHP.Prelude
 import IHP.ModelSupport
+import IHP.LoginSupport.Types
 import Generated.Types
 
 data AdminApplication = AdminApplication deriving (Eq, Show)
 
 
 data StaticController = WelcomeAction deriving (Eq, Show, Data)
+
+instance HasNewSessionUrl User where
+    newSessionUrl _ = "/admin/NewSession"
+
+type instance CurrentUserRecord = User
+
+data SessionsController
+    = NewSessionAction
+    | CreateSessionAction
+    | DeleteSessionAction
+    deriving (Eq, Show, Data)
 
 data ProducersController
     = ProducersAction

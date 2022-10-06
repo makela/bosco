@@ -7,6 +7,8 @@ import Admin.View.Customers.Edit
 import Admin.View.Customers.Show
 
 instance Controller CustomersController where
+    beforeAction = ensureIsUser
+
     action CustomersAction = do
         (customersQ, pagination) <- query @Customer
             |> orderBy #name

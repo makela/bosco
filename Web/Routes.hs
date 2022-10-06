@@ -5,4 +5,3 @@ import Web.Types
 
 -- Generator Marker
 instance AutoRoute OrdersController
-

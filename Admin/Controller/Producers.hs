@@ -7,6 +7,8 @@ import Admin.View.Producers.Edit
 import Admin.View.Producers.Show
 
 instance Controller ProducersController where
+    beforeAction = ensureIsUser
+
     action ProducersAction = do
         (producersQ, pagination) <- query @Producer
             |> orderBy #name
