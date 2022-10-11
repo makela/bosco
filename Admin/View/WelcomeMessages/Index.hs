@@ -31,10 +31,10 @@ instance View IndexView where
 renderWelcomeMessage :: WelcomeMessage -> Html
 renderWelcomeMessage welcomeMessage = [hsx|
     <tr>
-        <td>{get #text welcomeMessage}</td>
-        <td>{get #publishedAt welcomeMessage}</td>
-        <td><a href={ShowWelcomeMessageAction (get #id welcomeMessage)}>Show</a></td>
-        <td><a href={EditWelcomeMessageAction (get #id welcomeMessage)} class="text-muted">Edit</a></td>
-        <td><a href={DeleteWelcomeMessageAction (get #id welcomeMessage)} class="js-delete text-muted">Delete</a></td>
+        <td>{welcomeMessage.text}</td>
+        <td>{timeAgo welcomeMessage.publishedAt}</td>
+        <td><a href={ShowWelcomeMessageAction welcomeMessage.id}>Show</a></td>
+        <td><a href={EditWelcomeMessageAction welcomeMessage.id} class="text-muted">Edit</a></td>
+        <td><a href={DeleteWelcomeMessageAction welcomeMessage.id} class="js-delete text-muted">Delete</a></td>
     </tr>
 |]

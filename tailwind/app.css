@@ -10,6 +10,10 @@ body {
   @apply mx-auto w-full max-w-2xl;
 }
 
+thead {
+  @apply text-left;
+}
+
 h1 {
   @apply text-3xl;
 }
