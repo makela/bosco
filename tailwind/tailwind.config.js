@@ -7,6 +7,7 @@ module.exports = {
         },
     },
     content: [
+        "Admin/View/**/*.hs",
         "Web/View/**/*.hs",
     ],
     safelist: [
