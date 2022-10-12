@@ -14,7 +14,6 @@ type ProductsByProducers = Map (Id Producer) [Product]
 data NewView = NewView
     { customer :: Customer
     , orders :: Orders
-    , products :: [Product]
     , producers :: [Producer]
     , productsByProducers :: ProductsByProducers
     }
@@ -23,7 +22,9 @@ instance View NewView where
     html NewView { .. } = [hsx|
         <h1>Tilauslomake</h1>
         <form method="POST" action={CreateOrderAction}>
-            {forEach producers (renderProducer orders productsByProducers)}
+            <div class="flex flex-wrap">
+                {forEach producers (renderProducer orders productsByProducers)}
+            </div>
             {renderCustomerForm customer}
             <input type="submit" value="Tilaa" />
         </form>
@@ -73,7 +74,7 @@ renderProducer orders productsByProducer producer = [hsx|
     <fieldset>
         <h2>{producer.name}</h2>
         <p>{renderMarkdown producer.description}</p>
-        <table>
+        <table class="whitespace-nowrap">
         <tbody>
         {forEach products (renderProduct orders)}
         </tbody>

@@ -2,12 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-a {
-  @apply text-blue-600;
+.container {
+  @apply p-2 mx-auto w-full max-w-2xl;
 }
 
-body {
-  @apply mx-auto w-full max-w-2xl;
+a {
+  @apply text-blue-600;
 }
 
 thead {
@@ -24,10 +24,6 @@ h2 {
 
 p {
   @apply px-4 my-4;
-}
-
-.container {
-  @apply pt-8;
 }
 
 table {

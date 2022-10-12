@@ -9,9 +9,6 @@ import Web.View.Orders.Index
 import Web.View.Orders.New
 import Web.View.Orders.Show
 
-isBosco :: Producer -> Bool
-isBosco x = x.name == "Bosco Falconeria"
-
 instance Controller OrdersController where
     action OrdersAction = do
         message <- query @WelcomeMessage |> fetchOneOrNothing
@@ -25,7 +22,7 @@ instance Controller OrdersController where
         xs <- query @Producer
             |> orderBy #name
             |> fetch
-        let producers = filter isBosco xs ++ filter (not . isBosco) xs
+        let producers = sortProducers xs
         products <- query @Product
             |> orderByDesc #name
             |> fetch
@@ -37,6 +34,10 @@ instance Controller OrdersController where
     action ShowOrderAction { orderId } = do
         order <- fetch orderId
         customer <- fetch order.customerId
+        xs <- query @Producer
+            |> orderBy #name
+            |> fetch
+        let producers = sortProducers xs
         xs <- query @OrderedProduct
             |> filterWhere (#orderId, orderId)
             |> fetch
@@ -45,7 +46,7 @@ instance Controller OrdersController where
         let totalSum = xs
                 |> map (\x -> x.productId.price * x.quantity)
                 |> sum
-        let orderedProducts = sortOn (\x -> x.productId.name) xs
+        let orderedProductsByProducer = groupOrderedProducts xs
         render ShowView { .. }
 
     action CreateOrderAction = do
@@ -123,4 +124,15 @@ buildOrder order = order
 groupProducts :: [Product] -> ProductsByProducers
 groupProducts products = go products mempty
     where go [] m = m
-          go (x:xs) m = go xs (Map.insertWith (++) (get #producerId x) [x] m)
+          go (x:xs) m = go xs (Map.insertWith (++) x.producerId [x] m)
+
+groupOrderedProducts :: [Include "productId" OrderedProduct] -> OrderedProductsByProducer
+groupOrderedProducts orderedProducts = go orderedProducts mempty
+    where go [] m = m
+          go (x:xs) m = go xs (Map.insertWith (++) x.productId.producerId [x] m)
+
+sortProducers :: [Producer] -> [Producer]
+sortProducers xs = filter isBosco xs ++ filter (not . isBosco) xs
+
+isBosco :: Producer -> Bool
+isBosco x = x.name == "Bosco Falconeria"

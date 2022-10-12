@@ -1,23 +1,27 @@
 module Web.View.Orders.Show where
 import Web.View.Prelude
 
+import qualified Data.Map as Map
+
 import Web.View.Orders.New (formatMoney)
+
+type OrderedProductsByProducer = Map (Id' "producers") [OrderedProduct' (Id' "orders") Product]
 
 data ShowView = ShowView
     { orderId :: Id Order
     , customer :: Customer
-    , orderedProducts :: [Include "productId" OrderedProduct]
+    , producers :: [Producer]
+    , orderedProductsByProducer :: OrderedProductsByProducer
     , totalSum :: Int
     }
 
 instance View ShowView where
     html ShowView { .. } = [hsx|
         <h1>Lasku</h1>
-        <a href="#" onclick="window.print(); return false" class="float-right">Tulosta</a>
         {renderCustomer customer}
-        <table>
+        <table class="whitespace-nowrap">
         <tbody>
-            {forEach orderedProducts renderOrderedProduct}
+            {forEach producers (renderProducer orderedProductsByProducer)}
             <tr class="font-bold">
                 <td>Yhteensä</td>
                 <td></td>
@@ -25,11 +29,23 @@ instance View ShowView where
             </tr>
         </tbody>
         </table>
-        <p>TODO Maksuohjeet</p>
         <p>
             Mikäli huomasit tilauksessa virheen, voit vielä
             <a href={cancelAction} class="back-button">perua</a>
             sen.
+        </p>
+        <h2>Maksuohjeet</h2>
+        <p>
+            REMOVED-ACCOUNT-HOLDER
+            <br/>
+            IBAN REMOVED-IBAN
+            <br/>
+            BIC REMOVED-BIC      (last digit is a zero)
+            <br/>
+            via Vittorio Emanuele II 15/17 91011 Alcamo TP,  ITALIA
+        </p>
+        <p>
+            Voit myös <a href="#" onclick="window.print(); return false">tulostaa</a> laskun maksaaksesi sen myöhemmin.
         </p>
     |]
         where cancelAction = pathTo CancelOrderAction { orderId }
@@ -46,6 +62,15 @@ renderCustomer customer = [hsx|
           {customer.address}
     </p>
 |]
+
+renderProducer :: OrderedProductsByProducer -> Producer -> Html
+renderProducer orderedProductsByProducer producer =
+    case Map.lookup producer.id orderedProductsByProducer of
+        Nothing -> pure ()
+        Just orderedProducts -> [hsx|
+                <tr><td colspan="3" class="font-bold">{producer.name}</td></tr>
+                {forEach orderedProducts renderOrderedProduct}
+            |]
 
 renderOrderedProduct :: Include "productId" OrderedProduct -> Html
 renderOrderedProduct orderedProduct = [hsx|

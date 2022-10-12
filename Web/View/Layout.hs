@@ -22,6 +22,7 @@ defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
 </head>
 <body>
     <div class="container">
+        <img src="/img/logo.jpg" alt="Bosco Falconeria logo" />
         {renderFlashMessages}
         {inner}
     </div>
