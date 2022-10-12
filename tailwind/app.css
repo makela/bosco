@@ -33,6 +33,9 @@ table {
 table th, table td {
   @apply py-1 px-4;
 }
+table td.last {
+  @apply text-right;
+}
 table td span {
   @apply px-2;
 }

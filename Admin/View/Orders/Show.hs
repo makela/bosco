@@ -21,7 +21,7 @@ instance View ShowView where
             <tr class="font-bold">
                 <td>Yhteensä</td>
                 <td></td>
-                <td>{formatMoney totalSum}</td>
+                <td class="last">{formatMoney totalSum}</td>
             </tr>
         </tbody>
         </table>
@@ -40,7 +40,7 @@ renderProduct product = [hsx|
     <tr>
         <td>{product.productId.name}</td>
         <td>{product.quantity} * {formatMoney product.productId.price}</td>
-        <td>= {formatMoney (product.quantity * product.productId.price)}</td>
+        <td class="last">= {formatMoney (product.quantity * product.productId.price)}</td>
     </tr>
 |]
 

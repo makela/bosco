@@ -89,7 +89,7 @@ renderProduct orders product = [hsx|
         <td>{product.name}</td>
         <td>{product.package}</td>
         <td>{price}</td>
-        <td><input type="number" min="0" name={show product.id} value={count}> <span>kpl</span></td>
+        <td class="last"><input type="number" min="0" name={show product.id} value={count}> <span>kpl</span></td>
     </tr>
 |]
     where
