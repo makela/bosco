@@ -17,9 +17,10 @@ instance View EditView where
 
 renderForm :: Customer -> Html
 renderForm customer = formFor customer [hsx|
-    {(textField #name)}
-    {(textField #email)}
-    {(textField #phone)}
+    {(textField #name) { required = True, autofocus = True }}
+    {(textField #email) { required = True }}
+    {(textField #phone) { required = True }}
+    {(textField #address) { required = True }}
     {submitButton}
 
 |]

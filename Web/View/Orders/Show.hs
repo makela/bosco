@@ -37,9 +37,13 @@ instance View ShowView where
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|
     <p>
-          {customer.name}<br/>
-          {customer.email}<br/>
+          {customer.name}
+          <br/>
+          {customer.email}
+          <br/>
           {customer.phone}
+          <br/>
+          {customer.address}
     </p>
 |]
 

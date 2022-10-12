@@ -6,6 +6,8 @@ import Admin.View.Customers.New
 import Admin.View.Customers.Edit
 import Admin.View.Customers.Show
 
+import Web.Controller.Orders (isEmail', isPhone)
+
 instance Controller CustomersController where
     beforeAction = ensureIsUser
 
@@ -57,4 +59,7 @@ instance Controller CustomersController where
         redirectTo CustomersAction
 
 buildCustomer customer = customer
-    |> fill @["name","email","phone"]
+    |> fill @["name","email","phone","address"]
+    |> validateField #email isEmail'
+    |> validateField #phone isPhone
+    |> validateField #address nonEmpty

@@ -40,20 +40,31 @@ renderCustomerForm customer = [hsx|
         <input type="text" name="email" placeholder="" id="customer_email" required="required" value={customer.email}
                class={classes ["form-control", ("is-invalid", isInvalidEmail)]}>
         {emailFeedback}
-    </div> <div class="flex flex-col my-6 space-y-2" id="form-group-customer_phone">
+    </div>
+    <div class="flex flex-col my-6 space-y-2" id="form-group-customer_phone">
         <label class="font-medium text-gray-700 " for="customer_phone">Puhelinnumero</label>
         <input type="text" name="phone" placeholder="" id="customer_phone" required="required" value={customer.phone}
                class={classes ["form-control", ("is-invalid", isInvalidPhone)]}>
         {phoneFeedback}
     </div>
+    <div class="flex flex-col my-6 space-y-2" id="form-group-customer_address">
+        <label class="font-medium text-gray-700 " for="customer_address">Osoite</label>
+        <input type="text" name="address" placeholder="" id="customer_address" required="required" value={customer.address}
+               class={classes ["form-control", ("is-invalid", isInvalidAddress)]}>
+        {addressFeedback}
+    </div>
 |]
     where
         isInvalidEmail = isJust (getValidationFailure #email customer)
         isInvalidPhone = isJust (getValidationFailure #phone customer)
+        isInvalidAddress = isJust (getValidationFailure #address customer)
         emailFeedback = case getValidationFailure #email customer of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
             Nothing -> mempty
         phoneFeedback = case getValidationFailure #phone customer of
+            Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
+            Nothing -> mempty
+        addressFeedback = case getValidationFailure #address customer of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
             Nothing -> mempty
 

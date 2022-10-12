@@ -100,9 +100,10 @@ instance Controller OrdersController where
         redirectTo OrdersAction
 
 buildCustomer customer = customer
-    |> fill @["name","email","phone"]
+    |> fill @["name","email","phone","address"]
     |> validateField #email isEmail'
     |> validateField #phone isPhone
+    |> validateField #address nonEmpty
 
 isEmail' :: Text -> ValidatorResult
 isEmail' text = case isEmail text of

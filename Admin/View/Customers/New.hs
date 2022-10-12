@@ -20,6 +20,7 @@ renderForm customer = formFor customer [hsx|
     {(textField #name) { required = True, autofocus = True }}
     {(textField #email) { required = True }}
     {(textField #phone) { required = True }}
+    {(textField #address) { required = True }}
     {submitButton}
 
 |]
