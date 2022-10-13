@@ -1,7 +1,7 @@
 module Admin.View.Orders.Show where
 import Admin.View.Prelude
 import Web.View.Orders.New (formatMoney)
-import Web.View.Orders.Show (renderCustomer, OrderedProductsByProducer, renderProducer)
+import Web.View.Orders.Show (renderCustomer, OrderedProductsByProducer, renderProducer, renderTotalSum)
 
 data ShowView = ShowView
     { order :: Include "customerId" Order
@@ -17,14 +17,7 @@ instance View ShowView where
         <table>
         <tbody>
             {forEach producers (renderProducer orderedProductsByProducer)}
-            <tr class="font-bold">
-                <td>Yhteensä</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td class="last">{formatMoney totalSum}</td>
-            </tr>
+            {renderTotalSum totalSum}
         </tbody>
         </table>
 
@@ -38,7 +31,7 @@ instance View ShowView where
             breadcrumbs = case (order.cancelledAt, order.paidAt) of
                 (Nothing, Nothing) -> baseBreadcrumbs ++
                     [ breadcrumbLink "Mark Paid" (MarkPaidOrderAction order.id)
-                    , breadcrumbLink "Cancel" (CancelOrderAction order.id)
+                    , breadcrumbLink [hsx|<a href={CancelOrderAction order.id} class="back-button">Cancel</a>|] (CancelOrderAction order.id)
                     ]
                 (_, _) -> baseBreadcrumbs
             breadcrumb = renderBreadcrumb breadcrumbs

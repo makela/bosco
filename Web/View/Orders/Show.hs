@@ -8,8 +8,7 @@ import Web.View.Orders.New (formatMoney)
 type OrderedProductsByProducer = Map (Id' "producers") [OrderedProduct' (Id' "orders") Product]
 
 data ShowView = ShowView
-    { orderId :: Id Order
-    , customer :: Customer
+    { order :: Include "customerId" Order
     , producers :: [Producer]
     , orderedProductsByProducer :: OrderedProductsByProducer
     , totalSum :: Int
@@ -18,40 +17,36 @@ data ShowView = ShowView
 instance View ShowView where
     html ShowView { .. } = [hsx|
         <h1>Lasku</h1>
-        {renderCustomer customer}
+        {cancelOption}
+        {renderCustomer order.customerId}
         <table class="whitespace-nowrap">
         <tbody>
             {forEach producers (renderProducer orderedProductsByProducer)}
-            <tr class="font-bold">
-                <td>Yhteensä</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td class="last">{formatMoney totalSum}</td>
-            </tr>
+            {renderTotalSum totalSum}
         </tbody>
         </table>
-        <p>
-            Mikäli huomasit tilauksessa virheen, voit vielä
-            <a href={cancelAction} class="back-button">perua</a>
-            sen.
-        </p>
         <h2>Maksuohjeet</h2>
+        <p>REMOVED-ACCOUNT-HOLDER</p>
+        <p>IBAN REMOVED-IBAN</p>
+        <p>BIC REMOVED-BIC (last digit is a zero)</p>
+        <p>via Vittorio Emanuele II 15/17 91011 Alcamo TP,  ITALIA</p>
         <p>
-            REMOVED-ACCOUNT-HOLDER
-            <br/>
-            IBAN REMOVED-IBAN
-            <br/>
-            BIC REMOVED-BIC      (last digit is a zero)
-            <br/>
-            via Vittorio Emanuele II 15/17 91011 Alcamo TP,  ITALIA
-        </p>
-        <p>
-            Voit myös <a href="#" onclick="window.print(); return false">tulostaa</a> laskun maksaaksesi sen myöhemmin.
+            Voit myös
+            <a href="#" onclick="window.print(); return false">tulostaa</a>
+            laskun maksaaksesi sen myöhemmin.
         </p>
     |]
-        where cancelAction = pathTo CancelOrderAction { .. }
+        where
+            cancelOption = case (order.paidAt, order.cancelledAt) of
+                (Nothing, Nothing) -> [hsx|
+                        <p>
+                            Mikäli huomaat laskussa virheen, voit vielä
+                            <a href={CancelOrderAction order.id} class="back-button">perua</a>
+                            sen.
+                        </p>
+                    |]
+                (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
+                (Just _, _) -> [hsx|<p class="font-bold">Lasku on maksettu.</p>|]
 
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|
@@ -81,5 +76,17 @@ renderOrderedProduct orderedProduct = [hsx|
         <td>{formatMoney orderedProduct.productId.price}</td>
         <td>=</td>
         <td class="last">{formatMoney (orderedProduct.productId.price * orderedProduct.quantity)}</td>
+    </tr>
+|]
+
+renderTotalSum :: Int -> Html
+renderTotalSum totalSum = [hsx|
+    <tr class="font-bold">
+        <td>Yhteensä</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class="last">{formatMoney totalSum}</td>
     </tr>
 |]

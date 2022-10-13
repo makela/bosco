@@ -1,4 +1,8 @@
-module Web.Controller.Orders where
+module Web.Controller.Orders
+    ( fetchShowOrderContext
+    , isEmail'
+    , isPhone
+    ) where
 
 import qualified Network.URI.Encode as E
 import qualified Data.Map as Map
@@ -32,20 +36,8 @@ instance Controller OrdersController where
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
-        order <- fetch orderId >>= fetchRelated #customerId
-        let customer = order.customerId
-        xs <- query @OrderedProduct
-            |> filterWhere (#orderId, orderId)
-            |> fetch
-            >>= collectionFetchRelated #productId
-        -- TODO We should fix total price at ordering, because prices can change
-        let totalSum = countSum xs
-        let orderedProductsByProducer = groupOrderedProducts xs
-        xs <- query @Producer
-            |> filterWhereIn (#id, Map.keys orderedProductsByProducer)
-            |> orderBy #name
-            |> fetch
-        let producers = sortProducers xs
+        (order, totalSum, orderedProductsByProducer, producers) <-
+            fetchShowOrderContext orderId
         render ShowView { .. }
 
     action CreateOrderAction = do
@@ -139,3 +131,26 @@ isBosco x = x.name == "Bosco Falconeria"
 countSum xs = xs
     |> map (\x -> x.productId.price * x.quantity)
     |> sum
+
+fetchShowOrderContext :: (?modelContext :: ModelContext)
+                      => Id Order
+                      -> IO ( Include "customerId" Order
+                            , Int
+                            , OrderedProductsByProducer
+                            , [Producer]
+                            )
+fetchShowOrderContext orderId = do
+    order <- fetch orderId >>= fetchRelated #customerId
+    xs <- query @OrderedProduct
+        |> filterWhere (#orderId, orderId)
+        |> fetch
+        >>= collectionFetchRelated #productId
+    -- TODO We should fix total price at ordering, because prices can change
+    let totalSum = countSum xs
+    let orderedProductsByProducer = groupOrderedProducts xs
+    xs <- query @Producer
+        |> filterWhereIn (#id, Map.keys orderedProductsByProducer)
+        |> orderBy #name
+        |> fetch
+    let producers = sortProducers xs
+    return (order, totalSum, orderedProductsByProducer, producers)

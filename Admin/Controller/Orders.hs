@@ -3,13 +3,13 @@ module Admin.Controller.Orders where
 import Admin.Controller.Prelude
 import Admin.View.Orders.Index
 import Admin.View.Orders.Show
-import Web.Controller.Orders (countSum, groupOrderedProducts, sortProducers)
+import Web.Controller.Orders (fetchShowOrderContext)
 
 instance Controller OrdersController where
     beforeAction = ensureIsUser
 
     action OrdersAction = do
-        -- TODO filter to exclude handled orders
+        -- TODO exclude handled orders, separate Action/View?
         (ordersQ, pagination) <- query @Order
             |> orderByDesc #orderedAt
             |> paginate
@@ -17,17 +17,8 @@ instance Controller OrdersController where
         render IndexView { .. }
 
     action ShowOrderAction { orderId } = do
-        order <- fetch orderId >>= fetchRelated #customerId
-        xs <- query @Producer
-            |> orderBy #name
-            |> fetch
-        let producers = sortProducers xs
-        xs <- query @OrderedProduct
-            |> filterWhere (#orderId, order.id)
-            |> fetch
-            >>= collectionFetchRelated #productId
-        let totalSum = countSum xs
-        let orderedProductsByProducer = groupOrderedProducts xs
+        (order, totalSum, orderedProductsByProducer, producers) <-
+            fetchShowOrderContext orderId
         render ShowView { .. }
 
     action MarkPaidOrderAction { orderId } = do

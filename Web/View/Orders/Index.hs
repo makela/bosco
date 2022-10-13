@@ -12,7 +12,7 @@ instance View IndexView where
     html IndexView { .. } = [hsx|
         <h1>Bosco Falconeria {year}</h1>
         <p>{renderMarkdown $ maybe "" (get #text) message}</p>
-        <a href={pathTo NewOrderAction} class="btn">Täytä tilaus</a>
+        <a href={NewOrderAction} class="btn">Täytä tilaus</a>
     |]
 
 renderMarkdown text = case text |> MMark.parse "" of

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 .container {
-  @apply p-2 mx-auto w-full max-w-2xl;
+  @apply p-2 pb-8 mx-auto w-full max-w-2xl;
 }
 
 a {
@@ -15,7 +15,7 @@ thead {
 }
 
 h1 {
-  @apply text-3xl;
+  @apply pt-4 text-3xl;
 }
 
 h2 {
