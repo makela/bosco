@@ -39,7 +39,7 @@ instance Controller CustomersController where
                 Right customer -> do
                     customer <- customer |> updateRecord
                     setSuccessMessage "Customer updated"
-                    redirectTo EditCustomerAction { .. }
+                    redirectTo ShowCustomerAction { .. }
 
     action CreateCustomerAction = do
         let customer = newRecord @Customer
@@ -50,7 +50,7 @@ instance Controller CustomersController where
                 Right customer -> do
                     customer <- customer |> createRecord
                     setSuccessMessage "Customer created"
-                    redirectTo CustomersAction
+                    redirectTo $ ShowCustomerAction customer.id
 
     action DeleteCustomerAction { customerId } = do
         customer <- fetch customerId

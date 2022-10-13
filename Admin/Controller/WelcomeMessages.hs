@@ -35,7 +35,7 @@ instance Controller WelcomeMessagesController where
                 Right welcomeMessage -> do
                     welcomeMessage <- welcomeMessage |> updateRecord
                     setSuccessMessage "WelcomeMessage updated"
-                    redirectTo EditWelcomeMessageAction { .. }
+                    redirectTo ShowWelcomeMessageAction { .. }
 
     action CreateWelcomeMessageAction = do
         let welcomeMessage = newRecord @WelcomeMessage
@@ -46,7 +46,7 @@ instance Controller WelcomeMessagesController where
                 Right welcomeMessage -> do
                     welcomeMessage <- welcomeMessage |> createRecord
                     setSuccessMessage "WelcomeMessage created"
-                    redirectTo WelcomeMessagesAction
+                    redirectTo $ ShowWelcomeMessageAction welcomeMessage.id
 
     action DeleteWelcomeMessageAction { welcomeMessageId } = do
         welcomeMessage <- fetch welcomeMessageId

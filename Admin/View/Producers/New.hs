@@ -18,7 +18,7 @@ instance View NewView where
 renderForm :: Producer -> Html
 renderForm producer = formFor producer [hsx|
     {(textField #name) { required = True, autofocus = True }}
-    {(textField #subject) { required = True }}
+    {(textField #subject)}
     {(textareaField #description)}
     {submitButton}
 

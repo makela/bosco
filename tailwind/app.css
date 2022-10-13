@@ -61,7 +61,7 @@ form input[type=submit] {
 }
 
 fieldset {
-  @apply rounded border-2 my-4;
+  @apply rounded border-2 my-4 w-full;
 }
 
 a.back-button {

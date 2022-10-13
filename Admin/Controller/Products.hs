@@ -43,7 +43,7 @@ instance Controller ProductsController where
                 Right product -> do
                     product <- product |> updateRecord
                     setSuccessMessage "Product updated"
-                    redirectTo EditProductAction { .. }
+                    redirectTo ShowProductAction { .. }
 
     action CreateProductAction = do
         let product = newRecord @Product
@@ -56,7 +56,7 @@ instance Controller ProductsController where
                 Right product -> do
                     product <- product |> createRecord
                     setSuccessMessage "Product created"
-                    redirectTo ProductsAction
+                    redirectTo $ ShowProductAction product.id
 
     action DeleteProductAction { productId } = do
         product <- fetch productId

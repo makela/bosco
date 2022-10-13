@@ -37,7 +37,7 @@ instance Controller ProducersController where
                 Right producer -> do
                     producer <- producer |> updateRecord
                     setSuccessMessage "Producer updated"
-                    redirectTo EditProducerAction { .. }
+                    redirectTo ShowProducerAction { .. }
 
     action CreateProducerAction = do
         let producer = newRecord @Producer
@@ -48,7 +48,7 @@ instance Controller ProducersController where
                 Right producer -> do
                     producer <- producer |> createRecord
                     setSuccessMessage "Producer created"
-                    redirectTo ProducersAction
+                    redirectTo $ ShowProducerAction producer.id
 
     action DeleteProducerAction { producerId } = do
         producer <- fetch producerId

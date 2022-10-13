@@ -20,6 +20,7 @@ instance View ShowView where
             {renderTotalSum totalSum}
         </tbody>
         </table>
+        {paidOrCancelled}
 
     |]
         where
@@ -35,3 +36,7 @@ instance View ShowView where
                     ]
                 (_, _) -> baseBreadcrumbs
             breadcrumb = renderBreadcrumb breadcrumbs
+            paidOrCancelled = case (order.paidAt, order.cancelledAt) of
+                (Just paidAt, _) -> [hsx|<p class="font-bold">Paid {timeAgo paidAt}</p>|]
+                (_ , Just cancelledAt) -> [hsx|<p class="font-bold">Cancelled {timeAgo cancelledAt}</p>|]
+                (_, _) -> pure ()
