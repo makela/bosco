@@ -34,7 +34,9 @@ renderCustomerForm :: Customer -> Html
 renderCustomerForm customer = [hsx|
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_name">
         <label class="font-medium text-gray-700 " for="customer_name">Nimi</label>
-        <input type="text" name="name" placeholder="" id="customer_name" required="required" value={customer.name}>
+        <input type="text" name="name" placeholder="" id="customer_name" required="required" value={customer.name}
+               class={classes ["form-control", ("is-invalid", isInvalidName)]}>
+        {nameFeedback}
     </div>
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_email">
         <label class="font-medium text-gray-700 " for="customer_email">Sähköposti</label>
@@ -56,9 +58,13 @@ renderCustomerForm customer = [hsx|
     </div>
 |]
     where
+        isInvalidName = isJust (getValidationFailure #name customer)
         isInvalidEmail = isJust (getValidationFailure #email customer)
         isInvalidPhone = isJust (getValidationFailure #phone customer)
         isInvalidAddress = isJust (getValidationFailure #address customer)
+        nameFeedback = case getValidationFailure #name customer of
+            Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
+            Nothing -> mempty
         emailFeedback = case getValidationFailure #email customer of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
             Nothing -> mempty

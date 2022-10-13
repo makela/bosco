@@ -12,6 +12,7 @@ import Web.Controller.Prelude
 import Web.View.Orders.Index
 import Web.View.Orders.New
 import Web.View.Orders.Show
+import Web.View.Orders.NewEmail
 
 instance Controller OrdersController where
     action OrdersAction = do
@@ -91,11 +92,39 @@ instance Controller OrdersController where
         setSuccessMessage "Tilaus peruttu"
         redirectTo OrdersAction
 
+    action NewEmailAction = do
+        let customer = newRecord @Customer
+        render NewEmailView { .. }
+
+    action CreateEmailAction = do
+        let customer = newRecord @Customer
+        customer
+            |> buildEmail
+            |> ifValid \case
+                Left customer -> do
+                    render NewEmailView { .. }
+                Right customer -> do
+                    customer <- customer |> createRecord
+                    setSuccessMessage "Tiedot tallennettu"
+                    redirectTo OrdersAction
+
 buildCustomer customer = customer
     |> fill @["name","email","phone","address"]
+    |> validateField #name nonEmptyOrWhitespace
     |> validateField #email isEmail'
     |> validateField #phone isPhone
-    |> validateField #address nonEmpty
+    |> validateField #address nonEmptyOrWhitespace
+
+buildEmail customer = customer
+    |> fill @["name","email"]
+    |> validateField #name nonEmptyOrWhitespace
+    |> validateField #email isEmail'
+
+nonEmptyOrWhitespace :: Text -> ValidatorResult
+nonEmptyOrWhitespace text = case nonEmpty $ T.strip text of
+    Success -> Success
+    Failure _ -> Failure "Tämä kenttä vaaditaan"
+    FailureHtml x -> FailureHtml x
 
 isEmail' :: Text -> ValidatorResult
 isEmail' text = case isEmail text of

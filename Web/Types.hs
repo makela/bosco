@@ -12,4 +12,6 @@ data OrdersController
     | ShowOrderAction { orderId :: !(Id Order) }
     | CreateOrderAction
     | CancelOrderAction { orderId :: !(Id Order) }
+    | NewEmailAction
+    | CreateEmailAction
     deriving (Eq, Show, Data)
