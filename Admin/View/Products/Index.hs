@@ -1,5 +1,6 @@
 module Admin.View.Products.Index where
 import Admin.View.Prelude
+import Web.View.Orders.New (formatMoney)
 
 data IndexView = IndexView
     { products :: [Include "producerId" Product] , pagination :: Pagination }
@@ -8,18 +9,14 @@ instance View IndexView where
     html IndexView { .. } = [hsx|
         {breadcrumb}
 
-        <a href={pathTo NewProductAction}>+ New</a>
         <div class="table-responsive">
-            <table class="table">
+            <table class="table whitespace-nowrap">
                 <thead>
                     <tr>
                         <th>Name</th>
                         <th>Package</th>
                         <th>Price</th>
                         <th>Producer</th>
-                        <th></th>
-                        <th></th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>{forEach products renderProduct}</tbody>
@@ -29,18 +26,17 @@ instance View IndexView where
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Products" ProductsAction
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbText "Products"
+                , breadcrumbLink "New" NewProductAction
                 ]
 
 renderProduct :: Include "producerId" Product -> Html
 renderProduct product = [hsx|
     <tr>
-        <td>{get #name product}</td>
-        <td>{get #package product}</td>
-        <td>{get #price product}</td>
-        <td>{get #producerId product |> get #name}</td>
-        <td><a href={ShowProductAction (get #id product)}>Show</a></td>
-        <td><a href={EditProductAction (get #id product)} class="text-muted">Edit</a></td>
-        <td><a href={DeleteProductAction (get #id product)} class="js-delete text-muted">Delete</a></td>
+        <td><a href={ShowProductAction product.id}>{product.name}</a></td>
+        <td>{product.package}</td>
+        <td>{formatMoney product.price}</td>
+        <td>{product.producerId.name}</td>
     </tr>
 |]

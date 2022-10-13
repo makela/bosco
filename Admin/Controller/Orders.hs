@@ -3,6 +3,7 @@ module Admin.Controller.Orders where
 import Admin.Controller.Prelude
 import Admin.View.Orders.Index
 import Admin.View.Orders.Show
+import Web.Controller.Orders (countSum, groupOrderedProducts, sortProducers)
 
 instance Controller OrdersController where
     beforeAction = ensureIsUser
@@ -16,16 +17,17 @@ instance Controller OrdersController where
         render IndexView { .. }
 
     action ShowOrderAction { orderId } = do
-        -- TODO should unify with Web.Orders.ShowOrderAction
         order <- fetch orderId >>= fetchRelated #customerId
+        xs <- query @Producer
+            |> orderBy #name
+            |> fetch
+        let producers = sortProducers xs
         xs <- query @OrderedProduct
             |> filterWhere (#orderId, order.id)
             |> fetch
             >>= collectionFetchRelated #productId
-        let totalSum = xs
-                |> map (\x -> x.productId.price * x.quantity)
-                |> sum
-        let orderedProducts = sortOn (\x -> x.productId.name) xs
+        let totalSum = countSum xs
+        let orderedProductsByProducer = groupOrderedProducts xs
         render ShowView { .. }
 
     action MarkPaidOrderAction { orderId } = do

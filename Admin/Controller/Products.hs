@@ -24,7 +24,7 @@ instance Controller ProductsController where
         render NewView { .. }
 
     action ShowProductAction { productId } = do
-        product <- fetch productId
+        product <- fetch productId >>= fetchRelated #producerId
         render ShowView { .. }
 
     action EditProductAction { productId } = do

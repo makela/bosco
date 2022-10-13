@@ -22,7 +22,6 @@ defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
 </head>
 <body>
     <div class="container">
-        <a href={WelcomeAction}>Home</a>
         {renderFlashMessages}
         {inner}
     </div>

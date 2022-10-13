@@ -10,6 +10,6 @@ instance View WelcomeView where
             <li><a href={CustomersAction}>Customers</a></li>
             <li><a href={ProducersAction}>Producers</a></li>
             <li><a href={ProductsAction}>Products</a></li>
-            <li><a href={WelcomeMessagesAction}>Welcome messages</a></li>
+            <li><a href={WelcomeMessagesAction}>Welcome Messages</a></li>
         </ul>
 |]

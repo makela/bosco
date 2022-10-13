@@ -25,6 +25,9 @@ instance View ShowView where
             <tr class="font-bold">
                 <td>Yhteensä</td>
                 <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
                 <td class="last">{formatMoney totalSum}</td>
             </tr>
         </tbody>
@@ -48,19 +51,16 @@ instance View ShowView where
             Voit myös <a href="#" onclick="window.print(); return false">tulostaa</a> laskun maksaaksesi sen myöhemmin.
         </p>
     |]
-        where cancelAction = pathTo CancelOrderAction { orderId }
+        where cancelAction = pathTo CancelOrderAction { .. }
 
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|
-    <p>
-          {customer.name}
-          <br/>
-          {customer.email}
-          <br/>
-          {customer.phone}
-          <br/>
-          {customer.address}
-    </p>
+    <div class="flex">
+      <p>{customer.name}</p>
+      <p>{customer.email}</p>
+      <p>{customer.phone}</p>
+      <p>{customer.address}</p>
+    </div>
 |]
 
 renderProducer :: OrderedProductsByProducer -> Producer -> Html
@@ -68,7 +68,7 @@ renderProducer orderedProductsByProducer producer =
     case Map.lookup producer.id orderedProductsByProducer of
         Nothing -> pure ()
         Just orderedProducts -> [hsx|
-                <tr><td colspan="3" class="font-bold">{producer.name}</td></tr>
+                <tr><td colspan="4" class="font-bold">{producer.name}</td></tr>
                 {forEach orderedProducts renderOrderedProduct}
             |]
 
@@ -76,7 +76,10 @@ renderOrderedProduct :: Include "productId" OrderedProduct -> Html
 renderOrderedProduct orderedProduct = [hsx|
     <tr>
         <td>{orderedProduct.productId.name} ({orderedProduct.productId.package})</td>
-        <td>{orderedProduct.quantity} * {formatMoney orderedProduct.productId.price}</td>
-        <td class="last">= {formatMoney (orderedProduct.productId.price * orderedProduct.quantity)}</td>
+        <td>{orderedProduct.quantity}</td>
+        <td>*</td>
+        <td>{formatMoney orderedProduct.productId.price}</td>
+        <td>=</td>
+        <td class="last">{formatMoney (orderedProduct.productId.price * orderedProduct.quantity)}</td>
     </tr>
 |]

@@ -1,54 +1,44 @@
 module Admin.View.Orders.Show where
 import Admin.View.Prelude
 import Web.View.Orders.New (formatMoney)
+import Web.View.Orders.Show (renderCustomer, OrderedProductsByProducer, renderProducer)
 
 data ShowView = ShowView
     { order :: Include "customerId" Order
-    , orderedProducts :: [Include "productId" OrderedProduct]
+    , producers :: [Producer]
+    , orderedProductsByProducer :: OrderedProductsByProducer
     , totalSum :: Int
     }
 
 instance View ShowView where
     html ShowView { .. } = [hsx|
         {breadcrumb}
-        <h1>{order.customerId.name}</h1>
-        <p>{order.customerId.email}</p>
-        <p>{order.customerId.phone}</p>
-
+        {renderCustomer order.customerId}
         <table>
         <tbody>
-            {forEach orderedProducts renderProduct}
+            {forEach producers (renderProducer orderedProductsByProducer)}
             <tr class="font-bold">
                 <td>Yhteensä</td>
+                <td></td>
+                <td></td>
+                <td></td>
                 <td></td>
                 <td class="last">{formatMoney totalSum}</td>
             </tr>
         </tbody>
         </table>
 
-        {renderActionButtons order}
-
     |]
         where
-            breadcrumb = renderBreadcrumb
-                            [ breadcrumbLink "Orders" OrdersAction
-                            , breadcrumbText "Show Order"
-                            ]
-
-renderProduct :: Include "productId" OrderedProduct -> Html
-renderProduct product = [hsx|
-    <tr>
-        <td>{product.productId.name}</td>
-        <td>{product.quantity} * {formatMoney product.productId.price}</td>
-        <td class="last">= {formatMoney (product.quantity * product.productId.price)}</td>
-    </tr>
-|]
-
-renderActionButtons :: Include "customerId" Order -> Html
-renderActionButtons order =
-    case (order.cancelledAt, order.paidAt) of
-        (Nothing, Nothing) -> [hsx|
-            <a href={CancelOrderAction order.id} class="back-button">Peruuta tilaus</a>
-            <a href={MarkPaidOrderAction order.id} class="float-right">Merkitse maksetuksi</a>
-        |]
-        _ -> pure ()
+            baseBreadcrumbs =
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbLink "Orders" OrdersAction
+                , breadcrumbText (timeAgo order.orderedAt)
+                ]
+            breadcrumbs = case (order.cancelledAt, order.paidAt) of
+                (Nothing, Nothing) -> baseBreadcrumbs ++
+                    [ breadcrumbLink "Mark Paid" (MarkPaidOrderAction order.id)
+                    , breadcrumbLink "Cancel" (CancelOrderAction order.id)
+                    ]
+                (_, _) -> baseBreadcrumbs
+            breadcrumb = renderBreadcrumb breadcrumbs

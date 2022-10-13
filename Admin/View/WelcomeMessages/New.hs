@@ -6,13 +6,13 @@ data NewView = NewView { welcomeMessage :: WelcomeMessage }
 instance View NewView where
     html NewView { .. } = [hsx|
         {breadcrumb}
-        <h1>New WelcomeMessage</h1>
         {renderForm welcomeMessage}
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "WelcomeMessages" WelcomeMessagesAction
-                , breadcrumbText "New WelcomeMessage"
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbLink "Welcome Messages" WelcomeMessagesAction
+                , breadcrumbText "New"
                 ]
 
 renderForm :: WelcomeMessage -> Html

@@ -7,15 +7,11 @@ instance View IndexView where
     html IndexView { .. } = [hsx|
         {breadcrumb}
 
-        <a href={pathTo NewWelcomeMessageAction}>+ New</a>
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Message</th>
                         <th>Published</th>
-                        <th></th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>{forEach welcomeMessages renderWelcomeMessage}</tbody>
@@ -25,16 +21,14 @@ instance View IndexView where
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "WelcomeMessages" WelcomeMessagesAction
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbText "Welcome Messages"
+                , breadcrumbLink "New" NewWelcomeMessageAction
                 ]
 
 renderWelcomeMessage :: WelcomeMessage -> Html
 renderWelcomeMessage welcomeMessage = [hsx|
     <tr>
-        <td>{welcomeMessage.text}</td>
-        <td>{timeAgo welcomeMessage.publishedAt}</td>
-        <td><a href={ShowWelcomeMessageAction welcomeMessage.id}>Show</a></td>
-        <td><a href={EditWelcomeMessageAction welcomeMessage.id} class="text-muted">Edit</a></td>
-        <td><a href={DeleteWelcomeMessageAction welcomeMessage.id} class="js-delete text-muted">Delete</a></td>
+        <td><a href={ShowWelcomeMessageAction welcomeMessage.id}>{timeAgo welcomeMessage.publishedAt}</a></td>
     </tr>
 |]

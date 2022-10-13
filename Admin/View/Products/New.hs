@@ -9,13 +9,13 @@ data NewView = NewView
 instance View NewView where
     html NewView { .. } = [hsx|
         {breadcrumb}
-        <h1>New Product</h1>
         {renderForm producers product}
     |]
         where
-            breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Products" ProductsAction
-                , breadcrumbText "New Product"
+             breadcrumb = renderBreadcrumb
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbLink "Products" ProductsAction
+                , breadcrumbText "New"
                 ]
 
 instance CanSelect Producer where

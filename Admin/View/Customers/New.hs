@@ -6,13 +6,13 @@ data NewView = NewView { customer :: Customer }
 instance View NewView where
     html NewView { .. } = [hsx|
         {breadcrumb}
-        <h1>New Customer</h1>
         {renderForm customer}
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Customers" CustomersAction
-                , breadcrumbText "New Customer"
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbLink "Customers" CustomersAction
+                , breadcrumbText "New"
                 ]
 
 renderForm :: Customer -> Html

@@ -7,11 +7,13 @@ data EditView = EditView { producer :: Producer }
 instance View EditView where
     html EditView { .. } = [hsx|
         {breadcrumb}
-        <h1>Edit Producer</h1>
         {renderForm producer}
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Producers" ProducersAction
-                , breadcrumbText "Edit Producer"
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbLink "Producers" ProducersAction
+                , breadcrumbLink [hsx|{producer.name}|] (ShowProducerAction producer.id)
+                , breadcrumbText "Edit"
+                , breadcrumbLink [hsx|<a href={DeleteProducerAction producer.id} class="js-delete back-button">Delete</a>|] (DeleteProducerAction producer.id)
                 ]

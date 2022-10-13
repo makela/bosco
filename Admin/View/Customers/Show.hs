@@ -6,12 +6,13 @@ data ShowView = ShowView { customer :: Customer }
 instance View ShowView where
     html ShowView { .. } = [hsx|
         {breadcrumb}
-        <h1>Show Customer</h1>
         <p>{customer}</p>
 
     |]
         where
             breadcrumb = renderBreadcrumb
-                            [ breadcrumbLink "Customers" CustomersAction
-                            , breadcrumbText "Show Customer"
-                            ]
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbLink "Customers" CustomersAction
+                , breadcrumbText [hsx|{customer.name}|]
+                , breadcrumbLink "Edit" (EditCustomerAction customer.id)
+                ]

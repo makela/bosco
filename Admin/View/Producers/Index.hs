@@ -7,16 +7,11 @@ instance View IndexView where
     html IndexView { .. } = [hsx|
         {breadcrumb}
 
-        <a href={pathTo NewProducerAction}>+ New</a>
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Produces</th>
-                        <th></th>
-                        <th></th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>{forEach producers renderProducer}</tbody>
@@ -26,16 +21,14 @@ instance View IndexView where
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Producers" ProducersAction
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbText "Producers"
+                , breadcrumbLink "New" NewProducerAction
                 ]
 
 renderProducer :: Producer -> Html
 renderProducer producer = [hsx|
     <tr>
-        <td>{get #name producer}</td>
-        <td>{get #subject producer}</td>
-        <td><a href={ShowProducerAction (get #id producer)}>Show</a></td>
-        <td><a href={EditProducerAction (get #id producer)} class="text-muted">Edit</a></td>
-        <td><a href={DeleteProducerAction (get #id producer)} class="js-delete text-muted">Delete</a></td>
+        <td><a href={ShowProducerAction producer.id}>{producer.name}</a></td>
     </tr>
 |]

@@ -7,11 +7,13 @@ data EditView = EditView { welcomeMessage :: WelcomeMessage }
 instance View EditView where
     html EditView { .. } = [hsx|
         {breadcrumb}
-        <h1>Edit WelcomeMessage</h1>
         {renderForm welcomeMessage}
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "WelcomeMessages" WelcomeMessagesAction
-                , breadcrumbText "Edit WelcomeMessage"
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbLink "Welcome Messages" WelcomeMessagesAction
+                , breadcrumbLink (timeAgo welcomeMessage.publishedAt) (ShowWelcomeMessageAction welcomeMessage.id)
+                , breadcrumbText "Edit"
+                , breadcrumbLink [hsx|<a href={DeleteWelcomeMessageAction welcomeMessage.id} class="js-delete back-button">Delete</a>|] (DeleteWelcomeMessageAction welcomeMessage.id)
                 ]

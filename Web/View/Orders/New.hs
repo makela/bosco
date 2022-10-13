@@ -104,4 +104,3 @@ formatMoney amount =
         |> T.pack
         |> T.replace "." ","
         |> T.replace ",00" ""
-        -- |> map (\c -> if c == '.' then ',' else c)

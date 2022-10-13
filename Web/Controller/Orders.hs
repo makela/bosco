@@ -32,21 +32,20 @@ instance Controller OrdersController where
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
-        order <- fetch orderId
-        customer <- fetch order.customerId
-        xs <- query @Producer
-            |> orderBy #name
-            |> fetch
-        let producers = sortProducers xs
+        order <- fetch orderId >>= fetchRelated #customerId
+        let customer = order.customerId
         xs <- query @OrderedProduct
             |> filterWhere (#orderId, orderId)
             |> fetch
             >>= collectionFetchRelated #productId
         -- TODO We should fix total price at ordering, because prices can change
-        let totalSum = xs
-                |> map (\x -> x.productId.price * x.quantity)
-                |> sum
+        let totalSum = countSum xs
         let orderedProductsByProducer = groupOrderedProducts xs
+        xs <- query @Producer
+            |> filterWhereIn (#id, Map.keys orderedProductsByProducer)
+            |> orderBy #name
+            |> fetch
+        let producers = sortProducers xs
         render ShowView { .. }
 
     action CreateOrderAction = do
@@ -136,3 +135,7 @@ sortProducers xs = filter isBosco xs ++ filter (not . isBosco) xs
 
 isBosco :: Producer -> Bool
 isBosco x = x.name == "Bosco Falconeria"
+
+countSum xs = xs
+    |> map (\x -> x.productId.price * x.quantity)
+    |> sum

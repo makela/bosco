@@ -14,8 +14,8 @@ instance View IndexView where
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Order</th>
                         <th>Ordered At</th>
+                        <th>Customer</th>
                         <th>Paid At</th>
                         <th>Cancelled At</th>
                         <th></th>
@@ -28,16 +28,17 @@ instance View IndexView where
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Orders" OrdersAction
+                [ breadcrumbLink "Home" WelcomeAction
+                , breadcrumbText "Orders"
                 ]
 
 renderOrder :: Include "customerId" Order -> Html
 renderOrder order = [hsx|
     <tr>
+        <td><a href={ShowOrderAction order.id}>{timeAgo order.orderedAt}</a></td>
         <td>{order.customerId.name}</td>
-        <td>{timeAgo order.orderedAt}</td>
         <td>{fmap timeAgo order.paidAt}</td>
         <td>{fmap timeAgo order.cancelledAt}</td>
-        <td><a href={ShowOrderAction order.id}>Show</a></td>
+        <td></td>
     </tr>
 |]
