@@ -52,6 +52,10 @@ input[type=text], input[type=email], input[type=password] {
   @apply focus:ring-blue-500 focus:border-blue-500 block w-full border-gray-300 rounded-md;
 }
 
+textarea {
+  @apply h-48;
+}
+
 form {
   @apply w-full;
 }
