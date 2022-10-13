@@ -10,7 +10,6 @@ data IndexView = IndexView
 
 instance View IndexView where
     html IndexView { .. } = [hsx|
-        <h1>Bosco Falconeria {year}</h1>
         <p>{renderMarkdown $ maybe "" (get #text) message}</p>
         <a href={NewOrderAction} class="btn">Täytä tilaus</a>
         <a href={NewEmailAction}>Tilaa uutiskirje</a>
