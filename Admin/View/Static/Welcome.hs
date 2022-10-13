@@ -5,11 +5,12 @@ data WelcomeView = WelcomeView
 
 instance View WelcomeView where
     html WelcomeView = [hsx|
-        <ul class="my-4">
+        <a class="js-delete js-delete-no-confirm back-button float-right p-2" href={DeleteSessionAction}>Logout</a>
+        <ol class="my-4">
             <li><a href={OrdersAction}>Orders</a></li>
             <li><a href={CustomersAction}>Customers</a></li>
             <li><a href={ProducersAction}>Producers</a></li>
             <li><a href={ProductsAction}>Products</a></li>
             <li><a href={WelcomeMessagesAction}>Welcome Messages</a></li>
-        </ul>
+        </ol>
 |]

@@ -44,11 +44,11 @@ input[type=number] {
   @apply w-24 h-8 border-gray-300 rounded-md;
 }
 
-input[type=submit], a.btn {
+input[type=submit], a.btn, button.btn {
   @apply rounded m-8 px-4 py-2 bg-blue-500 text-white cursor-pointer;
 }
 
-input[type=text] {
+input[type=text], input[type=email], input[type=password] {
   @apply focus:ring-blue-500 focus:border-blue-500 block w-full border-gray-300 rounded-md;
 }
 
@@ -56,8 +56,8 @@ form {
   @apply w-full;
 }
 
-form input[type=submit] {
-  @apply float-right mr-4 my-8 ;
+form input[type=submit], form button[type=submit] {
+  @apply float-right mr-4 my-8;
 }
 
 fieldset {
