@@ -134,9 +134,16 @@ isEmail' text = case isEmail text of
     FailureHtml x -> FailureHtml x
 
 isPhone :: Text -> ValidatorResult
-isPhone text | ("+" `isPrefixOf` text) && (T.length text) == 13 = Success
-isPhone text | ("0" `isPrefixOf` text) && (T.length text) == 10 = Success
-isPhone text = Failure "Puhelinnumero on virheellinen"
+isPhone text
+    | ("+" `isPrefixOf` text) && l > 9 && l < 14 && onlyNumbers = Success
+    -- allow country code even without missing +
+    | ("3" `isPrefixOf` text) && l > 8 && l < 13 && onlyNumbers = Success
+    | ("0" `isPrefixOf` text) && l > 6 && l < 11 && onlyNumbers = Success
+    | otherwise = Failure "Puhelinnumero on virheellinen"
+    where
+        l = T.length $ T.filter ((/=) ' ') text
+        validChars = "+0123456789 " :: String
+        onlyNumbers = T.all (\x -> x `elem` validChars) text
 
 buildOrder order = order
     |> fill @'["customerId"]
