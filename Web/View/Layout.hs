@@ -34,13 +34,18 @@ defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
 -- See https://ihp.digitallyinduced.com/Guide/assets.html for more details
 
 stylesheets :: Html
-stylesheets = [hsx|
+stylesheets = do
+    when isDevelopment [hsx|
         <link rel="stylesheet" href={assetPath "/app.css"}/>
+    |]
+    when isProduction [hsx|
+        <link rel="stylesheet" href={assetPath "/prod.css"}/>
     |]
 
 scripts :: Html
-scripts = [hsx|
-        {when isDevelopment devScripts}
+scripts = do
+    when isDevelopment [hsx|
+        <script id="livereload-script" src={assetPath "/livereload.js"} data-ws={liveReloadWebsocketUrl}></script>
         <script src={assetPath "/vendor/morphdom-umd.min.js"}></script>
         <script src={assetPath "/vendor/turbolinks.js"}></script>
         <script src={assetPath "/vendor/turbolinksInstantClick.js"}></script>
@@ -48,10 +53,8 @@ scripts = [hsx|
         <script src={assetPath "/helpers.js"}></script>
         <script src={assetPath "/app.js"}></script>
     |]
-
-devScripts :: Html
-devScripts = [hsx|
-        <script id="livereload-script" src={assetPath "/livereload.js"} data-ws={liveReloadWebsocketUrl}></script>
+    when isProduction [hsx|
+        <script src={assetPath "/prod.js"}></script>
     |]
 
 metaTags :: Html
