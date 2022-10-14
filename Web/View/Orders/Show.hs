@@ -17,7 +17,6 @@ data ShowView = ShowView
 instance View ShowView where
     html ShowView { .. } = [hsx|
         <h1>Lasku</h1>
-        {cancelOption}
         {renderCustomer order.customerId}
         <table class="whitespace-nowrap">
         <tbody>
@@ -25,24 +24,25 @@ instance View ShowView where
             {renderTotalSum totalSum}
         </tbody>
         </table>
-        <h2>Maksuohjeet</h2>
-        <p>REMOVED-ACCOUNT-HOLDER</p>
-        <p>IBAN REMOVED-IBAN</p>
-        <p>BIC REMOVED-BIC (last digit is a zero)</p>
-        <p>via Vittorio Emanuele II 15/17 91011 Alcamo TP,  ITALIA</p>
-        <p>
-            Voit myös
-            <a href="#" onclick="window.print(); return false">tulostaa</a>
-            laskun maksaaksesi sen myöhemmin.
-        </p>
+        {paymentInstructions}
     |]
         where
-            cancelOption = case (order.paidAt, order.cancelledAt) of
+            paymentInstructions = case (order.paidAt, order.cancelledAt) of
                 (Nothing, Nothing) -> [hsx|
                         <p>
                             Mikäli huomaat laskussa virheen, voit vielä
                             <a href={CancelOrderAction order.id} class="back-button">perua</a>
                             sen.
+                        </p>
+                        <h2>Maksuohjeet</h2>
+                        <p>REMOVED-ACCOUNT-HOLDER</p>
+                        <p>IBAN REMOVED-IBAN</p>
+                        <p>BIC REMOVED-BIC (last digit is a zero)</p>
+                        <p>via Vittorio Emanuele II 15/17 91011 Alcamo TP,  ITALIA</p>
+                        <p>
+                            Voit myös
+                            <a href="#" onclick="window.print(); return false">tulostaa</a>
+                            laskun maksaaksesi sen myöhemmin.
                         </p>
                     |]
                 (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
