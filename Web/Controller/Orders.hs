@@ -30,6 +30,7 @@ instance Controller OrdersController where
         let producers = sortProducers xs
         products <- query @Product
             |> orderByDesc #name
+            |> orderBy #package
             |> fetch
         let orders = mempty
         let productsByProducers = groupProducts products
@@ -82,7 +83,7 @@ instance Controller OrdersController where
                                                   |> set #productId pid
                                                   |> set #quantity count)
                                 forM_ orders createRecord
-                                setSuccessMessage "Tilaus tallennettu"
+                                -- setSuccessMessage "Tilaus tallennettu"
                                 redirectTo ShowOrderAction { orderId = order.id }
 
     action CancelOrderAction { orderId } = do
