@@ -12,5 +12,6 @@ instance View WelcomeView where
             <li><a href={ProducersAction}>Producers</a></li>
             <li><a href={ProductsAction}>Products</a></li>
             <li><a href={WelcomeMessagesAction}>Welcome Messages</a></li>
+            <li><a href={EmailsAction}>Emails for news letter</a></li>
         </ol>
 |]

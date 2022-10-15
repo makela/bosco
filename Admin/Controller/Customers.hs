@@ -5,6 +5,7 @@ import Admin.View.Customers.Index
 import Admin.View.Customers.New
 import Admin.View.Customers.Edit
 import Admin.View.Customers.Show
+import Admin.View.Customers.Email
 
 import Web.Controller.Orders (isEmail', isPhone)
 
@@ -57,6 +58,13 @@ instance Controller CustomersController where
         deleteRecord customer
         setSuccessMessage "Customer deleted"
         redirectTo CustomersAction
+
+    action EmailsAction = do
+        customers <- query @Customer
+            |> distinctOn #email
+            |> fetch
+        let emails = map (\x -> x.email) customers
+        render EmailView { .. }
 
 buildCustomer customer = customer
     |> fill @["name","email","phone","address"]
