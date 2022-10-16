@@ -11,3 +11,6 @@ instance AutoRoute ProductsController
 instance AutoRoute CustomersController
 instance AutoRoute OrdersController
 instance AutoRoute WelcomeMessagesController
+
+instance AutoRoute PaymentInstructionsController
+

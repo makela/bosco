@@ -1,5 +1,6 @@
 module Web.View.Orders.Show where
 import Web.View.Prelude
+import Web.View.Orders.Index (renderMarkdown)
 
 import qualified Data.Map as Map
 
@@ -12,6 +13,7 @@ data ShowView = ShowView
     , producers :: [Producer]
     , orderedProductsByProducer :: OrderedProductsByProducer
     , totalSum :: Int
+    , paymentInstruction :: Maybe PaymentInstruction
     }
 
 instance View ShowView where
@@ -24,29 +26,29 @@ instance View ShowView where
             {renderTotalSum totalSum}
         </tbody>
         </table>
-        {paymentInstructions}
+        {renderPaymentInstruction order paymentInstruction}
     |]
-        where
-            paymentInstructions = case (order.paidAt, order.cancelledAt) of
-                (Nothing, Nothing) -> [hsx|
-                        <p>
-                            Mikäli huomaat laskussa virheen, voit vielä
-                            <a href={CancelOrderAction order.id} class="back-button">perua</a>
-                            sen.
-                        </p>
-                        <h2>Maksuohjeet</h2>
-                        <p>REMOVED-ACCOUNT-HOLDER</p>
-                        <p>IBAN REMOVED-IBAN</p>
-                        <p>BIC REMOVED-BIC (last digit is a zero)</p>
-                        <p>via Vittorio Emanuele II 15/17 91011 Alcamo TP,  ITALIA</p>
-                        <p>
-                            Voit myös
-                            <a href="#" onclick="window.print(); return false">tulostaa</a>
-                            laskun maksaaksesi sen myöhemmin.
-                        </p>
-                    |]
-                (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
-                (Just _, _) -> [hsx|<p class="font-bold">Lasku on maksettu.</p>|]
+
+renderPaymentInstruction :: Include "customerId" Order -> Maybe PaymentInstruction -> Html
+renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.cancelledAt) of
+    (Nothing, Nothing) -> [hsx|
+            <p>
+                Mikäli huomaat laskussa virheen, voit vielä
+                <a href={CancelOrderAction order.id} class="back-button">perua</a>
+                sen.
+            </p>
+            <h2>Maksuohjeet</h2>
+            {instructions}
+            <p>
+                Voit myös
+                <a href="#" onclick="window.print(); return false">tulostaa</a>
+                laskun maksaaksesi sen myöhemmin.
+            </p>
+        |]
+    (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
+    (Just _, _) -> [hsx|<p class="font-bold">Lasku on maksettu.</p>|]
+
+    where instructions = fmap (\x -> renderMarkdown x.text) paymentInstruction
 
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|

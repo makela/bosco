@@ -6,6 +6,7 @@ import Admin.Controller.Prelude
 import Admin.View.Layout (defaultLayout)
 
 -- Controller Imports
+import Admin.Controller.PaymentInstructions
 import Admin.Controller.Orders
 import Admin.Controller.Sessions
 import Admin.Controller.WelcomeMessages
@@ -19,6 +20,7 @@ instance FrontController AdminApplication where
         [ startPage WelcomeAction
         , parseRoute @SessionsController
         -- Generator Marker
+        , parseRoute @PaymentInstructionsController
         , parseRoute @OrdersController
         , parseRoute @WelcomeMessagesController
         , parseRoute @CustomersController

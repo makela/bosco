@@ -9,9 +9,10 @@ instance View WelcomeView where
         <ol class="my-4">
             <li><a href={OrdersAction}>Orders</a></li>
             <li><a href={CustomersAction}>Customers</a></li>
+            <li><a href={EmailsAction}>Emails for news letter</a></li>
             <li><a href={ProducersAction}>Producers</a></li>
             <li><a href={ProductsAction}>Products</a></li>
             <li><a href={WelcomeMessagesAction}>Welcome Messages</a></li>
-            <li><a href={EmailsAction}>Emails for news letter</a></li>
+            <li><a href={PaymentInstructionsAction}>Payment Instructions</a></li>
         </ol>
 |]

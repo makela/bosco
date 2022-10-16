@@ -68,3 +68,13 @@ data WelcomeMessagesController
     | UpdateWelcomeMessageAction { welcomeMessageId :: !(Id WelcomeMessage) }
     | DeleteWelcomeMessageAction { welcomeMessageId :: !(Id WelcomeMessage) }
     deriving (Eq, Show, Data)
+
+data PaymentInstructionsController
+    = PaymentInstructionsAction
+    | NewPaymentInstructionAction
+    | ShowPaymentInstructionAction { paymentInstructionId :: !(Id PaymentInstruction) }
+    | CreatePaymentInstructionAction
+    | EditPaymentInstructionAction { paymentInstructionId :: !(Id PaymentInstruction) }
+    | UpdatePaymentInstructionAction { paymentInstructionId :: !(Id PaymentInstruction) }
+    | DeletePaymentInstructionAction { paymentInstructionId :: !(Id PaymentInstruction) }
+    deriving (Eq, Show, Data)
