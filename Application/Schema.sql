@@ -18,7 +18,8 @@ CREATE TABLE products (
     name TEXT NOT NULL,
     description TEXT NOT NULL,
     package TEXT NOT NULL,
-    price INT NOT NULL
+    price INT NOT NULL,
+    ordering INT DEFAULT NULL
 );
 CREATE TABLE customers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,

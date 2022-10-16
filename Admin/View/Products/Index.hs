@@ -13,10 +13,10 @@ instance View IndexView where
             <table class="table whitespace-nowrap">
                 <thead>
                     <tr>
+                        <th>Producer</th>
                         <th>Name</th>
                         <th>Package</th>
                         <th>Price</th>
-                        <th>Producer</th>
                     </tr>
                 </thead>
                 <tbody>{forEach products renderProduct}</tbody>
@@ -34,9 +34,9 @@ instance View IndexView where
 renderProduct :: Include "producerId" Product -> Html
 renderProduct product = [hsx|
     <tr>
+        <td>{product.producerId.name}</td>
         <td><a href={ShowProductAction product.id}>{product.name}</a></td>
         <td>{product.package}</td>
         <td>{formatMoney product.price}</td>
-        <td>{product.producerId.name}</td>
     </tr>
 |]

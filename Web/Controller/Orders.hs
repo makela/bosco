@@ -28,10 +28,7 @@ instance Controller OrdersController where
             |> orderBy #name
             |> fetch
         let producers = sortProducers xs
-        products <- query @Product
-            |> orderByDesc #name
-            |> orderBy #package
-            |> fetch
+        products <- fetchProducts
         let orders = mempty
         let productsByProducers = groupProducts products
         let customer = newRecord @Customer
@@ -46,9 +43,7 @@ instance Controller OrdersController where
         producers <- query @Producer
             |> orderBy #name
             |> fetch
-        products <- query @Product
-            |> orderByDesc #name
-            |> fetch
+        products <- fetchProducts
         let params = products
                 |> map (\x -> (x.id, paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)))
                 |> filter (\(_, i) -> i > 0)
@@ -148,6 +143,14 @@ isPhone text
 buildOrder order = order
     |> fill @'["customerId"]
     -- TODO validate the order, empty orders are worth of nothing
+
+fetchProducts :: (?modelContext :: ModelContext) =>IO [Product]
+fetchProducts = do
+    products <- query @Product
+        |> orderByDesc #ordering
+        |> orderByDesc #name
+        |> fetch
+    return products
 
 groupProducts :: [Product] -> ProductsByProducers
 groupProducts products = go products mempty

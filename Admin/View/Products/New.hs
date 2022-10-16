@@ -26,6 +26,7 @@ instance CanSelect Producer where
 renderForm :: [Producer] -> Product -> Html
 renderForm producers product = formFor product [hsx|
     {(selectField #producerId producers) { required = True, autofocus = True }}
+    {(numberField #ordering)}
     {(textField #name) { required = True }}
     {(textareaField #description)}
     {(textField #package) { required = True }}

@@ -12,10 +12,12 @@ instance Controller ProductsController where
     action ProductsAction = do
         (productsQ, pagination) <- query @Product
             |> paginate
-        products <- productsQ
+        xs <- productsQ
+            |> orderBy #ordering
             |> orderBy #name
             |> fetch
             >>= collectionFetchRelated #producerId
+        let products = sortOn (\x -> x.producerId.name) xs
         render IndexView { .. }
 
     action NewProductAction = do
@@ -65,4 +67,4 @@ instance Controller ProductsController where
         redirectTo ProductsAction
 
 buildProduct product = product
-    |> fill @["producerId","name","description","package","price"]
+    |> fill @["producerId","name","description","package","price","ordering"]
