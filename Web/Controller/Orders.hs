@@ -79,7 +79,7 @@ instance Controller OrdersController where
                                                   |> set #productId pid
                                                   |> set #quantity count)
                                 forM_ orders createRecord
-                                -- setSuccessMessage "Tilaus tallennettu"
+                                setSuccessMessage "Tilaus lähetetty"
                                 redirectTo ShowOrderAction { orderId = order.id }
 
     action CancelOrderAction { orderId } = do
