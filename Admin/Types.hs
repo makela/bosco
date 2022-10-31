@@ -57,6 +57,7 @@ data OrdersController
     | ShowOrderAction { orderId :: !(Id Order) }
     | MarkPaidOrderAction { orderId :: !(Id Order) }
     | CancelOrderAction { orderId :: !(Id Order) }
+    | OrderedProductsAction
     deriving (Eq, Show, Data)
 
 data WelcomeMessagesController

@@ -2,6 +2,8 @@ module Web.Controller.Orders
     ( fetchShowOrderContext
     , isEmail'
     , isPhone
+    , groupOrderedProducts
+    , sortProducers
     ) where
 
 import qualified Network.URI.Encode as E

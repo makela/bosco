@@ -7,6 +7,7 @@ instance View WelcomeView where
     html WelcomeView = [hsx|
         <a class="js-delete js-delete-no-confirm back-button float-right p-2" href={DeleteSessionAction}>Logout</a>
         <ol class="my-4">
+            <li><a href={OrderedProductsAction}>All ordered products</a></li>
             <li><a href={OrdersAction}>Orders</a></li>
             <li><a href={CustomersAction}>Customers</a></li>
             <li><a href={EmailsAction}>Emails for news letter</a></li>
