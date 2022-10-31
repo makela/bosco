@@ -20,6 +20,7 @@ renderForm producer = formFor producer [hsx|
     {(textField #name) { required = True, autofocus = True }}
     {(textField #subject)}
     {(textareaField #description)}
+    {(checkboxField #enabled)}
     {submitButton}
 
 |]

@@ -10,7 +10,8 @@ CREATE TABLE producers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     subject TEXT NOT NULL,
-    description TEXT NOT NULL
+    description TEXT NOT NULL,
+    enabled BOOLEAN DEFAULT true NOT NULL
 );
 CREATE TABLE products (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,

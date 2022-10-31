@@ -57,4 +57,4 @@ instance Controller ProducersController where
         redirectTo ProducersAction
 
 buildProducer producer = producer
-    |> fill @["name","subject","description"]
+    |> fill @["name","subject","description","enabled"]

@@ -25,6 +25,7 @@ instance Controller OrdersController where
 
     action NewOrderAction = do
         xs <- query @Producer
+            |> filterWhere (#enabled, True)
             |> orderBy #name
             |> fetch
         let producers = sortProducers xs

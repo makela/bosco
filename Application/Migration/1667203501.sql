@@ -1,0 +1,1 @@
+ALTER TABLE producers ADD COLUMN enabled BOOLEAN DEFAULT true NOT NULL;
