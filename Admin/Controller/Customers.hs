@@ -59,11 +59,19 @@ instance Controller CustomersController where
         setSuccessMessage "Customer deleted"
         redirectTo CustomersAction
 
-    action EmailsAction = do
+    action EmailsForDeliveryInfoAction = do
+        customers <- query @Order
+            |> filterWhereSql (#cancelledAt, "IS NULL")
+            |> fetch
+            >>= collectionFetchRelated #customerId
+        let emails = sort . nub $ map (\x -> x.customerId.email) customers
+        render EmailView { .. }
+
+    action EmailsForNewsLetterAction = do
         customers <- query @Customer
             |> distinctOn #email
             |> fetch
-        let emails = map (\x -> x.email) customers
+        let emails = sort . nub $ map (\x -> x.email) customers
         render EmailView { .. }
 
 buildCustomer customer = customer

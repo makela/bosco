@@ -49,7 +49,8 @@ data CustomersController
     | EditCustomerAction { customerId :: !(Id Customer) }
     | UpdateCustomerAction { customerId :: !(Id Customer) }
     | DeleteCustomerAction { customerId :: !(Id Customer) }
-    | EmailsAction
+    | EmailsForDeliveryInfoAction
+    | EmailsForNewsLetterAction
     deriving (Eq, Show, Data)
 
 data OrdersController
