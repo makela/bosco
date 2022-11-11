@@ -8,7 +8,7 @@ data WebApplication = WebApplication deriving (Eq, Show)
 
 data OrdersController
     = OrdersAction
-    | NewOrderAction
+    -- | NewOrderAction
     | ShowOrderAction { orderId :: !(Id Order) }
     | CreateOrderAction
     | CancelOrderAction { orderId :: !(Id Order) }

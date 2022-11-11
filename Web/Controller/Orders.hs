@@ -25,6 +25,7 @@ instance Controller OrdersController where
             year = show y
         render IndexView { .. }
 
+    {-
     action NewOrderAction = do
         xs <- query @Producer
             |> filterWhere (#enabled, True)
@@ -36,6 +37,7 @@ instance Controller OrdersController where
         let productsByProducers = groupProducts products
         let customer = newRecord @Customer
         render NewView { .. }
+    -}
 
     action ShowOrderAction { orderId } = do
         (order, totalSum, orderedProductsByProducer, producers) <-
