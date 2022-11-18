@@ -20,23 +20,11 @@ instance View ShowView where
             {renderTotalSum totalSum}
         </tbody>
         </table>
-        {paidOrCancelled}
 
     |]
         where
-            baseBreadcrumbs =
+            breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbLink "Orders" OrdersAction
                 , breadcrumbText (timeAgo order.orderedAt)
                 ]
-            breadcrumbs = case (order.cancelledAt, order.paidAt) of
-                (Nothing, Nothing) -> baseBreadcrumbs ++
-                    [ breadcrumbLink "Mark Paid" (MarkPaidOrderAction order.id)
-                    , breadcrumbLink [hsx|<a href={CancelOrderAction order.id} class="back-button">Cancel</a>|] (CancelOrderAction order.id)
-                    ]
-                (_, _) -> baseBreadcrumbs
-            breadcrumb = renderBreadcrumb breadcrumbs
-            paidOrCancelled = case (order.paidAt, order.cancelledAt) of
-                (Just paidAt, _) -> [hsx|<p class="font-bold">Paid {timeAgo paidAt}</p>|]
-                (_ , Just cancelledAt) -> [hsx|<p class="font-bold">Cancelled {timeAgo cancelledAt}</p>|]
-                (_, _) -> pure ()

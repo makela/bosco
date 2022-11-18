@@ -13,10 +13,13 @@ instance Controller OrdersController where
 
     action OrdersAction = do
         -- TODO exclude handled orders, separate Action/View?
-        (ordersQ, pagination) <- query @Order
-            |> orderByDesc #orderedAt
-            |> paginate
-        orders <- ordersQ |> fetch >>= collectionFetchRelated #customerId
+        xs <- query @Order
+            |> filterWhereSql (#cancelledAt, "IS NULL")
+            |> fetch
+            -- TODO should sort in database
+            -- >>= pure . map (modify #customerId (orderBy #name))
+            >>= collectionFetchRelated #customerId
+        let orders = sortOn (\x -> toLower x.customerId.name) xs
         render IndexView { .. }
 
     action ShowOrderAction { orderId } = do

@@ -3,7 +3,6 @@ import Admin.View.Prelude
 
 data IndexView = IndexView
     { orders :: [Include "customerId" Order]
-    , pagination :: Pagination
     }
 
 instance View IndexView where
@@ -16,14 +15,11 @@ instance View IndexView where
                     <tr>
                         <th>Ordered At</th>
                         <th>Customer</th>
-                        <th>Paid At</th>
-                        <th>Cancelled At</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>{forEach orders renderOrder}</tbody>
             </table>
-            {renderPagination pagination}
         </div>
     |]
         where
@@ -35,10 +31,8 @@ instance View IndexView where
 renderOrder :: Include "customerId" Order -> Html
 renderOrder order = [hsx|
     <tr>
-        <td><a href={ShowOrderAction order.id}>{timeAgo order.orderedAt}</a></td>
+        <td><a href={ShowOrderAction order.id}>{order.orderedAt}</a></td>
         <td>{order.customerId.name}</td>
-        <td>{fmap timeAgo order.paidAt}</td>
-        <td>{fmap timeAgo order.cancelledAt}</td>
         <td></td>
     </tr>
 |]
