@@ -1,5 +1,6 @@
 module Admin.View.Orders.Index where
 import Admin.View.Prelude
+import Data.Time.Format (formatTime)
 
 data IndexView = IndexView
     { orders :: [Include "customerId" Order]
@@ -15,7 +16,6 @@ instance View IndexView where
                     <tr>
                         <th>Ordered At</th>
                         <th>Customer</th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>{forEach orders renderOrder}</tbody>
@@ -31,8 +31,10 @@ instance View IndexView where
 renderOrder :: Include "customerId" Order -> Html
 renderOrder order = [hsx|
     <tr>
-        <td><a href={ShowOrderAction order.id}>{order.orderedAt}</a></td>
+        <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
         <td>{order.customerId.name}</td>
-        <td></td>
     </tr>
 |]
+
+formatUTCTime :: UTCTime -> String
+formatUTCTime = formatTime defaultTimeLocale "%Y-%m-%d %H:%M UTC"

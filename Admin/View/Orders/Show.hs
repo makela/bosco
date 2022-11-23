@@ -1,5 +1,6 @@
 module Admin.View.Orders.Show where
 import Admin.View.Prelude
+import Admin.View.Orders.Index (formatUTCTime)
 import Web.View.Orders.New (formatMoney)
 import Web.View.Orders.Show (renderCustomer, OrderedProductsByProducer, renderProducer, renderTotalSum)
 
@@ -26,5 +27,5 @@ instance View ShowView where
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbLink "Orders" OrdersAction
-                , breadcrumbText (timeAgo order.orderedAt)
+                , breadcrumbText [hsx|{formatUTCTime order.orderedAt}|]
                 ]
