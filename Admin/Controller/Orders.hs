@@ -2,6 +2,8 @@ module Admin.Controller.Orders where
 
 import qualified Data.Map as Map
 
+import Text.Regex.TDFA
+
 import Admin.Controller.Prelude
 import Admin.View.Orders.Index
 import Admin.View.Orders.Show
@@ -12,6 +14,7 @@ instance Controller OrdersController where
     beforeAction = ensureIsUser
 
     action OrdersAction = do
+        let q = paramOrDefault @Text "" "q"
         -- TODO exclude handled orders, separate Action/View?
         xs <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
@@ -19,7 +22,10 @@ instance Controller OrdersController where
             -- TODO should sort in database
             -- >>= pure . map (modify #customerId (orderBy #name))
             >>= collectionFetchRelated #customerId
-        let orders = sortOn (\x -> toLower x.customerId.name) xs
+        let orders = xs
+                -- TODO should filter in database
+                |> filter (\x -> if q == "" then True else toLower x.customerId.name =~ toLower q)
+                |> sortOn (\x -> toLower x.customerId.name)
         render IndexView { .. }
 
     action ShowOrderAction { orderId } = do

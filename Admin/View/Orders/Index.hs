@@ -4,29 +4,38 @@ import Data.Time.Format (formatTime)
 
 data IndexView = IndexView
     { orders :: [Include "customerId" Order]
+    , q :: Text
     }
 
 instance View IndexView where
     html IndexView { .. } = [hsx|
         {breadcrumb}
 
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Ordered At</th>
-                        <th>Customer</th>
-                    </tr>
-                </thead>
-                <tbody>{forEach orders renderOrder}</tbody>
-            </table>
-        </div>
+        <form method="GET" action={OrdersAction}>
+            <input type="search" placeholder="Search" name="q" value={q} />
+            <p>{n} orders</p>
+        </form>
+        {tableOrNot}
     |]
         where
+            n = length orders
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbText "Orders"
                 ]
+            tableOrNot = if n == 0 then pure () else [hsx|
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Ordered At</th>
+                                <th>Customer</th>
+                            </tr>
+                        </thead>
+                        <tbody>{forEach orders renderOrder}</tbody>
+                    </table>
+                </div>
+            |]
 
 renderOrder :: Include "customerId" Order -> Html
 renderOrder order = [hsx|
