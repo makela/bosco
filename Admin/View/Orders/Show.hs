@@ -21,7 +21,7 @@ instance View ShowView where
             {renderTotalSum totalSum}
         </tbody>
         </table>
-
+        {markDelivered}
     |]
         where
             breadcrumb = renderBreadcrumb
@@ -29,3 +29,10 @@ instance View ShowView where
                 , breadcrumbLink "Orders" OrdersAction
                 , breadcrumbText [hsx|{formatUTCTime order.orderedAt}|]
                 ]
+            markDelivered = case order.deliveredAt of
+                Just _ -> pure ()
+                Nothing -> [hsx|
+                    <form method="POST" action={UpdateDeliverOrderAction order.id}>
+                        <input type="submit" value="Mark as delivered" />
+                    </form>
+                |]

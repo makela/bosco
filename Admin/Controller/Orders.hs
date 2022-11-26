@@ -15,6 +15,7 @@ instance Controller OrdersController where
 
     action OrdersAction = do
         let q = paramOrDefault @Text "" "q"
+        let excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
         -- TODO exclude handled orders, separate Action/View?
         xs <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
@@ -25,6 +26,7 @@ instance Controller OrdersController where
         let orders = xs
                 -- TODO should filter in database
                 |> filter (\x -> if q == "" then True else toLower x.customerId.name =~ toLower q)
+                |> filter (\x -> if excludeDelivered then not (isJust x.deliveredAt) else True)
                 |> sortOn (\x -> toLower x.customerId.name)
         render IndexView { .. }
 
@@ -33,22 +35,31 @@ instance Controller OrdersController where
             fetchShowOrderContext orderId
         render ShowView { .. }
 
-    action MarkPaidOrderAction { orderId } = do
+    action UpdateMarkPaidOrderAction { orderId } = do
         now <- getCurrentTime
         order <- fetch orderId
         order
             |> setJust #paidAt now
             |> updateRecord
-        setSuccessMessage "Tilais maksettu"
+        setSuccessMessage "Order paid"
         redirectTo ShowOrderAction { orderId }
 
-    action CancelOrderAction { orderId } = do
+    action UpdateCancelOrderAction { orderId } = do
         now <- getCurrentTime
         order <- fetch orderId
         order
             |> setJust #cancelledAt now
             |> updateRecord
-        setSuccessMessage "Tilais peruttu"
+        setSuccessMessage "Order cancelled"
+        redirectTo ShowOrderAction { orderId }
+
+    action UpdateDeliverOrderAction { orderId } = do
+        now <- getCurrentTime
+        order <- fetch orderId
+        order
+            |> setJust #deliveredAt now
+            |> updateRecord
+        setSuccessMessage "Order delivered"
         redirectTo ShowOrderAction { orderId }
 
     action OrderedProductsAction = do

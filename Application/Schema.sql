@@ -36,7 +36,8 @@ CREATE TABLE orders (
     customer_id UUID NOT NULL,
     ordered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     paid_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-    cancelled_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
+    cancelled_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
 CREATE INDEX orders_customer_id_index ON orders (customer_id);
 CREATE TABLE ordered_products (

@@ -56,8 +56,9 @@ data CustomersController
 data OrdersController
     = OrdersAction
     | ShowOrderAction { orderId :: !(Id Order) }
-    | MarkPaidOrderAction { orderId :: !(Id Order) }
-    | CancelOrderAction { orderId :: !(Id Order) }
+    | UpdateMarkPaidOrderAction { orderId :: !(Id Order) }
+    | UpdateCancelOrderAction { orderId :: !(Id Order) }
+    | UpdateDeliverOrderAction { orderId :: !(Id Order) }
     | OrderedProductsAction
     deriving (Eq, Show, Data)
 
