@@ -87,7 +87,7 @@ instance Controller OrdersController where
                                 setSuccessMessage "Tilaus lähetetty"
                                 redirectTo ShowOrderAction { orderId = order.id }
 
-    action CancelOrderAction { orderId } = do
+    action UpdateCancelOrderAction { orderId } = do
         order <- fetch orderId
         now <- getCurrentTime
         order |> setJust #cancelledAt now |> updateRecord

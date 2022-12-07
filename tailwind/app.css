@@ -79,6 +79,9 @@ fieldset {
 a.back-button {
   @apply text-red-500;
 }
+form input.back-button {
+  @apply bg-white text-red-500 float-none px-1 mx-0;
+}
 
 input.is-invalid {
   @apply border-red-500;

@@ -32,11 +32,13 @@ instance View ShowView where
 renderPaymentInstruction :: Include "customerId" Order -> Maybe PaymentInstruction -> Html
 renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.cancelledAt) of
     (Nothing, Nothing) -> [hsx|
-            <p>
-                Mikäli huomaat laskussa virheen, voit vielä
-                <a href={CancelOrderAction order.id} class="back-button">perua</a>
-                sen.
-            </p>
+            <form method="POST" action={UpdateCancelOrderAction order.id}>
+              <p>
+                  Mikäli huomaat laskussa virheen, voit vielä
+                  <input type="submit" class="back-button" value="perua" />
+                  sen.
+              </p>
+            </form>
             <h2>Maksuohjeet</h2>
             {instructions}
             <p>
