@@ -15,6 +15,7 @@ instance Controller OrdersController where
 
     action OrdersAction = do
         let q = paramOrDefault @Text "" "q"
+        let excludePaid = paramOrDefault @Bool False "excludePaid"
         let excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
         -- TODO exclude handled orders, separate Action/View?
         xs <- query @Order
@@ -26,6 +27,7 @@ instance Controller OrdersController where
         let orders = xs
                 -- TODO should filter in database
                 |> filter (\x -> if q == "" then True else toLower x.customerId.name =~ toLower q)
+                |> filter (\x -> if excludePaid then not (isJust x.paidAt) else True)
                 |> filter (\x -> if excludeDelivered then not (isJust x.deliveredAt) else True)
                 |> sortOn (\x -> toLower x.customerId.name)
         render IndexView { .. }

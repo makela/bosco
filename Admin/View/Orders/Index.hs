@@ -5,6 +5,7 @@ import Data.Time.Format (formatTime)
 data IndexView = IndexView
     { orders :: [Include "customerId" Order]
     , q :: Text
+    , excludePaid :: Bool
     , excludeDelivered :: Bool
     }
 
@@ -13,6 +14,11 @@ instance View IndexView where
         {breadcrumb}
 
         <form method="GET" action={OrdersAction}>
+            <label>
+                <input type="checkbox" name="excludePaid" checked={excludePaid} onchange="this.form.submit()"/>
+                Exclude paid orders
+            </label>
+            <br />
             <label>
                 <input type="checkbox" name="excludeDelivered" checked={excludeDelivered} onchange="this.form.submit()"/>
                 Exclude delivered orders
@@ -35,6 +41,7 @@ instance View IndexView where
                             <tr>
                                 <th>Ordered At</th>
                                 <th>Customer</th>
+                                <th>Paid At</th>
                                 <th>Delivered At</th>
                             </tr>
                         </thead>
@@ -48,6 +55,7 @@ renderOrder order = [hsx|
     <tr>
         <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
         <td>{order.customerId.name}</td>
+        <td>{fmap formatUTCTime order.paidAt}</td>
         <td>{fmap formatUTCTime order.deliveredAt}</td>
     </tr>
 |]
