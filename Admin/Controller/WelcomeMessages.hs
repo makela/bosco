@@ -10,23 +10,33 @@ instance Controller WelcomeMessagesController where
     beforeAction = ensureIsUser
 
     action WelcomeMessagesAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         (welcomeMessagesQ, pagination) <- query @WelcomeMessage |> paginate
         welcomeMessages <- welcomeMessagesQ |> fetch
         render IndexView { .. }
 
     action NewWelcomeMessageAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let welcomeMessage = newRecord
         render NewView { .. }
 
     action ShowWelcomeMessageAction { welcomeMessageId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         welcomeMessage <- fetch welcomeMessageId
         render ShowView { .. }
 
     action EditWelcomeMessageAction { welcomeMessageId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         welcomeMessage <- fetch welcomeMessageId
         render EditView { .. }
 
     action UpdateWelcomeMessageAction { welcomeMessageId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         welcomeMessage <- fetch welcomeMessageId
         welcomeMessage
             |> buildWelcomeMessage
@@ -38,6 +48,8 @@ instance Controller WelcomeMessagesController where
                     redirectTo ShowWelcomeMessageAction { .. }
 
     action CreateWelcomeMessageAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let welcomeMessage = newRecord @WelcomeMessage
         welcomeMessage
             |> buildWelcomeMessage
@@ -49,6 +61,8 @@ instance Controller WelcomeMessagesController where
                     redirectTo $ ShowWelcomeMessageAction welcomeMessage.id
 
     action DeleteWelcomeMessageAction { welcomeMessageId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         welcomeMessage <- fetch welcomeMessageId
         deleteRecord welcomeMessage
         setSuccessMessage "WelcomeMessage deleted"

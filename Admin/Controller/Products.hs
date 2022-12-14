@@ -10,6 +10,8 @@ instance Controller ProductsController where
     beforeAction = ensureIsUser
 
     action ProductsAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         (productsQ, pagination) <- query @Product
             |> paginate
         xs <- productsQ
@@ -21,20 +23,28 @@ instance Controller ProductsController where
         render IndexView { .. }
 
     action NewProductAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         producers <- query @Producer |> fetch
         let product = newRecord
         render NewView { .. }
 
     action ShowProductAction { productId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         product <- fetch productId >>= fetchRelated #producerId
         render ShowView { .. }
 
     action EditProductAction { productId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         producers <- query @Producer |> fetch
         product <- fetch productId
         render EditView { .. }
 
     action UpdateProductAction { productId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         product <- fetch productId
         product
             |> buildProduct
@@ -48,6 +58,8 @@ instance Controller ProductsController where
                     redirectTo ShowProductAction { .. }
 
     action CreateProductAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let product = newRecord @Product
         product
             |> buildProduct
@@ -61,6 +73,8 @@ instance Controller ProductsController where
                     redirectTo $ ShowProductAction product.id
 
     action DeleteProductAction { productId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         product <- fetch productId
         deleteRecord product
         setSuccessMessage "Product deleted"

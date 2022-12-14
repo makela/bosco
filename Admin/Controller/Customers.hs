@@ -13,6 +13,8 @@ instance Controller CustomersController where
     beforeAction = ensureIsUser
 
     action CustomersAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         (customersQ, pagination) <- query @Customer
             |> orderBy #name
             |> paginate
@@ -20,18 +22,26 @@ instance Controller CustomersController where
         render IndexView { .. }
 
     action NewCustomerAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let customer = newRecord
         render NewView { .. }
 
     action ShowCustomerAction { customerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         customer <- fetch customerId
         render ShowView { .. }
 
     action EditCustomerAction { customerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         customer <- fetch customerId
         render EditView { .. }
 
     action UpdateCustomerAction { customerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         customer <- fetch customerId
         customer
             |> buildCustomer
@@ -43,6 +53,8 @@ instance Controller CustomersController where
                     redirectTo ShowCustomerAction { .. }
 
     action CreateCustomerAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let customer = newRecord @Customer
         customer
             |> buildCustomer
@@ -54,12 +66,16 @@ instance Controller CustomersController where
                     redirectTo $ ShowCustomerAction customer.id
 
     action DeleteCustomerAction { customerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         customer <- fetch customerId
         deleteRecord customer
         setSuccessMessage "Customer deleted"
         redirectTo CustomersAction
 
     action EmailsForDeliveryInfoAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         customers <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
             |> fetch
@@ -68,6 +84,8 @@ instance Controller CustomersController where
         render EmailView { .. }
 
     action EmailsForNewsLetterAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         customers <- query @Customer
             |> distinctOn #email
             |> fetch

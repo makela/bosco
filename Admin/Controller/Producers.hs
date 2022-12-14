@@ -10,6 +10,8 @@ instance Controller ProducersController where
     beforeAction = ensureIsUser
 
     action ProducersAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         (producersQ, pagination) <- query @Producer
             |> orderBy #name
             |> paginate
@@ -17,18 +19,26 @@ instance Controller ProducersController where
         render IndexView { .. }
 
     action NewProducerAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let producer = newRecord
         render NewView { .. }
 
     action ShowProducerAction { producerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         producer <- fetch producerId
         render ShowView { .. }
 
     action EditProducerAction { producerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         producer <- fetch producerId
         render EditView { .. }
 
     action UpdateProducerAction { producerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         producer <- fetch producerId
         producer
             |> buildProducer
@@ -40,6 +50,8 @@ instance Controller ProducersController where
                     redirectTo ShowProducerAction { .. }
 
     action CreateProducerAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let producer = newRecord @Producer
         producer
             |> buildProducer
@@ -51,6 +63,8 @@ instance Controller ProducersController where
                     redirectTo $ ShowProducerAction producer.id
 
     action DeleteProducerAction { producerId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         producer <- fetch producerId
         deleteRecord producer
         setSuccessMessage "Producer deleted"

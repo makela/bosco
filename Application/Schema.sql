@@ -4,7 +4,8 @@ CREATE TABLE users (
     email TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     locked_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-    failed_login_attempts INT DEFAULT 0 NOT NULL
+    failed_login_attempts INT DEFAULT 0 NOT NULL,
+    is_admin BOOLEAN DEFAULT false NOT NULL
 );
 CREATE TABLE producers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,

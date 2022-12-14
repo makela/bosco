@@ -33,6 +33,7 @@ instance Controller OrdersController where
         render IndexView { .. }
 
     action ShowOrderAction { orderId } = do
+        user <- fetch currentUserId
         (order, totalSum, orderedProductsByProducer, producers) <-
             fetchShowOrderContext orderId
         render ShowView { .. }

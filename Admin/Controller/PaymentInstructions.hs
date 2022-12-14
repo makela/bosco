@@ -10,23 +10,33 @@ instance Controller PaymentInstructionsController where
     beforeAction = ensureIsUser
 
     action PaymentInstructionsAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         (paymentInstructionsQ, pagination) <- query @PaymentInstruction |> paginate
         paymentInstructions <- paymentInstructionsQ |> fetch
         render IndexView { .. }
 
     action NewPaymentInstructionAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let paymentInstruction = newRecord
         render NewView { .. }
 
     action ShowPaymentInstructionAction { paymentInstructionId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         paymentInstruction <- fetch paymentInstructionId
         render ShowView { .. }
 
     action EditPaymentInstructionAction { paymentInstructionId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         paymentInstruction <- fetch paymentInstructionId
         render EditView { .. }
 
     action UpdatePaymentInstructionAction { paymentInstructionId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         paymentInstruction <- fetch paymentInstructionId
         paymentInstruction
             |> buildPaymentInstruction
@@ -38,6 +48,8 @@ instance Controller PaymentInstructionsController where
                     redirectTo ShowPaymentInstructionAction { .. }
 
     action CreatePaymentInstructionAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         let paymentInstruction = newRecord @PaymentInstruction
         paymentInstruction
             |> buildPaymentInstruction
@@ -49,6 +61,8 @@ instance Controller PaymentInstructionsController where
                     redirectTo $ ShowPaymentInstructionAction paymentInstruction.id
 
     action DeletePaymentInstructionAction { paymentInstructionId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         paymentInstruction <- fetch paymentInstructionId
         deleteRecord paymentInstruction
         setSuccessMessage "PaymentInstruction deleted"

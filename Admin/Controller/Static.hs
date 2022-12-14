@@ -5,4 +5,6 @@ import Admin.View.Static.Welcome
 instance Controller StaticController where
     beforeAction = ensureIsUser
 
-    action WelcomeAction = render WelcomeView
+    action WelcomeAction = do
+        user <- fetch currentUserId
+        render WelcomeView { .. }

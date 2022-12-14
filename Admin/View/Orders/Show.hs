@@ -9,6 +9,7 @@ data ShowView = ShowView
     , producers :: [Producer]
     , orderedProductsByProducer :: OrderedProductsByProducer
     , totalSum :: Int
+    , user :: User
     }
 
 instance View ShowView where
@@ -30,13 +31,13 @@ instance View ShowView where
                 , breadcrumbLink "Orders" OrdersAction
                 , breadcrumbText [hsx|{formatUTCTime order.orderedAt}|]
                 ]
-            markPaid = case order.paidAt of
-                Just _ -> pure ()
-                Nothing -> [hsx|
+            markPaid = case (user.isAdmin, order.paidAt) of
+                (True, Nothing) -> [hsx|
                     <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
                         <input type="submit" value="Mark as paid" />
                     </form>
                 |]
+                (_, _) -> pure ()
             markDelivered = case order.deliveredAt of
                 Just _ -> pure ()
                 Nothing -> [hsx|
