@@ -36,8 +36,7 @@ renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.ca
             {instructions}
             <p>
                 Voit myös
-                <a href="#" onclick="window.print(); return false">tulostaa</a>
-                laskun maksaaksesi sen myöhemmin.
+                <a href="#" onclick="window.print(); return false">tulostaa</a> laskun.
             </p>
         |]
     (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
