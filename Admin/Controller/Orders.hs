@@ -39,6 +39,8 @@ instance Controller OrdersController where
         render ShowView { .. }
 
     action UpdateMarkPaidOrderAction { orderId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         now <- getCurrentTime
         order <- fetch orderId
         order
@@ -48,6 +50,8 @@ instance Controller OrdersController where
         redirectTo ShowOrderAction { orderId }
 
     action UpdateCancelOrderAction { orderId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         now <- getCurrentTime
         order <- fetch orderId
         order
@@ -66,6 +70,8 @@ instance Controller OrdersController where
         redirectTo ShowOrderAction { orderId }
 
     action OrderedProductsAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         orders <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
             |> fetch
