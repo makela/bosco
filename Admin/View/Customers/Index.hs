@@ -24,7 +24,7 @@ instance View IndexView where
         where
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
-                , breadcrumbText "Customers"
+                , breadcrumbText [hsx|<span>Customers</span>|]
                 , breadcrumbLink "New" NewCustomerAction
                 ]
 

@@ -22,7 +22,7 @@ instance View IndexView where
         where
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
-                , breadcrumbText "Payment Instructions"
+                , breadcrumbText [hsx|<span>Payment Instructions</span>|]
                 , breadcrumbLink "New" NewPaymentInstructionAction
                 ]
 
