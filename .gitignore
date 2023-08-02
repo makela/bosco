@@ -1,5 +1,8 @@
 .DS_Store
-.envrc
+.devenv*
+devenv.local.nix
+.direnv
+.env
 .idea
 tmp
 result
