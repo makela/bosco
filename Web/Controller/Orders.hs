@@ -6,15 +6,15 @@ module Web.Controller.Orders
     , sortProducers
     ) where
 
-import qualified Network.URI.Encode as E
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified Network.URI.Encode as E
 
 import Web.Controller.Prelude
 import Web.View.Orders.Index
 import Web.View.Orders.New
-import Web.View.Orders.Show
 import Web.View.Orders.NewEmail
+import Web.View.Orders.Show
 
 instance Controller OrdersController where
     action OrdersAction = do
@@ -25,7 +25,6 @@ instance Controller OrdersController where
             year = show y
         render IndexView { .. }
 
-    {-
     action NewOrderAction = do
         xs <- query @Producer
             |> filterWhere (#enabled, True)
@@ -37,7 +36,6 @@ instance Controller OrdersController where
         let productsByProducers = groupProducts products
         let customer = newRecord @Customer
         render NewView { .. }
-    -}
 
     action ShowOrderAction { orderId } = do
         (order, totalSum, orderedProductsByProducer, producers) <-
@@ -124,14 +122,14 @@ buildEmail customer = customer
 
 nonEmptyOrWhitespace :: Text -> ValidatorResult
 nonEmptyOrWhitespace text = case nonEmpty $ T.strip text of
-    Success -> Success
-    Failure _ -> Failure "Tämä kenttä vaaditaan"
+    Success       -> Success
+    Failure _     -> Failure "Tämä kenttä vaaditaan"
     FailureHtml x -> FailureHtml x
 
 isEmail' :: Text -> ValidatorResult
 isEmail' text = case isEmail text of
-    Success -> Success
-    Failure _ -> Failure "Sähköposti on virheellinen"
+    Success       -> Success
+    Failure _     -> Failure "Sähköposti on virheellinen"
     FailureHtml x -> FailureHtml x
 
 isPhone :: Text -> ValidatorResult
@@ -160,12 +158,12 @@ fetchProducts = do
 
 groupProducts :: [Product] -> ProductsByProducers
 groupProducts products = go products mempty
-    where go [] m = m
+    where go [] m     = m
           go (x:xs) m = go xs (Map.insertWith (++) x.producerId [x] m)
 
 groupOrderedProducts :: [Include "productId" OrderedProduct] -> OrderedProductsByProducer
 groupOrderedProducts orderedProducts = go orderedProducts mempty
-    where go [] m = m
+    where go [] m     = m
           go (x:xs) m = go xs (Map.insertWith (++) x.productId.producerId [x] m)
 
 sortProducers :: [Producer] -> [Producer]
