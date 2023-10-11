@@ -3,10 +3,12 @@ import Admin.View.Prelude
 import Data.Time.Format (formatTime)
 
 data IndexView = IndexView
-    { orders :: [Include "customerId" Order]
-    , q :: Text
-    , excludePaid :: Bool
+    { orders           :: [Include "customerId" Order]
+    , q                :: Text
+    , excludePaid      :: Bool
     , excludeDelivered :: Bool
+    , year             :: Integer
+    , years            :: [Integer]
     }
 
 instance View IndexView where
@@ -14,6 +16,8 @@ instance View IndexView where
         {breadcrumb}
 
         <form method="GET" action={OrdersAction}>
+            {renderYearSelect years year}
+            <br />
             <label>
                 <input type="checkbox" name="excludePaid" checked={excludePaid} onchange="this.form.submit()"/>
                 Exclude paid orders
@@ -58,6 +62,21 @@ renderOrder order = [hsx|
         <td>{fmap formatUTCTime order.paidAt}</td>
         <td>{fmap formatUTCTime order.deliveredAt}</td>
     </tr>
+|]
+
+renderYearSelect :: [Integer] -> Integer -> Html
+renderYearSelect years year = [hsx|
+    <label>
+        Year
+        <select name="year" onchange="this.form.submit()">
+            {forEach years (renderYearOption year)}
+        </select>
+    </label>
+|]
+
+renderYearOption :: Integer -> Integer -> Html
+renderYearOption selected year = [hsx|
+    <option selected={year == selected}>{year}</option>
 |]
 
 formatUTCTime :: UTCTime -> String

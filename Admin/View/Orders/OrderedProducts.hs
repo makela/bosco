@@ -2,17 +2,23 @@ module Admin.View.Orders.OrderedProducts where
 
 import qualified Data.Map as Map
 
+import Admin.View.Orders.Index (renderYearSelect)
 import Admin.View.Prelude
 import Web.View.Orders.Show (OrderedProductsByProducer)
 
 data OrderedProductsView = OrderedProductsView
-    { producers :: [Producer]
+    { producers                 :: [Producer]
     , orderedProductsByProducer :: OrderedProductsByProducer
+    , year                      :: Integer
+    , years                     :: [Integer]
     }
 
 instance View OrderedProductsView where
     html OrderedProductsView { .. } = [hsx|
         {breadcrumb}
+        <form method="GET" action={OrderedProductsAction}>
+            {renderYearSelect years year}
+        </form>
         <table class="whitespace-nowrap">
         <tbody>
             {forEach producers (renderProducer orderedProductsByProducer)}

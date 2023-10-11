@@ -7,4 +7,6 @@ instance Controller StaticController where
 
     action WelcomeAction = do
         user <- fetch currentUserId
+        now <- getCurrentTime
+        let (year, _, _) = toGregorian $ utctDay now
         render WelcomeView { .. }

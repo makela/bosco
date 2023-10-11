@@ -1,9 +1,9 @@
 module Admin.Types where
 
-import IHP.Prelude
-import IHP.ModelSupport
-import IHP.LoginSupport.Types
 import Generated.Types
+import IHP.LoginSupport.Types
+import IHP.ModelSupport
+import IHP.Prelude
 
 data AdminApplication = AdminApplication deriving (Eq, Show)
 

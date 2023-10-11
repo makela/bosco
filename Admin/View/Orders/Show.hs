@@ -1,15 +1,16 @@
 module Admin.View.Orders.Show where
-import Admin.View.Prelude
 import Admin.View.Orders.Index (formatUTCTime)
+import Admin.View.Prelude
 import Web.View.Orders.New (formatMoney)
-import Web.View.Orders.Show (renderCustomer, OrderedProductsByProducer, renderProducer, renderTotalSum)
+import Web.View.Orders.Show (OrderedProductsByProducer, renderCustomer,
+                             renderProducer, renderTotalSum)
 
 data ShowView = ShowView
-    { order :: Include "customerId" Order
-    , producers :: [Producer]
+    { order                     :: Include "customerId" Order
+    , producers                 :: [Producer]
     , orderedProductsByProducer :: OrderedProductsByProducer
-    , totalSum :: Int
-    , user :: User
+    , totalSum                  :: Int
+    , user                      :: User
     }
 
 instance View ShowView where

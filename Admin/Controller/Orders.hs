@@ -1,25 +1,33 @@
 module Admin.Controller.Orders where
 
 import qualified Data.Map as Map
+import qualified Data.Text.Encoding as E
 
 import Text.Regex.TDFA
 
 import Admin.Controller.Prelude
 import Admin.View.Orders.Index
-import Admin.View.Orders.Show
 import Admin.View.Orders.OrderedProducts
-import Web.Controller.Orders (fetchShowOrderContext, groupOrderedProducts, sortProducers)
+import Admin.View.Orders.Show
+import Web.Controller.Orders (fetchShowOrderContext, groupOrderedProducts,
+                              sortProducers)
 
 instance Controller OrdersController where
     beforeAction = ensureIsUser
 
     action OrdersAction = do
+        (yearNow, years) <- queryYears
+        let year = paramOrDefault @Integer yearNow "year"
         let q = paramOrDefault @Text "" "q"
         let excludePaid = paramOrDefault @Bool False "excludePaid"
         let excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
+        let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
+        let dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
         -- TODO exclude handled orders, separate Action/View?
         xs <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
+            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateAfter)
+            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateBefore)
             |> fetch
             -- TODO should sort in database
             -- >>= pure . map (modify #customerId (orderBy #name))
@@ -72,8 +80,14 @@ instance Controller OrdersController where
     action OrderedProductsAction = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
+        (yearNow, years) <- queryYears
+        let year = paramOrDefault @Integer yearNow "year"
+        let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
+        let dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
         orders <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
+            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateAfter)
+            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateBefore)
             |> fetch
         let orderIds = map (.id) orders
         xs <- query @OrderedProduct
@@ -93,3 +107,16 @@ mergeByProductId orders = go [] orders
           go acc (x:xs) =
               let q = x.quantity + (sum $ map (.quantity) (filter (\y -> x.productId == y.productId) xs))
               in go (x { quantity = q } : acc) (filter (\y -> x.productId /= y.productId) xs)
+
+
+queryYears :: (?context::ControllerContext, ?modelContext::ModelContext) => IO (Integer, [Integer])
+queryYears = do
+    now <- getCurrentTime
+    let (yearNow, _, _) = toGregorian $ utctDay now
+    firstOrder <- query @Order
+        |> orderByAsc #orderedAt
+        |> fetchOneOrNothing
+    let maybeFirstYear = fmap ((\(y, _, _) -> y) . toGregorian . utctDay . (\x -> x.orderedAt)) firstOrder
+    let firstYear = fromMaybe yearNow maybeFirstYear
+    let years = [firstYear .. yearNow]
+    pure (yearNow, years)
