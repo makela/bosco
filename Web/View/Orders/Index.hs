@@ -10,10 +10,14 @@ data IndexView = IndexView
 
 instance View IndexView where
     html IndexView { .. } = [hsx|
-        <p>{renderMarkdown $ maybe "" (get #text) message}</p>
-        <a href={NewOrderAction} class="btn">Täytä tilaus</a>
+        <p>{renderMarkdown $ maybe "" (.text) message}</p>
+        {orderButton}
         <a href={NewEmailAction}>Tilaa uutiskirje</a>
     |]
+        where
+            orderButton = if maybe False (.isOrderingEnabled) message
+                          then [hsx|<a href={NewOrderAction} class="btn">Täytä tilaus</a>|]
+                          else [hsx||]
 
 renderMarkdown text = case text |> MMark.parse "" of
     Left error     -> "Jokin meni pieleen"

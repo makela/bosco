@@ -18,7 +18,7 @@ instance View NewView where
 renderForm :: WelcomeMessage -> Html
 renderForm welcomeMessage = formFor welcomeMessage [hsx|
     {(textareaField #text)}
-    {(textField #picture)}
+    {(checkboxField #isOrderingEnabled)}
     {submitButton}
 
 |]

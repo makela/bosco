@@ -53,8 +53,8 @@ CREATE INDEX products_producer_id_index ON products (producer_id);
 CREATE TABLE welcome_messages (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
     text TEXT NOT NULL,
-    picture TEXT DEFAULT NULL,
-    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    is_ordering_enabled BOOLEAN DEFAULT false NOT NULL
 );
 CREATE TABLE payment_instructions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,

@@ -1,9 +1,9 @@
 module Admin.Controller.WelcomeMessages where
 
 import Admin.Controller.Prelude
+import Admin.View.WelcomeMessages.Edit
 import Admin.View.WelcomeMessages.Index
 import Admin.View.WelcomeMessages.New
-import Admin.View.WelcomeMessages.Edit
 import Admin.View.WelcomeMessages.Show
 
 instance Controller WelcomeMessagesController where
@@ -69,4 +69,4 @@ instance Controller WelcomeMessagesController where
         redirectTo WelcomeMessagesAction
 
 buildWelcomeMessage welcomeMessage = welcomeMessage
-    |> fill @["text","picture"]
+    |> fill @["text","isOrderingEnabled"]

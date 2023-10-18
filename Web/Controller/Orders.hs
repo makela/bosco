@@ -18,7 +18,7 @@ import Web.View.Orders.Show
 
 instance Controller OrdersController where
     action OrdersAction = do
-        message <- query @WelcomeMessage |> fetchOneOrNothing
+        message <- fetchLastWelcomeMessage
         now <- getCurrentTime
         let publishedAt = maybe now (get #publishedAt) message
             (y, _, _) = toGregorian $ utctDay publishedAt
@@ -26,6 +26,8 @@ instance Controller OrdersController where
         render IndexView { .. }
 
     action NewOrderAction = do
+        message <- fetchLastWelcomeMessage
+        unless (maybe False (.isOrderingEnabled) message) renderNotFound
         xs <- query @Producer
             |> filterWhere (#enabled, True)
             |> orderBy #name
@@ -44,6 +46,8 @@ instance Controller OrdersController where
         render ShowView { .. }
 
     action CreateOrderAction = do
+        message <- fetchLastWelcomeMessage
+        unless (maybe False (.isOrderingEnabled) message) (redirectTo OrdersAction)
         producers <- query @Producer
             |> orderBy #name
             |> fetch
@@ -198,3 +202,6 @@ fetchShowOrderContext orderId = do
         |> fetch
     let producers = sortProducers xs
     return (order, totalSum, orderedProductsByProducer, producers)
+
+fetchLastWelcomeMessage :: (?modelContext :: ModelContext) => IO (Maybe WelcomeMessage)
+fetchLastWelcomeMessage = query @WelcomeMessage |> orderByDesc #publishedAt |> fetchOneOrNothing
