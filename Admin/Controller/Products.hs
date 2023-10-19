@@ -1,9 +1,9 @@
 module Admin.Controller.Products where
 
 import Admin.Controller.Prelude
+import Admin.View.Products.Edit
 import Admin.View.Products.Index
 import Admin.View.Products.New
-import Admin.View.Products.Edit
 import Admin.View.Products.Show
 
 instance Controller ProductsController where
@@ -81,4 +81,4 @@ instance Controller ProductsController where
         redirectTo ProductsAction
 
 buildProduct product = product
-    |> fill @["producerId","name","description","package","price","ordering"]
+    |> fill @["producerId","name","description","package","price","ordering","enabled"]

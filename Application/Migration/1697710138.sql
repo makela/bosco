@@ -1,0 +1,1 @@
+ALTER TABLE products ADD COLUMN enabled BOOLEAN DEFAULT true NOT NULL;

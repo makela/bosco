@@ -21,7 +21,8 @@ CREATE TABLE products (
     description TEXT NOT NULL,
     package TEXT NOT NULL,
     price INT NOT NULL,
-    ordering INT DEFAULT NULL
+    ordering INT DEFAULT NULL,
+    enabled BOOLEAN DEFAULT true NOT NULL
 );
 CREATE TABLE customers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,

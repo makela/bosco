@@ -155,6 +155,7 @@ buildOrder order = order
 fetchProducts :: (?modelContext :: ModelContext) =>IO [Product]
 fetchProducts = do
     products <- query @Product
+        |> filterWhere (#enabled, True)
         |> orderByDesc #ordering
         |> orderByDesc #name
         |> fetch

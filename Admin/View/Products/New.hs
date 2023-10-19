@@ -2,7 +2,7 @@ module Admin.View.Products.New where
 import Admin.View.Prelude
 
 data NewView = NewView
-    { product :: Product
+    { product   :: Product
     , producers :: [Producer]
     }
 
@@ -31,6 +31,7 @@ renderForm producers product = formFor product [hsx|
     {(textareaField #description)}
     {(textField #package) { required = True }}
     {(textField #price) { required = True, helpText = "In cents" }}
+    {(checkboxField #enabled)}
     {submitButton}
 
 |]
