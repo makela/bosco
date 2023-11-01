@@ -1,14 +1,14 @@
 module Admin.View.Layout (defaultLayout, Html) where
 
-import IHP.ViewPrelude
-import IHP.Environment
-import qualified Text.Blaze.Html5            as H
-import qualified Text.Blaze.Html5.Attributes as A
+import Admin.Routes
+import Admin.Types
+import Application.Helper.View
 import Generated.Types
 import IHP.Controller.RequestContext
-import Admin.Types
-import Admin.Routes
-import Application.Helper.View
+import IHP.Environment
+import IHP.ViewPrelude
+import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as A
 
 defaultLayout :: Html -> Html
 defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
@@ -38,8 +38,9 @@ stylesheets = [hsx|
     |]
 
 scripts :: Html
-scripts = [hsx|
-        {when isDevelopment devScripts}
+scripts = do
+    when isDevelopment [hsx|
+        {devScripts}
         <script src={assetPath "/vendor/timeago.js"}></script>
         <script src={assetPath "/vendor/morphdom-umd.min.js"}></script>
         <script src={assetPath "/vendor/turbolinks.js"}></script>
@@ -48,6 +49,9 @@ scripts = [hsx|
         <script src={assetPath "/helpers.js"}></script>
         <script src={assetPath "/ihp-auto-refresh.js"}></script>
         <script src={assetPath "/app.js"}></script>
+    |]
+    when isProduction [hsx|
+        <script src={assetPath "/prod.js"}></script>
     |]
 
 devScripts :: Html
