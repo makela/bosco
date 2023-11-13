@@ -1,10 +1,25 @@
 module Admin.View.Orders.Index where
 import Admin.View.Prelude
 import Data.Time.Format (formatTime)
+import IHP.Controller.Param
+
+data OrderBy = OrderByName | OrderByOrderedAt deriving Eq
+
+instance ParamReader OrderBy where
+    readParameter "ordered at" = Right OrderByOrderedAt
+    readParameter _            = Right OrderByName
+
+data OrderDir = OrderByAsc | OrderByDesc deriving Eq
+
+instance ParamReader OrderDir where
+    readParameter "descending" = Right OrderByDesc
+    readParameter _            = Right OrderByAsc
 
 data IndexView = IndexView
     { orders           :: [Include "customerId" Order]
     , q                :: Text
+    , ordering         :: OrderBy
+    , orderDir         :: OrderDir
     , excludePaid      :: Bool
     , excludeDelivered :: Bool
     , year             :: Integer
@@ -17,6 +32,8 @@ instance View IndexView where
 
         <form method="GET" action={OrdersAction}>
             {renderYearSelect years year}
+            {renderOrderBy ordering}
+            {renderOrderDir orderDir}
             <br />
             <label>
                 <input type="checkbox" name="excludePaid" checked={excludePaid} onchange="this.form.submit()"/>
@@ -77,6 +94,28 @@ renderYearSelect years year = [hsx|
 renderYearOption :: Integer -> Integer -> Html
 renderYearOption selected year = [hsx|
     <option selected={year == selected}>{year}</option>
+|]
+
+renderOrderBy :: OrderBy -> Html
+renderOrderBy ordering = [hsx|
+    <label>
+        Sort by
+        <select name="ordering" onchange="this.form.submit()">
+            <option selected={ordering == OrderByName}>customer</option>
+            <option selected={ordering == OrderByOrderedAt}>ordered at</option>
+        </select>
+    </label>
+|]
+
+renderOrderDir :: OrderDir -> Html
+renderOrderDir dir = [hsx|
+    <label>
+        Sort direction
+        <select name="orderDir" onchange="this.form.submit()">
+            <option selected={dir == OrderByAsc}>ascending</option>
+            <option selected={dir == OrderByDesc}>descending</option>
+        </select>
+    </label>
 |]
 
 formatUTCTime :: UTCTime -> String

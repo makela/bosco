@@ -19,6 +19,8 @@ instance Controller OrdersController where
         (yearNow, years) <- queryYears
         let year = paramOrDefault @Integer yearNow "year"
         let q = paramOrDefault @Text "" "q"
+        let ordering = paramOrDefault @OrderBy OrderByName "ordering"
+        let orderDir = paramOrDefault @OrderDir OrderByAsc "orderDir"
         let excludePaid = paramOrDefault @Bool False "excludePaid"
         let excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
         let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
@@ -32,12 +34,17 @@ instance Controller OrdersController where
             -- TODO should sort in database
             -- >>= pure . map (modify #customerId (orderBy #name))
             >>= collectionFetchRelated #customerId
-        let orders = xs
+        let orders' = xs
                 -- TODO should filter in database
                 |> filter (\x -> if q == "" then True else toLower x.customerId.name =~ toLower q)
                 |> filter (\x -> if excludePaid then not (isJust x.paidAt) else True)
                 |> filter (\x -> if excludeDelivered then not (isJust x.deliveredAt) else True)
-                |> sortOn (\x -> toLower x.customerId.name)
+        let orders'' = case ordering of
+                        OrderByName      -> orders' |> sortOn (\x -> toLower x.customerId.name)
+                        OrderByOrderedAt -> orders' |> sortOn (\x -> x.orderedAt)
+        let orders = case orderDir of
+                        OrderByAsc  -> orders''
+                        OrderByDesc -> reverse orders''
         render IndexView { .. }
 
     action ShowOrderAction { orderId } = do

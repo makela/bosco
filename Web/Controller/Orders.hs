@@ -154,12 +154,11 @@ buildOrder order = order
 
 fetchProducts :: (?modelContext :: ModelContext) =>IO [Product]
 fetchProducts = do
-    products <- query @Product
+    query @Product
         |> filterWhere (#enabled, True)
         |> orderByDesc #ordering
         |> orderByDesc #name
         |> fetch
-    return products
 
 groupProducts :: [Product] -> ProductsByProducers
 groupProducts products = go products mempty

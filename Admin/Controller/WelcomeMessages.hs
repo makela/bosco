@@ -19,7 +19,7 @@ instance Controller WelcomeMessagesController where
     action NewWelcomeMessageAction = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
-        let welcomeMessage = newRecord
+        let welcomeMessage = newRecord |> set #isOrderingEnabled True
         render NewView { .. }
 
     action ShowWelcomeMessageAction { welcomeMessageId } = do
