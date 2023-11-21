@@ -1,11 +1,14 @@
 module Admin.Controller.Customers where
 
+import qualified Data.Text.Encoding as E
+
+import Admin.Controller.Orders (queryYears)
 import Admin.Controller.Prelude
+import Admin.View.Customers.Edit
+import Admin.View.Customers.Email
 import Admin.View.Customers.Index
 import Admin.View.Customers.New
-import Admin.View.Customers.Edit
 import Admin.View.Customers.Show
-import Admin.View.Customers.Email
 
 import Web.Controller.Orders (isEmail', isPhone)
 
@@ -74,14 +77,20 @@ instance Controller CustomersController where
         redirectTo CustomersAction
 
     action EmailsForDeliveryInfoAction = do
+        (yearNow, years) <- queryYears
+        let year = paramOrDefault @Integer yearNow "year"
+        let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
+        let dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
         customers <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
+            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateAfter)
+            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateBefore)
             |> fetch
             >>= collectionFetchRelated #customerId
         let emails = sort . nub $ map (\x -> x.customerId.email) customers
-        render EmailView { .. }
+        render YearlyEmailView { .. }
 
     action EmailsForNewsLetterAction = do
         user <- fetch currentUserId
