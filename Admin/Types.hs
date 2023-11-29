@@ -81,3 +81,8 @@ data PaymentInstructionsController
     | UpdatePaymentInstructionAction { paymentInstructionId :: !(Id PaymentInstruction) }
     | DeletePaymentInstructionAction { paymentInstructionId :: !(Id PaymentInstruction) }
     deriving (Eq, Show, Data)
+
+data PasswordsController
+    = NewPasswordAction
+    | UpdatePasswordAction
+    deriving (Eq, Show, Data)

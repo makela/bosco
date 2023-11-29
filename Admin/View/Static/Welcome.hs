@@ -6,6 +6,7 @@ data WelcomeView = WelcomeView { user :: !User }
 instance View WelcomeView where
     html WelcomeView { .. } = [hsx|
         <a class="js-delete js-delete-no-confirm back-button float-right p-2" href={DeleteSessionAction}>Logout</a>
+        <a class="float-right p-2" href={NewPasswordAction}>Change password</a>
         <ol class="my-4">
             {links}
         </ol>

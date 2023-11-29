@@ -42,6 +42,7 @@
                         text
                         hlint
                         mmark
+                        password
                     ];
                 };
             };

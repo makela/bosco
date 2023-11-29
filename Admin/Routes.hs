@@ -1,7 +1,7 @@
 module Admin.Routes where
-import IHP.RouterPrelude
-import Generated.Types
 import Admin.Types
+import Generated.Types
+import IHP.RouterPrelude
 
 -- Generator Marker
 instance AutoRoute StaticController
@@ -11,6 +11,5 @@ instance AutoRoute ProductsController
 instance AutoRoute CustomersController
 instance AutoRoute OrdersController
 instance AutoRoute WelcomeMessagesController
-
 instance AutoRoute PaymentInstructionsController
-
+instance AutoRoute PasswordsController
