@@ -1,6 +1,8 @@
 module Admin.View.WelcomeMessages.Index where
 import Admin.View.Prelude
 
+import Admin.View.CheckMark (isEnabled)
+
 data IndexView = IndexView { welcomeMessages :: [WelcomeMessage] , pagination :: Pagination }
 
 instance View IndexView where
@@ -12,6 +14,7 @@ instance View IndexView where
                 <thead>
                     <tr>
                         <th>Published</th>
+                        <th>Is Ordering Enabled</th>
                     </tr>
                 </thead>
                 <tbody>{forEach welcomeMessages renderWelcomeMessage}</tbody>
@@ -30,5 +33,6 @@ renderWelcomeMessage :: WelcomeMessage -> Html
 renderWelcomeMessage welcomeMessage = [hsx|
     <tr>
         <td><a href={ShowWelcomeMessageAction welcomeMessage.id}>{timeAgo welcomeMessage.publishedAt}</a></td>
+        <td>{isEnabled welcomeMessage.isOrderingEnabled}</td>
     </tr>
 |]

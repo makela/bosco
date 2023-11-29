@@ -12,7 +12,7 @@ instance Controller WelcomeMessagesController where
     action WelcomeMessagesAction = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
-        (welcomeMessagesQ, pagination) <- query @WelcomeMessage |> paginate
+        (welcomeMessagesQ, pagination) <- query @WelcomeMessage |> orderByDesc #publishedAt |> paginate
         welcomeMessages <- welcomeMessagesQ |> fetch
         render IndexView { .. }
 
