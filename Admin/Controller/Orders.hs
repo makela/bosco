@@ -64,7 +64,7 @@ instance Controller OrdersController where
         setSuccessMessage "Order paid"
         redirectTo ShowOrderAction { orderId }
 
-    action UpdateCancelOrderAction { orderId } = do
+    action DeleteCancelOrderAction { orderId } = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
         now <- getCurrentTime
@@ -73,7 +73,7 @@ instance Controller OrdersController where
             |> setJust #cancelledAt now
             |> updateRecord
         setSuccessMessage "Order cancelled"
-        redirectTo ShowOrderAction { orderId }
+        redirectTo OrdersAction
 
     action UpdateDeliverOrderAction { orderId } = do
         now <- getCurrentTime
