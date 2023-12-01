@@ -1,8 +1,10 @@
 module Web.Controller.Orders
-    ( fetchShowOrderContext
+    ( createOrder
+    , fetchShowOrderContext
+    , groupOrderedProducts
+    , groupProducts
     , isEmail'
     , isPhone
-    , groupOrderedProducts
     , sortProducers
     ) where
 
@@ -28,15 +30,13 @@ instance Controller OrdersController where
     action NewOrderAction = do
         message <- fetchLastWelcomeMessage
         unless (maybe False (.isOrderingEnabled) message) renderNotFound
-        xs <- query @Producer
-            |> filterWhere (#enabled, True)
-            |> orderBy #name
-            |> fetch
+        xs <- fetchProducers
         let producers = sortProducers xs
         products <- fetchProducts
         let orders = mempty
         let productsByProducers = groupProducts products
         let customer = newRecord @Customer
+        let actionUrl = pathTo CreateOrderAction
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
@@ -48,46 +48,12 @@ instance Controller OrdersController where
     action CreateOrderAction = do
         message <- fetchLastWelcomeMessage
         unless (maybe False (.isOrderingEnabled) message) (redirectTo OrdersAction)
-        producers <- query @Producer
-            |> orderBy #name
-            |> fetch
+        producers <- fetchProducers
         products <- fetchProducts
-        let params = products
-                |> map (\x -> (x.id, paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)))
-                |> filter (\(_, i) -> i > 0)
-        let orders = Map.fromList params
-        let productsByProducers = groupProducts products
-        -- TODO if Map.isEmpty orders then render NewView { .. } else
-        -- TODO save valid customer information for later use
-        -- TODO match existing customer
-        let customer = newRecord @Customer
-        customer
-            |> buildCustomer
-            |> ifValid \case
-                Left customer -> do
-                    render NewView { .. }
-                Right customer -> do
-                    let order = newRecord @Order
-                    order
-                        |> buildOrder
-                        |> ifValid \case
-                            Left order -> do
-                                render NewView { .. }
-                            Right order -> do
-                                -- TODO transaction
-                                customer <- customer |> createRecord
-                                order <- order
-                                    |> set #customerId customer.id
-                                    |> createRecord
-                                let orders = params
-                                        |> map (\(pid, count) ->
-                                              newRecord @OrderedProduct
-                                                  |> set #orderId order.id
-                                                  |> set #productId pid
-                                                  |> set #quantity count)
-                                forM_ orders createRecord
-                                setSuccessMessage "Tilaus lähetetty"
-                                redirectTo ShowOrderAction { orderId = order.id }
+        let actionUrl = pathTo CreateOrderAction
+        createOrder actionUrl producers products $ \order -> do
+            setSuccessMessage "Tilaus lähetetty"
+            redirectTo ShowOrderAction { orderId = order.id }
 
     action UpdateCancelOrderAction { orderId } = do
         order <- fetch orderId
@@ -152,6 +118,13 @@ buildOrder order = order
     |> fill @'["customerId"]
     -- TODO validate the order, empty orders are worth of nothing
 
+fetchProducers :: (?modelContext :: ModelContext) =>IO [Producer]
+fetchProducers = do
+    query @Producer
+        |> filterWhere (#enabled, True)
+        |> orderByDesc #name
+        |> fetch
+
 fetchProducts :: (?modelContext :: ModelContext) =>IO [Product]
 fetchProducts = do
     query @Product
@@ -205,3 +178,41 @@ fetchShowOrderContext orderId = do
 
 fetchLastWelcomeMessage :: (?modelContext :: ModelContext) => IO (Maybe WelcomeMessage)
 fetchLastWelcomeMessage = query @WelcomeMessage |> orderByDesc #publishedAt |> fetchOneOrNothing
+
+createOrder :: (?context::ControllerContext, ?modelContext :: ModelContext) => Text -> [Producer] -> [Product] -> (Order -> IO ()) -> IO ()
+createOrder actionUrl producers products after = do
+    let params = products
+            |> map (\x -> (x.id, paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)))
+            |> filter (\(_, i) -> i > 0)
+    let orders = Map.fromList params
+    let productsByProducers = groupProducts products
+    -- TODO if Map.isEmpty orders then render NewView { .. } else
+    -- TODO save valid customer information for later use
+    -- TODO match existing customer
+    let customer = newRecord @Customer
+    customer
+        |> buildCustomer
+        |> ifValid \case
+            Left customer -> do
+                render NewView { .. }
+            Right customer -> do
+                let order = newRecord @Order
+                order
+                    |> buildOrder
+                    |> ifValid \case
+                        Left order -> do
+                            render NewView { .. }
+                        Right order -> do
+                            -- TODO transaction
+                            customer <- customer |> createRecord
+                            order <- order
+                                |> set #customerId customer.id
+                                |> createRecord
+                            let orders = params
+                                    |> map (\(pid, count) ->
+                                          newRecord @OrderedProduct
+                                              |> set #orderId order.id
+                                              |> set #productId pid
+                                              |> set #quantity count)
+                            forM_ orders createRecord
+                            after order

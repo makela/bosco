@@ -1,6 +1,6 @@
 module Web.View.Orders.New where
-import Web.View.Prelude
 import Numeric
+import Web.View.Prelude
 
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -12,16 +12,17 @@ type Orders = Map (Id Product) Int
 type ProductsByProducers = Map (Id Producer) [Product]
 
 data NewView = NewView
-    { customer :: Customer
-    , orders :: Orders
-    , producers :: [Producer]
+    { customer            :: Customer
+    , orders              :: Orders
+    , producers           :: [Producer]
     , productsByProducers :: ProductsByProducers
+    , actionUrl           :: Text
     }
 
 instance View NewView where
     html NewView { .. } = [hsx|
         <h1>Tilauslomake</h1>
-        <form method="POST" action={CreateOrderAction}>
+        <form method="POST" action={actionUrl}>
             <div class="flex flex-wrap">
                 {forEach producers (renderProducer orders productsByProducers)}
             </div>
@@ -64,16 +65,16 @@ renderCustomerForm customer = [hsx|
         isInvalidAddress = isJust (getValidationFailure #address customer)
         nameFeedback = case getValidationFailure #name customer of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
-            Nothing -> mempty
+            Nothing     -> mempty
         emailFeedback = case getValidationFailure #email customer of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
-            Nothing -> mempty
+            Nothing     -> mempty
         phoneFeedback = case getValidationFailure #phone customer of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
-            Nothing -> mempty
+            Nothing     -> mempty
         addressFeedback = case getValidationFailure #address customer of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
-            Nothing -> mempty
+            Nothing     -> mempty
 
 renderProducer :: Orders -> ProductsByProducers -> Producer -> Html
 renderProducer orders productsByProducer producer = [hsx|

@@ -55,7 +55,9 @@ data CustomersController
 
 data OrdersController
     = OrdersAction
+    | NewOrderAction
     | ShowOrderAction { orderId :: !(Id Order) }
+    | CreateOrderAction
     | UpdateMarkPaidOrderAction { orderId :: !(Id Order) }
     | DeleteCancelOrderAction { orderId :: !(Id Order) }
     | UpdateDeliverOrderAction { orderId :: !(Id Order) }

@@ -9,8 +9,10 @@ import Admin.Controller.Prelude
 import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
-import Web.Controller.Orders (fetchShowOrderContext, groupOrderedProducts,
+import Web.Controller.Orders (createOrder, fetchShowOrderContext,
+                              groupOrderedProducts, groupProducts,
                               sortProducers)
+import Web.View.Orders.New
 
 instance Controller OrdersController where
     beforeAction = ensureIsUser
@@ -47,11 +49,29 @@ instance Controller OrdersController where
                         OrderByDesc -> reverse orders''
         render IndexView { .. }
 
+    action NewOrderAction = do
+        xs <- fetchProducers
+        let producers = sortProducers xs
+        products <- fetchProducts
+        let orders = mempty
+        let productsByProducers = groupProducts products
+        let customer = newRecord @Customer
+        let actionUrl = pathTo CreateOrderAction
+        render NewView { .. }
+
     action ShowOrderAction { orderId } = do
         user <- fetch currentUserId
         (order, totalSum, orderedProductsByProducer, producers) <-
             fetchShowOrderContext orderId
         render ShowView { .. }
+
+    action CreateOrderAction = do
+        producers <- fetchProducers
+        products <- fetchProducts
+        let actionUrl = pathTo CreateOrderAction
+        createOrder actionUrl producers products $ \order -> do
+            setSuccessMessage "Order created"
+            redirectTo ShowOrderAction { orderId = order.id }
 
     action UpdateMarkPaidOrderAction { orderId } = do
         user <- fetch currentUserId
@@ -127,3 +147,16 @@ queryYears = do
     let firstYear = fromMaybe yearNow maybeFirstYear
     let years = [firstYear .. yearNow]
     pure (yearNow, years)
+
+fetchProducers :: (?modelContext :: ModelContext) =>IO [Producer]
+fetchProducers = do
+    query @Producer
+        |> orderByDesc #name
+        |> fetch
+
+fetchProducts :: (?modelContext :: ModelContext) =>IO [Product]
+fetchProducts = do
+    query @Product
+        |> orderByDesc #ordering
+        |> orderByDesc #name
+        |> fetch

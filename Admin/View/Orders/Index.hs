@@ -54,8 +54,9 @@ instance View IndexView where
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbText "Orders"
+                , breadcrumbLink "New" NewOrderAction
                 ]
-            tableOrNot = if n == 0 then pure () else [hsx|
+            tableOrNot = unless (n == 0) [hsx|
                 <div class="table-responsive">
                     <table class="table">
                         <thead>
