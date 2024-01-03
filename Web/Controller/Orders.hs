@@ -110,9 +110,9 @@ isPhone text
     | ("0" `isPrefixOf` text) && l > 6 && l < 11 && onlyNumbers = Success
     | otherwise = Failure "Puhelinnumero on virheellinen"
     where
-        l = T.length $ T.filter ((/=) ' ') text
+        l = T.length $ T.filter (' ' /=) text
         validChars = "+0123456789 " :: String
-        onlyNumbers = T.all (\x -> x `elem` validChars) text
+        onlyNumbers = T.all (`elem` validChars) text
 
 buildOrder order = order
     |> fill @'["customerId"]

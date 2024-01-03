@@ -98,7 +98,7 @@ instance Controller CustomersController where
         customers <- query @Customer
             |> distinctOn #email
             |> fetch
-        let emails = sort . nub $ map (\x -> x.email) customers
+        let emails = sort . nub $ map (.email) customers
         render EmailView { .. }
 
 buildCustomer customer = customer

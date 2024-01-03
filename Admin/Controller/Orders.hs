@@ -19,14 +19,16 @@ instance Controller OrdersController where
 
     action OrdersAction = do
         (yearNow, years) <- queryYears
+        putStrLn $ "XXX " <> show yearNow
+        putStrLn $ "XXX " <> show years
         let year = paramOrDefault @Integer yearNow "year"
-        let q = paramOrDefault @Text "" "q"
-        let ordering = paramOrDefault @OrderBy OrderByName "ordering"
-        let orderDir = paramOrDefault @OrderDir OrderByAsc "orderDir"
-        let excludePaid = paramOrDefault @Bool False "excludePaid"
-        let excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
-        let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
-        let dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
+            q = paramOrDefault @Text "" "q"
+            ordering = paramOrDefault @OrderBy OrderByName "ordering"
+            orderDir = paramOrDefault @OrderDir OrderByAsc "orderDir"
+            excludePaid = paramOrDefault @Bool False "excludePaid"
+            excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
+            dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
+            dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
         -- TODO exclude handled orders, separate Action/View?
         xs <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
@@ -38,12 +40,12 @@ instance Controller OrdersController where
             >>= collectionFetchRelated #customerId
         let orders' = xs
                 -- TODO should filter in database
-                |> filter (\x -> if q == "" then True else toLower x.customerId.name =~ toLower q)
-                |> filter (\x -> if excludePaid then not (isJust x.paidAt) else True)
-                |> filter (\x -> if excludeDelivered then not (isJust x.deliveredAt) else True)
+                |> filter (\x -> q == "" || toLower x.customerId.name =~ toLower q)
+                |> filter (\x -> not excludePaid || isNothing x.paidAt)
+                |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)
         let orders'' = case ordering of
-                        OrderByName      -> orders' |> sortOn (\x -> toLower x.customerId.name)
-                        OrderByOrderedAt -> orders' |> sortOn (\x -> x.orderedAt)
+                        OrderByName      -> orders' |> sortOn (toLower . (.customerId.name))
+                        OrderByOrderedAt -> orders' |> sortOn (.orderedAt)
         let orders = case orderDir of
                         OrderByAsc  -> orders''
                         OrderByDesc -> reverse orders''
@@ -51,12 +53,12 @@ instance Controller OrdersController where
 
     action NewOrderAction = do
         xs <- fetchProducers
-        let producers = sortProducers xs
         products <- fetchProducts
-        let orders = mempty
-        let productsByProducers = groupProducts products
-        let customer = newRecord @Customer
-        let actionUrl = pathTo CreateOrderAction
+        let producers = sortProducers xs
+            orders = mempty
+            productsByProducers = groupProducts products
+            customer = newRecord @Customer
+            actionUrl = pathTo CreateOrderAction
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
@@ -109,8 +111,8 @@ instance Controller OrdersController where
         accessDeniedUnless user.isAdmin
         (yearNow, years) <- queryYears
         let year = paramOrDefault @Integer yearNow "year"
-        let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
-        let dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
+            dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
+            dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
         orders <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
             |> filterWhereSql (#orderedAt, E.encodeUtf8 dateAfter)
@@ -129,32 +131,40 @@ instance Controller OrdersController where
         let producers = sortProducers xs
         render OrderedProductsView { .. }
 
-mergeByProductId orders = go [] orders
+mergeByProductId = go []
     where go acc [] = acc
           go acc (x:xs) =
-              let q = x.quantity + (sum $ map (.quantity) (filter (\y -> x.productId == y.productId) xs))
+              let q = x.quantity + sum (map (.quantity) (filter (\y -> x.productId == y.productId) xs))
               in go (x { quantity = q } : acc) (filter (\y -> x.productId /= y.productId) xs)
 
 
 queryYears :: (?context::ControllerContext, ?modelContext::ModelContext) => IO (Integer, [Integer])
 queryYears = do
     now <- getCurrentTime
-    let (yearNow, _, _) = toGregorian $ utctDay now
     firstOrder <- query @Order
         |> orderByAsc #orderedAt
+        |> limit 1
         |> fetchOneOrNothing
-    let maybeFirstYear = fmap ((\(y, _, _) -> y) . toGregorian . utctDay . (\x -> x.orderedAt)) firstOrder
-    let firstYear = fromMaybe yearNow maybeFirstYear
-    let years = [firstYear .. yearNow]
-    pure (yearNow, years)
+    lastOrder <- query @Order
+        |> orderByDesc #orderedAt
+        |> limit 1
+        |> fetchOneOrNothing
+    let (yearNow, _, _) = toGregorian $ utctDay now
+        maybeFirstYear = maybeYear firstOrder
+        maybeLastYear = maybeYear lastOrder
+        firstYear = fromMaybe yearNow maybeFirstYear
+        lastYear = fromMaybe yearNow maybeLastYear
+        years = [firstYear .. lastYear]
+    pure (lastYear, years)
+    where maybeYear = fmap ((\(y, _, _) -> y) . toGregorian . utctDay . (.orderedAt))
 
-fetchProducers :: (?modelContext :: ModelContext) =>IO [Producer]
+fetchProducers :: (?modelContext :: ModelContext) => IO [Producer]
 fetchProducers = do
     query @Producer
         |> orderByDesc #name
         |> fetch
 
-fetchProducts :: (?modelContext :: ModelContext) =>IO [Product]
+fetchProducts :: (?modelContext :: ModelContext) => IO [Product]
 fetchProducts = do
     query @Product
         |> orderByDesc #ordering
