@@ -42,7 +42,7 @@ instance Controller OrdersController where
     action ShowOrderAction { orderId } = do
         (order, totalSum, orderedProductsByProducer, producers) <-
             fetchShowOrderContext orderId
-        paymentInstruction <- query @PaymentInstruction |> fetchOneOrNothing
+        paymentInstruction <- query @PaymentInstruction |> orderByDesc #publishedAt |> fetchOneOrNothing
         render ShowView { .. }
 
     action CreateOrderAction = do
