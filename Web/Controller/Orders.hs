@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import qualified Network.URI.Encode as E
 
 import Web.Controller.Prelude
+import Web.Mail.Orders.Order
 import Web.View.Orders.Index
 import Web.View.Orders.New
 import Web.View.Orders.NewEmail
@@ -53,6 +54,10 @@ instance Controller OrdersController where
         let actionUrl = pathTo CreateOrderAction
         createOrder actionUrl producers products $ \order -> do
             setSuccessMessage "Tilaus lähetetty"
+            let email = newRecord @EmailOrderJob
+            email
+                |> set #orderId order.id
+                |> createRecord
             redirectTo ShowOrderAction { orderId = order.id }
 
     action UpdateCancelOrderAction { orderId } = do

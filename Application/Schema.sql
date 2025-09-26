@@ -62,6 +62,20 @@ CREATE TABLE payment_instructions (
     published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     text TEXT NOT NULL
 );
+CREATE TABLE email_order_jobs (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    status JOB_STATUS DEFAULT 'job_status_not_started' NOT NULL,
+    last_error TEXT DEFAULT NULL,
+    attempts_count INT DEFAULT 0 NOT NULL,
+    locked_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    locked_by UUID DEFAULT NULL,
+    run_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    order_id UUID NOT NULL
+);
+CREATE INDEX email_order_jobs_order_id_index ON email_order_jobs (order_id);
+ALTER TABLE email_order_jobs ADD CONSTRAINT email_order_jobs_ref_order_id FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE NO ACTION;
 ALTER TABLE ordered_products ADD CONSTRAINT ordered_products_ref_order_id FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE NO ACTION;
 ALTER TABLE ordered_products ADD CONSTRAINT ordered_products_ref_product_id FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE NO ACTION;
 ALTER TABLE orders ADD CONSTRAINT orders_ref_customer_id FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE NO ACTION;

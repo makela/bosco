@@ -1,15 +1,16 @@
 module Main where
 import IHP.Prelude
 
-import Config
-import qualified IHP.Server
-import IHP.RouterSupport
-import IHP.FrameworkConfig
-import IHP.Job.Types
-import Web.FrontController
-import Web.Types
 import Admin.FrontController
 import Admin.Types
+import Config
+import IHP.FrameworkConfig
+import IHP.Job.Types
+import IHP.RouterSupport
+import qualified IHP.Server
+import Web.FrontController
+import Web.Types
+import Web.Worker
 
 instance FrontController RootApplication where
     controllers = [
@@ -18,7 +19,7 @@ instance FrontController RootApplication where
         ]
 
 instance Worker RootApplication where
-    workers _ = []
+    workers _ = workers WebApplication
 
 main :: IO ()
 main = IHP.Server.run config

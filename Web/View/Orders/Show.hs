@@ -1,19 +1,18 @@
 module Web.View.Orders.Show where
-import Web.View.Prelude
 import Web.View.Orders.Index (renderMarkdown)
+import Web.View.Orders.New (formatMoney)
+import Web.View.Prelude
 
 import qualified Data.Map as Map
-
-import Web.View.Orders.New (formatMoney)
 
 type OrderedProductsByProducer = Map (Id' "producers") [OrderedProduct' (Id' "orders") Product]
 
 data ShowView = ShowView
-    { order :: Include "customerId" Order
-    , producers :: [Producer]
+    { order                     :: Include "customerId" Order
+    , producers                 :: [Producer]
     , orderedProductsByProducer :: OrderedProductsByProducer
-    , totalSum :: Int
-    , paymentInstruction :: Maybe PaymentInstruction
+    , totalSum                  :: Int
+    , paymentInstruction        :: Maybe PaymentInstruction
     }
 
 instance View ShowView where
@@ -27,6 +26,7 @@ instance View ShowView where
         </tbody>
         </table>
         {renderPaymentInstruction order paymentInstruction}
+        <p>Lasku on lähetetty myös sähköpostiinne.</p>
     |]
 
 renderPaymentInstruction :: Include "customerId" Order -> Maybe PaymentInstruction -> Html
@@ -34,10 +34,6 @@ renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.ca
     (Nothing, Nothing) -> [hsx|
             <h2>Maksuohjeet</h2>
             {instructions}
-            <p>
-                Voit myös
-                <a href="#" onclick="window.print(); return false">tulostaa</a> laskun.
-            </p>
         |]
     (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
     (Just _, _) -> [hsx|<p class="font-bold">Lasku on maksettu.</p>|]
