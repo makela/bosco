@@ -31,7 +31,8 @@ CREATE TABLE customers (
     phone TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     last_modified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    address TEXT DEFAULT '' NOT NULL
+    address TEXT DEFAULT '' NOT NULL,
+    reverse_name TEXT DEFAULT '' NOT NULL
 );
 CREATE TABLE orders (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,

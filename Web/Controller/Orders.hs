@@ -209,7 +209,10 @@ createOrder actionUrl producers products after = do
                             render NewView { .. }
                         Right order -> do
                             -- TODO transaction
-                            customer <- customer |> createRecord
+                            let reverseName = toLower . unwords . reverse $ words customer.name
+                            customer <- customer
+                                |> set #reverseName reverseName
+                                |> createRecord
                             order <- order
                                 |> set #customerId customer.id
                                 |> createRecord

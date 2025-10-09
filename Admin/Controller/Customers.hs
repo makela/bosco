@@ -19,7 +19,8 @@ instance Controller CustomersController where
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
         (customersQ, pagination) <- query @Customer
-            |> orderBy #name
+            |> distinctOn #reverseName
+            |> orderBy #reverseName
             |> paginate
         customers <- customersQ |> fetch
         render IndexView { .. }
