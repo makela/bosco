@@ -79,7 +79,10 @@ instance Controller OrdersController where
                 Left customer -> do
                     render NewEmailView { .. }
                 Right customer -> do
-                    customer <- customer |> createRecord
+                    let reverseName = toLower . unwords . reverse $ words customer.name
+                    customer <- customer
+                        |> set #reverseName reverseName
+                        |> createRecord
                     setSuccessMessage "Tiedot tallennettu"
                     redirectTo OrdersAction
 

@@ -52,7 +52,10 @@ instance Controller CustomersController where
             |> ifValid \case
                 Left customer -> render EditView { .. }
                 Right customer -> do
-                    customer <- customer |> updateRecord
+                    let reverseName = toLower . unwords . reverse $ words customer.name
+                    customer <- customer
+                        |> set #reverseName reverseName
+                        |> updateRecord
                     setSuccessMessage "Customer updated"
                     redirectTo ShowCustomerAction { .. }
 
