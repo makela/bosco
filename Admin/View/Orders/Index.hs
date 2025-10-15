@@ -20,6 +20,7 @@ data IndexView = IndexView
     , q                :: Text
     , ordering         :: OrderBy
     , orderDir         :: OrderDir
+    , excludeInvoiced  :: Bool
     , excludePaid      :: Bool
     , excludeDelivered :: Bool
     , year             :: Integer
@@ -34,6 +35,11 @@ instance View IndexView where
             {renderYearSelect years year}
             {renderOrderBy ordering}
             {renderOrderDir orderDir}
+            <br />
+            <label>
+                <input type="checkbox" name="excludeInvoiced" checked={excludeInvoiced} onchange="this.form.submit()"/>
+                Exclude invoiced orders
+            </label>
             <br />
             <label>
                 <input type="checkbox" name="excludePaid" checked={excludePaid} onchange="this.form.submit()"/>
@@ -63,6 +69,7 @@ instance View IndexView where
                             <tr>
                                 <th>Ordered At</th>
                                 <th>Customer</th>
+                                <th>Invoiced At</th>
                                 <th>Paid At</th>
                                 <th>Delivered At</th>
                             </tr>
@@ -77,6 +84,7 @@ renderOrder order = [hsx|
     <tr>
         <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
         <td>{order.customerId.name}</td>
+        <td>{fmap formatUTCTime order.invoicedAt}</td>
         <td>{fmap formatUTCTime order.paidAt}</td>
         <td>{fmap formatUTCTime order.deliveredAt}</td>
     </tr>

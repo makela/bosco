@@ -19,12 +19,11 @@ instance Controller OrdersController where
 
     action OrdersAction = do
         (yearNow, years) <- queryYears
-        putStrLn $ "XXX " <> show yearNow
-        putStrLn $ "XXX " <> show years
         let year = paramOrDefault @Integer yearNow "year"
             q = paramOrDefault @Text "" "q"
             ordering = paramOrDefault @OrderBy OrderByName "ordering"
             orderDir = paramOrDefault @OrderDir OrderByAsc "orderDir"
+            excludeInvoiced = paramOrDefault @Bool False "excludeInvoiced"
             excludePaid = paramOrDefault @Bool False "excludePaid"
             excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
             dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
@@ -41,6 +40,7 @@ instance Controller OrdersController where
         let orders' = xs
                 -- TODO should filter in database
                 |> filter (\x -> q == "" || toLower x.customerId.name =~ toLower q)
+                |> filter (\x -> not excludeInvoiced || isNothing x.invoicedAt)
                 |> filter (\x -> not excludePaid || isNothing x.paidAt)
                 |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)
         let orders'' = case ordering of
@@ -104,6 +104,15 @@ instance Controller OrdersController where
             |> setJust #deliveredAt now
             |> updateRecord
         setSuccessMessage "Order delivered"
+        redirectTo ShowOrderAction { orderId }
+
+    action UpdateInvoiceOrderAction { orderId } = do
+        now <- getCurrentTime
+        order <- fetch orderId
+        order
+            |> setJust #invoicedAt now
+            |> updateRecord
+        setSuccessMessage "Order invoiced"
         redirectTo ShowOrderAction { orderId }
 
     action OrderedProductsAction = do

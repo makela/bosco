@@ -45,6 +45,13 @@ instance View ShowView where
                         <input type="submit" value="Mark as delivered" />
                     </form>
                 |]
+            markInvoiced = case order.invoicedAt of
+                Just _ -> pure ()
+                Nothing -> [hsx|
+                    <form method="POST" action={UpdateInvoiceOrderAction order.id}>
+                        <input type="submit" value="Mark as invoiced" />
+                    </form>
+                |]
             cancelOrder = case (user.isAdmin, order.paidAt) of
                 (True, Nothing) -> [hsx|
                     <p><a href={DeleteCancelOrderAction order.id} class="js-delete back-button">Cancel order</a></p>
@@ -53,6 +60,7 @@ instance View ShowView where
             cancelledOrControls = case order.cancelledAt of
                 Just x -> [hsx|<p>Cancelled {formatUTCTime x}</p>|]
                 Nothing -> [hsx|
+                    {markInvoiced}
                     {markPaid}
                     {markDelivered}
                     {cancelOrder}
