@@ -1,7 +1,11 @@
 module Admin.View.Orders.Index where
+
+import qualified Data.Map as Map
+
 import Admin.View.Prelude
 import Data.Time.Format (formatTime)
 import IHP.Controller.Param
+import Web.View.Orders.New (formatMoney)
 
 data OrderBy = OrderByName | OrderByOrderedAt deriving Eq
 
@@ -17,6 +21,7 @@ instance ParamReader OrderDir where
 
 data IndexView = IndexView
     { orders           :: [Include "customerId" Order]
+    , priceMap         :: Map (Id Order) Int
     , q                :: Text
     , ordering         :: OrderBy
     , orderDir         :: OrderDir
@@ -67,28 +72,40 @@ instance View IndexView where
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Ordered At</th>
+                                <th>Ordered</th>
                                 <th>Customer</th>
-                                <th>Invoiced At</th>
-                                <th>Paid At</th>
-                                <th>Delivered At</th>
+                                <th>Invoiced</th>
+                                <th>Price</th>
+                                <th>Paid</th>
+                                <th>Delivered</th>
                             </tr>
                         </thead>
-                        <tbody>{forEach orders renderOrder}</tbody>
+                        <tbody>{forEach orders (renderOrder priceMap)}</tbody>
                     </table>
                 </div>
             |]
 
-renderOrder :: Include "customerId" Order -> Html
-renderOrder order = [hsx|
+renderOrder :: Map (Id Order) Int -> Include "customerId" Order -> Html
+renderOrder priceMap order = [hsx|
     <tr>
         <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
         <td>{order.customerId.name}</td>
         <td>{fmap formatUTCTime order.invoicedAt}</td>
-        <td>{fmap formatUTCTime order.paidAt}</td>
+        <td>{fmap formatMoney $ Map.lookup order.id priceMap}</td>
+        <td>{showOrMarkPaid order}</td>
         <td>{fmap formatUTCTime order.deliveredAt}</td>
     </tr>
 |]
+
+showOrMarkPaid :: Include "customerId" Order -> Html
+showOrMarkPaid order =
+    case order.paidAt of
+      Just paidAt -> [hsx|{formatUTCTime paidAt}|]
+      Nothing     -> [hsx|
+                    <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
+                        <input type="submit" value="Mark as paid" />
+                    </form>
+      |]
 
 renderYearSelect :: [Integer] -> Integer -> Html
 renderYearSelect years year = [hsx|

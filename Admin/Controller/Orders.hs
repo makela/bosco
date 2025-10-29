@@ -9,7 +9,7 @@ import Admin.Controller.Prelude
 import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
-import Web.Controller.Orders (createOrder, fetchShowOrderContext,
+import Web.Controller.Orders (countSum, createOrder, fetchShowOrderContext,
                               groupOrderedProducts, groupProducts,
                               sortProducers)
 import Web.View.Orders.New
@@ -49,6 +49,8 @@ instance Controller OrdersController where
         let orders = case orderDir of
                         OrderByAsc  -> orders''
                         OrderByDesc -> reverse orders''
+        prices <- mapM priceForOrder orders
+        let priceMap = Map.fromList prices
         render IndexView { .. }
 
     action NewOrderAction = do
@@ -84,7 +86,7 @@ instance Controller OrdersController where
             |> setJust #paidAt now
             |> updateRecord
         setSuccessMessage "Order paid"
-        redirectTo ShowOrderAction { orderId }
+        redirectTo OrdersAction
 
     action DeleteCancelOrderAction { orderId } = do
         user <- fetch currentUserId
@@ -179,3 +181,12 @@ fetchProducts = do
         |> orderByDesc #ordering
         |> orderByDesc #name
         |> fetch
+
+priceForOrder :: (?modelContext :: ModelContext) => Include "customerId" Order -> IO (Id Order, Int)
+priceForOrder order = do
+    xs <- query @OrderedProduct
+        |> filterWhere (#orderId, order.id)
+        |> fetch
+        >>= collectionFetchRelated #productId
+    let totalSum = countSum xs
+    return (order.id, totalSum)

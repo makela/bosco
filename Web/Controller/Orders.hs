@@ -1,5 +1,6 @@
 module Web.Controller.Orders
     ( createOrder
+    , countSum
     , fetchShowOrderContext
     , groupOrderedProducts
     , groupProducts

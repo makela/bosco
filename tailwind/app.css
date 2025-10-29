@@ -48,6 +48,10 @@ input[type=submit], a.btn, button.btn {
   @apply rounded m-8 px-4 py-2 bg-blue-500 text-white cursor-pointer;
 }
 
+table tr td input[type=submit] {
+  @apply m-0 float-none;
+}
+
 input[type=text], input[type=email], input[type=password], input[type=search], input[type=checkbox], select {
   @apply focus:ring-blue-500 focus:border-blue-500 border-gray-300 rounded-md;
 }
