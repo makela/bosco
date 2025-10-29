@@ -16,7 +16,7 @@ instance View IndexView where
     |]
         where
             orderButton = if maybe False (.isOrderingEnabled) message
-                          then [hsx|<a href={NewOrderAction} class="btn">Täytä tilaus</a>|]
+                          then [hsx|<a href={NewOrderAction} class="btn" data-turbolinks="false">Täytä tilaus</a>|]
                           else [hsx||]
 
 renderMarkdown text = case text |> MMark.parse "" of
