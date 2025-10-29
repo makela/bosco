@@ -1,4 +1,5 @@
 module Admin.View.Products.Index where
+import Admin.View.CheckMark (isEnabled)
 import Admin.View.Prelude
 import Web.View.Orders.New (formatMoney)
 
@@ -17,6 +18,7 @@ instance View IndexView where
                         <th>Name</th>
                         <th>Package</th>
                         <th>Price</th>
+                        <th>Enabled</th>
                     </tr>
                 </thead>
                 <tbody>{forEach products renderProduct}</tbody>
@@ -38,5 +40,6 @@ renderProduct product = [hsx|
         <td><a href={ShowProductAction product.id}>{product.name}</a></td>
         <td>{product.package}</td>
         <td>{formatMoney product.price}</td>
+        <td>{isEnabled product.enabled}</td>
     </tr>
 |]
