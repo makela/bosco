@@ -12,7 +12,7 @@ instance View IndexView where
     html IndexView { .. } = [hsx|
         <p>{renderMarkdown $ maybe "" (.text) message}</p>
         {orderButton}
-        <a href={NewEmailAction}>Tilaa uutiskirje</a>
+        <a href={NewEmailAction} data-turbolinks="false">Tilaa uutiskirje</a>
     |]
         where
             orderButton = if maybe False (.isOrderingEnabled) message
