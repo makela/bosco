@@ -93,7 +93,7 @@ instance Controller CustomersController where
             |> filterWhereSql (#orderedAt, E.encodeUtf8 dateBefore)
             |> fetch
             >>= collectionFetchRelated #customerId
-        let emails = sort . nub $ map (\x -> x.customerId.email) customers
+        let emails = sort . nub $ map (toLower . (\x -> x.customerId.email)) customers
         render YearlyEmailView { .. }
 
     action EmailsForNewsLetterAction = do
@@ -102,7 +102,7 @@ instance Controller CustomersController where
         customers <- query @Customer
             |> distinctOn #email
             |> fetch
-        let emails = sort . nub $ map (.email) customers
+        let emails = sort . nub $ map (toLower . (.email)) customers
         render EmailView { .. }
 
 buildCustomer customer = customer
