@@ -7,9 +7,14 @@ import Data.Time.Format (formatTime)
 import IHP.Controller.Param
 import Web.View.Orders.New (formatMoney)
 
-data OrderBy = OrderByName | OrderByOrderedAt deriving Eq
+data OrderBy
+    = OrderByName
+    | OrderByOrderedAt
+    | OrderByPrice
+    deriving Eq
 
 instance ParamReader OrderBy where
+    readParameter "price"      = Right OrderByPrice
     readParameter "ordered at" = Right OrderByOrderedAt
     readParameter _            = Right OrderByName
 
@@ -129,6 +134,7 @@ renderOrderBy ordering = [hsx|
         <select name="ordering" onchange="this.form.submit()">
             <option selected={ordering == OrderByName}>customer</option>
             <option selected={ordering == OrderByOrderedAt}>ordered at</option>
+            <option selected={ordering == OrderByPrice}>price</option>
         </select>
     </label>
 |]

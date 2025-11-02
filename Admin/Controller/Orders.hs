@@ -43,14 +43,15 @@ instance Controller OrdersController where
                 |> filter (\x -> not excludeInvoiced || isNothing x.invoicedAt)
                 |> filter (\x -> not excludePaid || isNothing x.paidAt)
                 |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)
+        prices <- mapM priceForOrder orders'
+        let priceMap = Map.fromList prices
         let orders'' = case ordering of
                         OrderByName      -> orders' |> sortOn (toLower . (.customerId.name))
                         OrderByOrderedAt -> orders' |> sortOn (.orderedAt)
+                        OrderByPrice -> orders' |> sortOn (\x -> Map.lookup x.id priceMap)
         let orders = case orderDir of
                         OrderByAsc  -> orders''
                         OrderByDesc -> reverse orders''
-        prices <- mapM priceForOrder orders
-        let priceMap = Map.fromList prices
         render IndexView { .. }
 
     action NewOrderAction = do
