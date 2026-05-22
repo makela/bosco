@@ -5,7 +5,6 @@ import IHP.Environment
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Generated.Types
-import IHP.Controller.RequestContext
 import Web.Types
 import Web.Routes
 import Application.Helper.View

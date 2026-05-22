@@ -34,5 +34,4 @@ instance FrontController AdminApplication where
 instance InitControllerContext AdminApplication where
     initContext = do
         setLayout defaultLayout
-        initAutoRefresh
         initAuthentication @User

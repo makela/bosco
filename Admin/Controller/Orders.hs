@@ -1,11 +1,11 @@
 module Admin.Controller.Orders where
 
 import qualified Data.Map as Map
-import qualified Data.Text.Encoding as E
 
+import Data.Ord
 import Text.Regex.TDFA
 
-import Admin.Controller.Prelude
+import Admin.Controller.Prelude hiding (createOrder)
 import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
@@ -31,8 +31,8 @@ instance Controller OrdersController where
         -- TODO exclude handled orders, separate Action/View?
         xs <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
-            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateAfter)
-            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateBefore)
+            |> filterWhereSql (#orderedAt, dateAfter)
+            |> filterWhereSql (#orderedAt, dateBefore)
             |> fetch
             -- TODO should sort in database
             -- >>= pure . map (modify #customerId (orderBy #name))
@@ -127,8 +127,8 @@ instance Controller OrdersController where
             dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
         orders <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
-            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateAfter)
-            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateBefore)
+            |> filterWhereSql (#orderedAt, dateAfter)
+            |> filterWhereSql (#orderedAt, dateBefore)
             |> fetch
         let orderIds = map (.id) orders
         xs <- query @OrderedProduct
@@ -146,8 +146,8 @@ instance Controller OrdersController where
 mergeByProductId = go []
     where go acc [] = acc
           go acc (x:xs) =
-              let q = x.quantity + sum (map (.quantity) (filter (\y -> x.productId == y.productId) xs))
-              in go (x { quantity = q } : acc) (filter (\y -> x.productId /= y.productId) xs)
+              let q = x.quantity + sum (map (.quantity) (filter (\y -> x.productId.id == y.productId.id) xs))
+              in go (x { quantity = q } : acc) (filter (\y -> x.productId.id /= y.productId.id) xs)
 
 
 queryYears :: (?context::ControllerContext, ?modelContext::ModelContext) => IO (Integer, [Integer])

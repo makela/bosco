@@ -13,7 +13,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Network.URI.Encode as E
 
-import Web.Controller.Prelude
+import Web.Controller.Prelude hiding (createOrder)
 import Web.Mail.Orders.Order
 import Web.View.Orders.Index
 import Web.View.Orders.New
@@ -188,7 +188,7 @@ fetchShowOrderContext orderId = do
 fetchLastWelcomeMessage :: (?modelContext :: ModelContext) => IO (Maybe WelcomeMessage)
 fetchLastWelcomeMessage = query @WelcomeMessage |> orderByDesc #publishedAt |> fetchOneOrNothing
 
-createOrder :: (?context::ControllerContext, ?modelContext :: ModelContext) => Text -> [Producer] -> [Product] -> (Order -> IO ()) -> IO ()
+createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> (Order -> IO ()) -> IO ()
 createOrder actionUrl producers products after = do
     let params = products
             |> map (\x -> (x.id, paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)))

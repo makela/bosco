@@ -4,7 +4,7 @@ import Admin.Routes
 import Admin.Types
 import Application.Helper.View
 import Generated.Types
-import IHP.Controller.RequestContext
+import IHP.Controller.Context
 import IHP.Environment
 import IHP.ViewPrelude
 import qualified Text.Blaze.Html5 as H

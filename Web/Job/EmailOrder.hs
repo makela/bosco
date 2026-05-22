@@ -1,4 +1,7 @@
 module Web.Job.EmailOrder where
+
+import IHP.Mail
+
 import Web.Controller.Orders (fetchShowOrderContext)
 import Web.Controller.Prelude
 import Web.Mail.Orders.Order

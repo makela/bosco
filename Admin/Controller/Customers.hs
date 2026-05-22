@@ -1,7 +1,5 @@
 module Admin.Controller.Customers where
 
-import qualified Data.Text.Encoding as E
-
 import Admin.Controller.Orders (queryYears)
 import Admin.Controller.Prelude
 import Admin.View.Customers.Edit
@@ -89,8 +87,8 @@ instance Controller CustomersController where
         accessDeniedUnless user.isAdmin
         customers <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
-            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateAfter)
-            |> filterWhereSql (#orderedAt, E.encodeUtf8 dateBefore)
+            |> filterWhereSql (#orderedAt, dateAfter)
+            |> filterWhereSql (#orderedAt, dateBefore)
             |> fetch
             >>= collectionFetchRelated #customerId
         let emails = sort . nub $ map (toLower . (\x -> x.customerId.email)) customers

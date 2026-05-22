@@ -8,7 +8,7 @@ import Web.View.Layout (defaultLayout)
 import Web.Controller.Orders
 
 instance FrontController WebApplication where
-    controllers = 
+    controllers =
         [ startPage OrdersAction
         -- Generator Marker
         , parseRoute @OrdersController
@@ -17,4 +17,3 @@ instance FrontController WebApplication where
 instance InitControllerContext WebApplication where
     initContext = do
         setLayout defaultLayout
-        initAutoRefresh

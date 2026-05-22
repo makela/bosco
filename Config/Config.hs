@@ -3,10 +3,8 @@ module Config where
 import IHP.Prelude
 import IHP.Environment
 import IHP.FrameworkConfig
-import Web.View.CustomCSSFramework
+import IHP.View.CSSFramework
 
 config :: ConfigBuilder
 config = do
-    option Development
-    option (AppHostname "localhost")
-    option customTailwind
+    option tailwind

@@ -10,9 +10,6 @@ JS_FILES += static/app.js
 
 include ${IHP}/Makefile.dist
 
-tailwind-dev:
-	tailwindcss -c tailwind/tailwind.config.js -i ./tailwind/app.css -o static/app.css --watch
-
 static/app.css:
-	tailwindcss -c tailwind/tailwind.config.js -i ./tailwind/app.css -o static/app.css --minify
+	tailwindcss -i tailwind/app.css -o static/app.css --minify
 
