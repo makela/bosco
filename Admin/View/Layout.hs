@@ -4,14 +4,15 @@ import Admin.Routes
 import Admin.Types
 import Application.Helper.View
 import Generated.Types
-import IHP.Controller.Context
 import IHP.Environment
 import IHP.ViewPrelude
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 
 defaultLayout :: Html -> Html
-defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
+defaultLayout inner = [hsx|
+<!DOCTYPE html>
+<html lang="fi">
 <head>
     {metaTags}
 
@@ -26,6 +27,7 @@ defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
         {inner}
     </div>
 </body>
+</html>
 |]
 
 -- The 'assetPath' function used below appends a `?v=SOME_VERSION` to the static assets in production

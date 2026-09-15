@@ -2,7 +2,7 @@
     inputs = {
         # Here you can adjust the IHP version of your project
         # You can find new releases at https://github.com/digitallyinduced/ihp/releases
-        ihp.url = "github:digitallyinduced/ihp/v1.5";
+        ihp.url = "github:digitallyinduced/ihp/v1.6";
         nixpkgs.follows = "ihp/nixpkgs";
         flake-parts.follows = "ihp/flake-parts";
         devenv.follows = "ihp/devenv";
@@ -27,13 +27,7 @@
                     packages = with pkgs; [
                         # Native dependencies, e.g. imagemagick
                         watchman
-                        (tailwindcss_4.overrideAttrs
-                            (_: {
-                                plugins = [
-                                    nodePackages."@tailwindcss/forms"
-                                ];
-                            })
-                        )
+                        tailwindcss_4
                     ];
                     haskellPackages = p: with p; [
                         # Haskell dependencies go here

@@ -34,4 +34,3 @@ instance FrontController AdminApplication where
 instance InitControllerContext AdminApplication where
     initContext = do
         setLayout defaultLayout
-        initAuthentication @User

@@ -31,7 +31,7 @@ instance Controller OrdersController where
 
     action NewOrderAction = do
         message <- fetchLastWelcomeMessage
-        unless (maybe False (.isOrderingEnabled) message) renderNotFound
+        unless (maybe False (.isOrderingEnabled) message) (earlyReturn $ renderNotFound)
         xs <- fetchProducers
         let producers = sortProducers xs
         products <- fetchProducts
@@ -49,7 +49,7 @@ instance Controller OrdersController where
 
     action CreateOrderAction = do
         message <- fetchLastWelcomeMessage
-        unless (maybe False (.isOrderingEnabled) message) (redirectTo OrdersAction)
+        unless (maybe False (.isOrderingEnabled) message) (earlyReturn $ redirectTo OrdersAction)
         producers <- fetchProducers
         products <- fetchProducts
         let actionUrl = pathTo CreateOrderAction
@@ -188,7 +188,7 @@ fetchShowOrderContext orderId = do
 fetchLastWelcomeMessage :: (?modelContext :: ModelContext) => IO (Maybe WelcomeMessage)
 fetchLastWelcomeMessage = query @WelcomeMessage |> orderByDesc #publishedAt |> fetchOneOrNothing
 
-createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> (Order -> IO ()) -> IO ()
+createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> (Order -> IO ResponseReceived) -> IO ResponseReceived
 createOrder actionUrl producers products after = do
     let params = products
             |> map (\x -> (x.id, paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)))

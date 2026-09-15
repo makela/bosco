@@ -10,7 +10,9 @@ import Web.Routes
 import Application.Helper.View
 
 defaultLayout :: Html -> Html
-defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
+defaultLayout inner = [hsx|
+<!DOCTYPE html>
+<html lang="fi">
 <head>
     {metaTags}
 
@@ -26,6 +28,7 @@ defaultLayout inner = H.docTypeHtml ! A.lang "en" $ [hsx|
         {inner}
     </div>
 </body>
+</html>
 |]
 
 -- The 'assetPath' function used below appends a `?v=SOME_VERSION` to the static assets in production
