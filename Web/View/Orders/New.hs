@@ -5,6 +5,7 @@ import Web.View.Prelude
 import qualified Data.Map as Map
 import qualified Data.Text as T
 
+import Application.Localization
 import Web.View.Orders.Index (renderMarkdown)
 
 type Orders = Map (Id Product) Int
@@ -21,38 +22,38 @@ data NewView = NewView
 
 instance View NewView where
     html NewView { .. } = [hsx|
-        <h1>Tilauslomake</h1>
+        <h1>{l10nText LOrderForm}</h1>
         <form method="POST" action={actionUrl}>
             <div class="flex flex-wrap">
                 {forEach producers (renderProducer orders productsByProducers)}
             </div>
             {renderCustomerForm customer}
-            <input type="submit" value="Tilaa" />
+            <input type="submit" value={l10nText LSubmit} />
         </form>
     |]
 
 renderCustomerForm :: Customer -> Html
 renderCustomerForm customer = [hsx|
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_name">
-        <label class="font-medium text-gray-700 " for="customer_name">Nimi</label>
+        <label class="font-medium text-gray-700 " for="customer_name">{l10nText LName}</label>
         <input type="text" name="name" placeholder="" id="customer_name" required="required" value={customer.name}
                class={classes ["form-control", ("is-invalid", isInvalidName)]}>
         {nameFeedback}
     </div>
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_email">
-        <label class="font-medium text-gray-700 " for="customer_email">Sähköposti</label>
+        <label class="font-medium text-gray-700 " for="customer_email">{l10nText LEmail}</label>
         <input type="text" name="email" placeholder="" id="customer_email" required="required" value={customer.email}
                class={classes ["form-control", ("is-invalid", isInvalidEmail)]}>
         {emailFeedback}
     </div>
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_phone">
-        <label class="font-medium text-gray-700 " for="customer_phone">Puhelinnumero</label>
+        <label class="font-medium text-gray-700 " for="customer_phone">{l10nText LPhone}</label>
         <input type="text" name="phone" placeholder="" id="customer_phone" required="required" value={customer.phone}
                class={classes ["form-control", ("is-invalid", isInvalidPhone)]}>
         {phoneFeedback}
     </div>
     <div class="flex flex-col my-6 space-y-2" id="form-group-customer_address">
-        <label class="font-medium text-gray-700 " for="customer_address">Osoite</label>
+        <label class="font-medium text-gray-700 " for="customer_address">{l10nText LAddress}</label>
         <input type="text" name="address" placeholder="" id="customer_address" required="required" value={customer.address}
                class={classes ["form-control", ("is-invalid", isInvalidAddress)]}>
         {addressFeedback}

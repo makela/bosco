@@ -5,6 +5,8 @@ import Web.View.Prelude
 
 import qualified Data.Map as Map
 
+import Application.Localization
+
 type OrderedProductsByProducer = Map (Id' "producers") [OrderedProduct' (Id' "orders") Product]
 
 data ShowView = ShowView
@@ -17,7 +19,7 @@ data ShowView = ShowView
 
 instance View ShowView where
     html ShowView { .. } = [hsx|
-        <h1>Lasku</h1>
+        <h1>{l10nText LInvoice}</h1>
         {renderCustomer order.customerId}
         <table class="whitespace-nowrap">
         <tbody>
@@ -26,13 +28,13 @@ instance View ShowView where
         </tbody>
         </table>
         {renderPaymentInstruction order paymentInstruction}
-        <p>Lasku on lähetetty myös sähköpostiinne.</p>
+        <p>{l10nText LPaymentSentToEmail}</p>
     |]
 
 renderPaymentInstruction :: Include "customerId" Order -> Maybe PaymentInstruction -> Html
 renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.cancelledAt) of
     (Nothing, Nothing) -> [hsx|
-            <h2>Maksuohjeet</h2>
+            <h2>{l10nText LPaymentInstructions}</h2>
             {instructions}
         |]
     (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
@@ -74,7 +76,7 @@ renderOrderedProduct orderedProduct = [hsx|
 renderTotalSum :: Int -> Html
 renderTotalSum totalSum = [hsx|
     <tr class="font-bold">
-        <td>Yhteensä</td>
+        <td>{l10nText LTotal}</td>
         <td></td>
         <td></td>
         <td></td>
