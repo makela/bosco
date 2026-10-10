@@ -8,7 +8,7 @@ data Locale
   deriving (Eq, Show)
 
 defaultLocale :: Locale
-defaultLocale = FR
+defaultLocale = FI
 
 data Localizable
   = LSubmit
