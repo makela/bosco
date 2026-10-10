@@ -25,6 +25,10 @@ p {
   @apply px-4 my-4;
 }
 
+pre {
+  @apply px-8 my-8;
+}
+
 table {
   @apply my-2 w-full;
 }
@@ -43,8 +47,11 @@ input[type=number] {
   @apply w-24 h-8 border-gray-300 rounded-md;
 }
 
+a.link {
+  @apply ml-8;
+}
 input[type=submit], a.btn, button.btn {
-  @apply rounded-sm m-8 px-4 py-2 bg-blue-500 text-white cursor-pointer;
+  @apply rounded-sm ml-8 px-4 py-2 bg-blue-500 text-white cursor-pointer;
 }
 
 table tr td input[type=submit] {
