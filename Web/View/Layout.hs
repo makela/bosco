@@ -23,7 +23,9 @@ defaultLayout inner = [hsx|
 </head>
 <body>
     <div class="container">
-        <img src="/img/logo.jpg" alt="Bosco Falconeria logo" />
+        <a href="http://www.boscofalconeria.it/">
+            <img src="/img/logo.jpg" alt="Bosco Falconeria logo" />
+        </a>
         {renderFlashMessages}
         {inner}
     </div>
