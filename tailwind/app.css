@@ -1,8 +1,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/forms";
 
+
 .container {
-  @apply p-2 pb-8 mx-auto w-full max-w-4xl;
+  @apply p-2 pb-8 w-full mx-auto max-w-4xl min-w-sm;
 }
 
 a {
@@ -33,8 +34,21 @@ table {
   @apply my-2 w-full;
 }
 
+pre code {
+  @apply whitespace-pre-line;
+}
+
 table th, table td {
   @apply py-1 px-4 whitespace-nowrap;
+}
+table td.normal {
+  @apply whitespace-normal;
+}
+table tr.product td {
+  @apply pb-0;
+}
+table tr.product-description td {
+  @apply text-sm px-8 pt-0;
 }
 table td.last {
   @apply text-right;
@@ -56,6 +70,10 @@ input[type=submit], a.btn, button.btn {
 
 table tr td input[type=submit] {
   @apply m-0 float-none;
+}
+
+table tr.product-row {
+  @apply border-t-2;
 }
 
 input[type=text], input[type=email], input[type=password], input[type=search], input[type=checkbox], select {

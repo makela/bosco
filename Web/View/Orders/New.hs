@@ -93,11 +93,14 @@ renderProducer orders productsByProducer producer = [hsx|
 
 renderProduct :: Orders -> Product -> Html
 renderProduct orders product = [hsx|
-    <tr>
+    <tr class="product">
         <td>{product.name}</td>
         <td>{product.package}</td>
         <td>{price}</td>
         <td class="last"><input type="number" min="0" name={show product.id} value={count}> <span>kpl</span></td>
+    </tr>
+    <tr class="product-description">
+        <td colspan="4" class="normal">{product.description}</td>
     </tr>
 |]
     where

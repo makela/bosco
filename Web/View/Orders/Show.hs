@@ -64,7 +64,7 @@ renderProducer orderedProductsByProducer producer =
 renderOrderedProduct :: Include "productId" OrderedProduct -> Html
 renderOrderedProduct orderedProduct = [hsx|
     <tr>
-        <td>{orderedProduct.productId.name} ({orderedProduct.productId.package})</td>
+        <td class="normal">{orderedProduct.productId.name} ({orderedProduct.productId.package})</td>
         <td>{orderedProduct.quantity}</td>
         <td>*</td>
         <td>{formatMoney orderedProduct.productId.price}</td>
