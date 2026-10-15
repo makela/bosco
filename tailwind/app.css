@@ -34,7 +34,7 @@ table {
 }
 
 table th, table td {
-  @apply py-1 px-4;
+  @apply py-1 px-4 whitespace-nowrap;
 }
 table td.last {
   @apply text-right;
