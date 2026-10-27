@@ -10,7 +10,7 @@ import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
 import Web.Controller.Orders (countSum, createOrder, fetchShowOrderContext,
-                              groupOrderedProducts, groupProducts,
+                              groupProducts,
                               sortProducers)
 import Web.View.Orders.New
 
@@ -121,34 +121,29 @@ instance Controller OrdersController where
     action OrderedProductsAction = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
-        (yearNow, years) <- queryYears
-        let year = paramOrDefault @Integer yearNow "year"
-            dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
-            dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
-        orders <- query @Order
-            |> filterWhereSql (#cancelledAt, "IS NULL")
-            |> filterWhereSql (#orderedAt, dateAfter)
-            |> filterWhereSql (#orderedAt, dateBefore)
-            |> fetch
-        let orderIds = map (.id) orders
-        xs <- query @OrderedProduct
-            |> filterWhereIn (#orderId, orderIds)
-            |> fetch
-            >>= collectionFetchRelated #productId
-        let orderedProductsByProducer = groupOrderedProducts $ reverse $ sortOn (.productId.name) $ mergeByProductId xs
+        (_, ascendingYears) <- queryYears
+        let years = reverse ascendingYears
+        orderedProductsByYear <- fmap Map.fromList $ forM years $ \year -> do
+            let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
+                dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
+            orders <- query @Order
+                |> filterWhereSql (#cancelledAt, "IS NULL")
+                |> filterWhereSql (#orderedAt, dateAfter)
+                |> filterWhereSql (#orderedAt, dateBefore)
+                |> fetch
+            let orderIds = map (.id) orders
+            orderedProducts <- query @OrderedProduct
+                |> filterWhereIn (#orderId, orderIds)
+                |> fetch
+                >>= collectionFetchRelated #productId
+            pure (year, orderedProducts)
+        let allOrderedProducts = concat (Map.elems orderedProductsByYear)
         xs <- query @Producer
-            |> filterWhereIn (#id, Map.keys orderedProductsByProducer)
+            |> filterWhereIn (#id, map (.productId.producerId) allOrderedProducts)
             |> orderBy #name
             |> fetch
         let producers = sortProducers xs
-        render OrderedProductsView { .. }
-
-mergeByProductId = go []
-    where go acc [] = acc
-          go acc (x:xs) =
-              let q = x.quantity + sum (map (.quantity) (filter (\y -> x.productId.id == y.productId.id) xs))
-              in go (x { quantity = q } : acc) (filter (\y -> x.productId.id /= y.productId.id) xs)
-
+        render OrderedProductsView { years, orderedProductsByYear, producers }
 
 queryYears :: (?context::ControllerContext, ?modelContext::ModelContext) => IO (Integer, [Integer])
 queryYears = do

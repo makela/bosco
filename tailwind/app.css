@@ -39,7 +39,7 @@ pre code {
 }
 
 table th, table td {
-  @apply py-1 px-4 whitespace-nowrap;
+  @apply py-1 px-4 whitespace-nowrap text-left;
 }
 table td.normal {
   @apply whitespace-normal;
