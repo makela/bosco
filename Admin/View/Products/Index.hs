@@ -4,7 +4,7 @@ import Admin.View.Prelude
 import Web.View.Orders.New (formatMoney)
 
 data IndexView = IndexView
-    { products :: [Include "producerId" Product] , pagination :: Pagination }
+    { products :: [Include "producerId" Product] }
 
 instance View IndexView where
     html IndexView { .. } = [hsx|
@@ -23,7 +23,6 @@ instance View IndexView where
                 </thead>
                 <tbody>{forEach products renderProduct}</tbody>
             </table>
-            {renderPagination pagination}
         </div>
     |]
         where

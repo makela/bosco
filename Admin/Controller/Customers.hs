@@ -80,12 +80,12 @@ instance Controller CustomersController where
         redirectTo CustomersAction
 
     action EmailsForDeliveryInfoAction = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
         (yearNow, years) <- queryYears
         let year = paramOrDefault @Integer yearNow "year"
         let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
         let dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
         customers <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
             |> filterWhereSql (#orderedAt, dateAfter)

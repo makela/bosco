@@ -8,7 +8,7 @@ import Admin.Controller.Prelude hiding (createOrder)
 import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
-import Web.Controller.Orders (countSum, createOrder, fetchShowOrderContext,
+import Web.Controller.Orders (createOrder, fetchShowOrderContext,
                               groupProducts,
                               sortProducers)
 import Web.View.Orders.New
@@ -44,8 +44,13 @@ instance Controller OrdersController where
                 |> filter (\x -> not excludeInvoiced || isNothing x.invoicedAt)
                 |> filter (\x -> not excludePaid || isNothing x.paidAt)
                 |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)
-        prices <- mapM priceForOrder orders'
-        let priceMap = Map.fromList prices
+        -- All order lines in one query, summed per order
+        orderLines <- query @OrderedProduct
+            |> filterWhereIn (#orderId, map (.id) orders')
+            |> fetch
+        let priceMap = Map.fromListWith (+) $
+                map (\x -> (x.id, 0)) orders'
+                <> map (\x -> (x.orderId, x.unitPrice * x.quantity)) orderLines
         let orders'' = case ordering of
                         OrderByName      -> orders' |> sortOn (toLower . (.customerId.name))
                         OrderByOrderedAt -> orders' |> sortOn (.orderedAt)
@@ -177,12 +182,3 @@ fetchProducts :: (?modelContext :: ModelContext) => IO [Product]
 fetchProducts = do
     query @Product
         |> fetch
-
-priceForOrder :: (?modelContext :: ModelContext) => Include "customerId" Order -> IO (Id Order, Int)
-priceForOrder order = do
-    xs <- query @OrderedProduct
-        |> filterWhere (#orderId, order.id)
-        |> fetch
-        >>= collectionFetchRelated #productId
-    let totalSum = countSum xs
-    return (order.id, totalSum)

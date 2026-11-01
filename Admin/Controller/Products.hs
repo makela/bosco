@@ -1,6 +1,7 @@
 module Admin.Controller.Products where
 
 import Admin.Controller.Prelude
+import Web.Controller.Orders (productOrder, sortProducers)
 import Admin.View.Products.Edit
 import Admin.View.Products.Index
 import Admin.View.Products.New
@@ -12,14 +13,13 @@ instance Controller ProductsController where
     action ProductsAction = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
-        (productsQ, pagination) <- query @Product
-            |> paginate
-        xs <- productsQ
-            |> orderBy #ordering
-            |> orderBy #name
-            |> fetch
-            >>= collectionFetchRelated #producerId
-        let products = sortOn (\x -> x.producerId.name) xs
+        -- The whole catalog on one page, grouped by producer in the order
+        -- the order form uses
+        producers <- query @Producer |> fetch
+        xs <- query @Product |> fetch >>= collectionFetchRelated #producerId
+        let producerRank = zip (map (.id) (sortProducers producers)) [0 :: Int ..]
+            rank x = lookup x.producerId.id producerRank
+            products = sortOn (\x -> (rank x, productOrder x)) xs
         render IndexView { .. }
 
     action NewProductAction = do
