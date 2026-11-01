@@ -22,7 +22,7 @@ defaultLayout inner = [hsx|
     <title>{pageTitleOrDefault "Manage Bosco Falconeria"}</title>
 </head>
 <body>
-    <div class="container">
+    <div class="container admin-container">
         {renderFlashMessages}
         {inner}
     </div>

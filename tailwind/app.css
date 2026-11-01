@@ -6,6 +6,11 @@
   @apply p-2 pb-8 w-full mx-auto max-w-4xl;
 }
 
+/* Admin pages are mostly tables, so they use the whole window */
+.container.admin-container {
+  @apply max-w-none sm:px-6;
+}
+
 a {
   @apply text-blue-600;
 }
