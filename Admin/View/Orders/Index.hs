@@ -35,6 +35,8 @@ data IndexView = IndexView
     , excludeDelivered :: Bool
     , year             :: Integer
     , years            :: [Integer]
+    , isAdmin          :: Bool
+      -- ^ Only admins can mark orders paid
     }
 
 instance View IndexView where
@@ -85,27 +87,28 @@ instance View IndexView where
                                 <th>Delivered</th>
                             </tr>
                         </thead>
-                        <tbody>{forEach orders (renderOrder priceMap)}</tbody>
+                        <tbody>{forEach orders (renderOrder isAdmin priceMap)}</tbody>
                     </table>
                 </div>
             |]
 
-renderOrder :: Map (Id Order) Int -> Include "customerId" Order -> Html
-renderOrder priceMap order = [hsx|
+renderOrder :: Bool -> Map (Id Order) Int -> Include "customerId" Order -> Html
+renderOrder isAdmin priceMap order = [hsx|
     <tr>
         <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
         <td class="normal">{order.customerId.name}</td>
         <td>{fmap formatUTCTime order.invoicedAt}</td>
         <td>{fmap formatMoney $ Map.lookup order.id priceMap}</td>
-        <td>{showOrMarkPaid order}</td>
+        <td>{showOrMarkPaid isAdmin order}</td>
         <td>{fmap formatUTCTime order.deliveredAt}</td>
     </tr>
 |]
 
-showOrMarkPaid :: Include "customerId" Order -> Html
-showOrMarkPaid order =
+showOrMarkPaid :: Bool -> Include "customerId" Order -> Html
+showOrMarkPaid isAdmin order =
     case order.paidAt of
       Just paidAt -> [hsx|{formatUTCTime paidAt}|]
+      Nothing | not isAdmin -> mempty
       Nothing     -> [hsx|
                     <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
                         <input type="submit" value="Mark as paid" />

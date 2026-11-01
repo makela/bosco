@@ -17,6 +17,8 @@ instance Controller OrdersController where
     beforeAction = ensureIsUser
 
     action OrdersAction = do
+        user <- fetch currentUserId
+        let isAdmin = user.isAdmin
         (yearNow, years) <- queryYears
         let year = paramOrDefault @Integer yearNow "year"
             q = paramOrDefault @Text "" "q"

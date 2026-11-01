@@ -47,6 +47,15 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             response `responseBodyShouldContain` "Ville Korhonen"
             response `responseBodyShouldNotContain` "Maija (Mäki) Virtanen"
 
+        it "shows the mark-as-paid button only to admins" $ withContext do
+            admin <- setUp
+            user <- createTestUser False
+            adminView <- withUser admin $ search ""
+            adminView `responseBodyShouldContain` "Mark as paid"
+            userView <- withUser user $ search ""
+            userView `responseBodyShouldContain` "Ville Korhonen"
+            userView `responseBodyShouldNotContain` "Mark as paid"
+
     describe "Admin OrdersController prices" do
         it "lists an order at the price it was placed at" $ withContext do
             admin <- createAdmin
