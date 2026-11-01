@@ -24,6 +24,8 @@ data Localizable
   | LTotal
   | LPaymentInstructions
   | LPaymentSentToEmail
+  | LNoLongerAvailable
+  | LCheckOrderAndResubmit
 
 l10nText :: Localizable -> Text
 l10nText l = l10nText' l defaultLocale
@@ -55,3 +57,7 @@ l10nText' LPaymentInstructions FI = "Maksuohjeet"
 l10nText' LPaymentInstructions FR = "Payment instructions"
 l10nText' LPaymentSentToEmail FI = "Lasku on lähetetty myös sähköpostiinne."
 l10nText' LPaymentSentToEmail FR = "Payment has been sent to your email as well."
+l10nText' LNoLongerAvailable FI = "Tilausta ei lähetetty, koska nämä tuotteet eivät ole enää tilattavissa:"
+l10nText' LNoLongerAvailable FR = "Your order was not sent because these products are no longer available:"
+l10nText' LCheckOrderAndResubmit FI = "Ne on poistettu lomakkeelta. Tarkista tilauksesi ja lähetä se uudelleen."
+l10nText' LCheckOrderAndResubmit FR = "They have been removed from the form. Please check your order and send it again."

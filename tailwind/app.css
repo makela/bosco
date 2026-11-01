@@ -119,6 +119,13 @@ div.invalid-feedback {
   @apply text-red-500;
 }
 
+div.unavailable-notice {
+  @apply rounded-sm border-2 border-red-300 bg-red-50 text-red-800 my-4;
+}
+div.unavailable-notice ul {
+  @apply list-disc px-12;
+}
+
 ul {
   @apply px-10 list-disc;
 }

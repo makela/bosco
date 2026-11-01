@@ -61,6 +61,7 @@ instance Controller OrdersController where
             productsByProducers = groupProducts products
             customer = newRecord @Customer
             actionUrl = pathTo CreateOrderAction
+            unavailable = []
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
@@ -73,7 +74,7 @@ instance Controller OrdersController where
         producers <- fetchProducers
         products <- fetchProducts
         let actionUrl = pathTo CreateOrderAction
-        createOrder actionUrl producers products $ \order -> do
+        createOrder actionUrl producers products [] $ \order -> do
             setSuccessMessage "Order created"
             redirectTo ShowOrderAction { orderId = order.id }
 

@@ -36,8 +36,9 @@ instance Controller OrdersController where
         unless (maybe False (.isOrderingEnabled) message) (earlyReturn $ renderNotFound)
         xs <- fetchProducers
         let producers = sortProducers xs
-        products <- fetchProducts
+        products <- fetchProducts producers
         let orders = mempty
+            unavailable = []
         let productsByProducers = groupProducts products
         let customer = newRecord @Customer
         let actionUrl = pathTo CreateOrderAction
@@ -53,9 +54,12 @@ instance Controller OrdersController where
         message <- fetchLastWelcomeMessage
         unless (maybe False (.isOrderingEnabled) message) (earlyReturn $ redirectTo OrdersAction)
         producers <- fetchProducers
-        products <- fetchProducts
-        let actionUrl = pathTo CreateOrderAction
-        createOrder actionUrl producers products $ \order -> do
+        products <- fetchProducts producers
+        allProducts <- query @Product |> fetch
+        let orderable = map (.id) products
+            unorderable = filter (\x -> x.id `notElem` orderable) allProducts
+            actionUrl = pathTo CreateOrderAction
+        createOrder actionUrl producers products unorderable $ \order -> do
             setSuccessMessage "Tilaus lähetetty"
             let email = newRecord @EmailOrderJob
             email
@@ -131,10 +135,12 @@ fetchProducers = do
         |> orderByDesc #name
         |> fetch
 
-fetchProducts :: (?modelContext :: ModelContext) =>IO [Product]
-fetchProducts = do
+-- | Products that can be ordered: enabled, from one of the given producers.
+fetchProducts :: (?modelContext :: ModelContext) => [Producer] -> IO [Product]
+fetchProducts producers = do
     query @Product
         |> filterWhere (#enabled, True)
+        |> filterWhereIn (#producerId, map (.id) producers)
         |> orderByDesc #ordering
         |> orderByDesc #name
         |> fetch
@@ -185,11 +191,16 @@ fetchShowOrderContext orderId = do
 fetchLastWelcomeMessage :: (?modelContext :: ModelContext) => IO (Maybe WelcomeMessage)
 fetchLastWelcomeMessage = query @WelcomeMessage |> orderByDesc #publishedAt |> fetchOneOrNothing
 
-createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> (Order -> IO ResponseReceived) -> IO ResponseReceived
-createOrder actionUrl producers products after = do
+-- | Saves the order for the given products. If any of the unorderable
+-- products were ordered too (they were disabled while the customer filled
+-- in the form), nothing is saved and the form says which ones they were.
+createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> [Product] -> (Order -> IO ResponseReceived) -> IO ResponseReceived
+createOrder actionUrl producers products unorderable after = do
+    let quantityOf x = paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)
     let params = products
-            |> map (\x -> (x.id, paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)))
+            |> map (\x -> (x.id, quantityOf x))
             |> filter (\(_, i) -> i > 0)
+    let unavailable = filter (\x -> quantityOf x > 0) unorderable
     let orders = Map.fromList params
     let productsByProducers = groupProducts products
     -- TODO if Map.isEmpty orders then render NewView { .. } else
@@ -200,6 +211,8 @@ createOrder actionUrl producers products after = do
         |> buildCustomer
         |> ifValid \case
             Left customer -> do
+                render NewView { .. }
+            Right customer | not (null unavailable) -> do
                 render NewView { .. }
             Right customer -> do
                 let order = newRecord @Order

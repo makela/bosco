@@ -18,12 +18,15 @@ data NewView = NewView
     , producers           :: [Producer]
     , productsByProducers :: ProductsByProducers
     , actionUrl           :: Text
+    , unavailable         :: [Product]
+      -- ^ Ordered products that can no longer be ordered
     }
 
 instance View NewView where
     html NewView { .. } = [hsx|
         <h1>{l10nText LOrderForm}</h1>
         <form method="POST" action={actionUrl}>
+            {renderUnavailable unavailable}
             <div class="flex flex-wrap">
                 {forEach producers (renderProducer orders productsByProducers)}
             </div>
@@ -31,6 +34,17 @@ instance View NewView where
             <input type="submit" value={l10nText LSubmit} />
         </form>
     |]
+
+renderUnavailable :: [Product] -> Html
+renderUnavailable [] = mempty
+renderUnavailable products = [hsx|
+    <div class="unavailable-notice" role="alert">
+        <p>{l10nText LNoLongerAvailable}</p>
+        <ul>{forEach products renderName}</ul>
+        <p>{l10nText LCheckOrderAndResubmit}</p>
+    </div>
+|]
+    where renderName product = [hsx|<li>{product.name} ({product.package})</li>|]
 
 renderCustomerForm :: Customer -> Html
 renderCustomerForm customer = [hsx|
