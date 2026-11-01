@@ -35,3 +35,9 @@ check:
 		echo "  $$c: $${result:-no result}"; \
 	done; \
 	exit $$status
+
+# Fills a fresh dev database with orders, customers and logins to browse.
+# Refuses to run if the database already has orders.
+.PHONY: seed-dev
+seed-dev:
+	run-script Application/Script/SeedDevData.hs
