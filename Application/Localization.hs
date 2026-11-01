@@ -1,5 +1,8 @@
 module Application.Localization where
 
+import qualified System.Environment as Environment
+import System.IO.Unsafe (unsafePerformIO)
+
 import IHP.Prelude
 
 data Locale
@@ -8,8 +11,25 @@ data Locale
   | FR
   deriving (Eq, Show, Enum, Bounded)
 
+-- | This instance's language, from APP_LOCALE (fi, en or fr; Finnish when
+-- unset). Each deployed instance serves one language, so it is read once
+-- for the whole process. Config.hs reads it at startup too, so a wrong
+-- value stops the server there instead of at the first page.
 defaultLocale :: Locale
-defaultLocale = FI
+defaultLocale = unsafePerformIO do
+    value <- Environment.lookupEnv "APP_LOCALE"
+    pure case parseLocale (maybe "" cs value) of
+        Right locale -> locale
+        Left message -> error (cs message)
+{-# NOINLINE defaultLocale #-}
+
+parseLocale :: Text -> Either Text Locale
+parseLocale "" = Right FI
+parseLocale code = case find (\locale -> localeCode locale == code) allLocales of
+    Just locale -> Right locale
+    Nothing -> Left ("APP_LOCALE should be one of " <> intercalate ", " (map localeCode allLocales) <> ", got " <> code)
+  where
+    allLocales = [minBound .. maxBound]
 
 -- | For the html lang attribute
 localeCode :: Locale -> Text
