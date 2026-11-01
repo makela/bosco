@@ -61,13 +61,6 @@ instance Controller OrdersController where
                 |> createRecord
             redirectTo ShowOrderAction { orderId = order.id }
 
-    action UpdateCancelOrderAction { orderId } = do
-        order <- fetch orderId
-        now <- getCurrentTime
-        order |> setJust #cancelledAt now |> updateRecord
-        setSuccessMessage "Tilaus peruttu"
-        redirectTo OrdersAction
-
     action NewEmailAction = do
         let customer = newRecord @Customer
         render NewEmailView { .. }
