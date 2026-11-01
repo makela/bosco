@@ -20,3 +20,29 @@ tests = describe "Application.Helper.Controller" do
         it "is empty only for a blank name" do
             reverseNameOf "   " `shouldBe` ""
 
+    describe "matchesSearch" do
+        it "matches everything when the query is empty" do
+            matchesSearch "" "Maija Virtanen" `shouldBe` True
+
+        it "matches everything when the query is only whitespace" do
+            matchesSearch "  " "Maija Virtanen" `shouldBe` True
+
+        it "matches a substring case-insensitively" do
+            matchesSearch "VIRT" "Maija Virtanen" `shouldBe` True
+
+        it "matches non-ASCII letters case-insensitively" do
+            matchesSearch "mäki" "Ville Mäkinen" `shouldBe` True
+
+        it "does not match unrelated names" do
+            matchesSearch "korhonen" "Maija Virtanen" `shouldBe` False
+
+        it "ignores surrounding whitespace in the query" do
+            matchesSearch " maija " "Maija Virtanen" `shouldBe` True
+
+        -- These used to be compiled as regexes and crashed the order list.
+        it "treats regex metacharacters as plain text" do
+            matchesSearch "maija (" "Maija (Mäki) Virtanen" `shouldBe` True
+            matchesSearch "(" "Maija Virtanen" `shouldBe` False
+            matchesSearch "[" "Maija Virtanen" `shouldBe` False
+            matchesSearch "*" "Maija Virtanen" `shouldBe` False
+            matchesSearch "m.ija" "Maija Virtanen" `shouldBe` False

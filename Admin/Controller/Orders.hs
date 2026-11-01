@@ -3,7 +3,6 @@ module Admin.Controller.Orders where
 import qualified Data.Map as Map
 
 import Data.Ord
-import Text.Regex.TDFA
 
 import Admin.Controller.Prelude hiding (createOrder)
 import Admin.View.Orders.Index
@@ -39,7 +38,7 @@ instance Controller OrdersController where
             >>= collectionFetchRelated #customerId
         let orders' = xs
                 -- TODO should filter in database
-                |> filter (\x -> q == "" || toLower x.customerId.name =~ toLower q)
+                |> filter (\x -> matchesSearch q x.customerId.name)
                 |> filter (\x -> not excludeInvoiced || isNothing x.invoicedAt)
                 |> filter (\x -> not excludePaid || isNothing x.paidAt)
                 |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)
