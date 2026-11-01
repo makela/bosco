@@ -8,18 +8,19 @@ import Generated.Types
 import Web.Types
 import Web.Routes
 import Application.Helper.View
+import Application.Localization
 
 defaultLayout :: Html -> Html
 defaultLayout inner = [hsx|
 <!DOCTYPE html>
-<html lang="fi">
+<html lang={localeCode defaultLocale}>
 <head>
     {metaTags}
 
     {stylesheets}
     {scripts}
 
-    <title>{pageTitleOrDefault "Bosco Falconeria Öljytilaus"}</title>
+    <title>{pageTitleOrDefault (l10nText LSiteTitle)}</title>
 </head>
 <body>
     <div class="container">
@@ -65,9 +66,9 @@ metaTags :: Html
 metaTags = [hsx|
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width"/>
-    <meta property="og:title" content="Bosco Falconeria Öljytilaus"/>
+    <meta property="og:title" content={l10nText LSiteTitle}/>
     <meta property="og:type" content="website"/>
     <meta property="og:url" content="TODO"/>
-    <meta property="og:description" content="Bosco Falconerian öljytilauslomake"/>
+    <meta property="og:description" content={l10nText LSiteDescription}/>
     {autoRefreshMeta}
 |]

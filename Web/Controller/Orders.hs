@@ -70,7 +70,7 @@ instance Controller OrdersController where
                 _ <- newRecord @EmailOrderJob |> set #orderId order.id |> createRecord
                 pure ()
         createOrder actionUrl producers products unorderable queueEmail \order -> do
-            setSuccessMessage "Tilaus lähetetty"
+            setSuccessMessage (l10nText LOrderSent)
             redirectTo ShowOrderAction { orderId = order.id }
 
     action NewEmailAction = do
@@ -86,7 +86,7 @@ instance Controller OrdersController where
                     render NewEmailView { .. }
                 Right customer -> do
                     _ <- customer |> createRecord
-                    setSuccessMessage "Tiedot tallennettu"
+                    setSuccessMessage (l10nText LDetailsSaved)
                     redirectTo OrdersAction
 
 buildCustomer customer = customer
@@ -109,13 +109,13 @@ setReverseName customer = customer |> set #reverseName (reverseNameOf customer.n
 nonEmptyOrWhitespace :: Text -> ValidatorResult
 nonEmptyOrWhitespace text = case nonEmpty $ T.strip text of
     Success       -> Success
-    Failure _     -> Failure "Tämä kenttä vaaditaan"
+    Failure _     -> Failure (l10nText LFieldRequired)
     FailureHtml x -> FailureHtml x
 
 isEmail' :: Text -> ValidatorResult
 isEmail' text = case isEmail text of
     Success       -> Success
-    Failure _     -> Failure "Sähköposti on virheellinen"
+    Failure _     -> Failure (l10nText LInvalidEmail)
     FailureHtml x -> FailureHtml x
 
 buildOrder order = order

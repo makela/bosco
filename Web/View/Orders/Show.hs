@@ -39,8 +39,8 @@ renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.ca
             <h2>{l10nText LPaymentInstructions}</h2>
             {instructions}
         |]
-    (_, Just _) -> [hsx|<p class="font-bold">Lasku on mitätöity.</p>|]
-    (Just _, _) -> [hsx|<p class="font-bold">Lasku on maksettu.</p>|]
+    (_, Just _) -> [hsx|<p class="font-bold">{l10nText LInvoiceCancelled}</p>|]
+    (Just _, _) -> [hsx|<p class="font-bold">{l10nText LInvoicePaid}</p>|]
 
     where instructions = fmap (\x -> renderMarkdown x.text) paymentInstruction
 

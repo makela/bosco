@@ -5,6 +5,8 @@ import Web.View.Orders.New (formatMoney)
 import Web.View.Orders.Show (OrderedProductsByProducer)
 import Web.View.Prelude
 
+import Application.Localization
+
 import qualified Data.Map as Map
 
 data OrderMail = OrderMail
@@ -16,12 +18,12 @@ data OrderMail = OrderMail
     }
 
 instance BuildMail OrderMail where
-    subject = "Bosco Falconeria Öljytilaus"
+    subject = l10nText LSiteTitle
     to OrderMail { .. } = Address { addressName = Just order.customerId.name, addressEmail = order.customerId.email }
     from = "postmaster@boscofalconeria.it"
     replyTo OrderMail { .. } = Just Address { addressName = Just "Olive Oil Bosco Falconeria", addressEmail = "oliveoil@boscofalconeria.it" }
     html OrderMail { .. } = [hsx|
-        <h1>Lasku</h1>
+        <h1>{l10nText LInvoice}</h1>
         <div>
           <p>{order.customerId.name}</p>
           <p>{order.customerId.email}</p>
@@ -32,7 +34,7 @@ instance BuildMail OrderMail where
         <tbody>
             {forEach producers (renderProducer orderedProductsByProducer)}
             <tr style="font-weight: bold">
-                <td>Yhteensä</td>
+                <td>{l10nText LTotal}</td>
                 <td></td>
                 <td></td>
                 <td></td>
@@ -41,7 +43,7 @@ instance BuildMail OrderMail where
             </tr>
         </tbody>
         </table>
-        <h2>Maksuohjeet</h2>
+        <h2>{l10nText LPaymentInstructions}</h2>
         {instructions}
     |]
         where

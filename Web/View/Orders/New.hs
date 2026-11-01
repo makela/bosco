@@ -124,7 +124,7 @@ renderProduct orders product = [hsx|
             <span class="product-price">{price}</span>
         </span>
         <span class="product-quantity">
-            <input type="number" min="0" name={show product.id} value={count} aria-label={product.name <> ", " <> product.package}> kpl
+            <input type="number" min="0" name={show product.id} value={count} aria-label={product.name <> ", " <> product.package}> {l10nText LPieces}
         </span>
         <span class="product-description">{product.description}</span>
     </div>

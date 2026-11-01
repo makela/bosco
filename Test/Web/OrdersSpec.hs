@@ -23,6 +23,15 @@ tests = aroundAll (withIHPApp WebApplication config) do
             simpleStatus response `shouldBe` status200
             bodyText response `shouldSatisfy` ("Maija Virtanen" `isInfixOf`)
 
+        it "says on the invoice when it has been paid or cancelled" $ withContext do
+            now <- getCurrentTime
+            paid <- createTestOrder "Paid Customer" >>= \o -> o |> setJust #paidAt now |> updateRecord
+            cancelled <- createTestOrder "Cancelled Customer" >>= \o -> o |> setJust #cancelledAt now |> updateRecord
+            paidPage <- inApp $ httpGet ("/ShowOrder?orderId=" <> idToParam paid.id)
+            bodyText paidPage `shouldSatisfy` ("Lasku on maksettu." `isInfixOf`)
+            cancelledPage <- inApp $ httpGet ("/ShowOrder?orderId=" <> idToParam cancelled.id)
+            bodyText cancelledPage `shouldSatisfy` ("Lasku on mitätöity." `isInfixOf`)
+
         it "has no public route that cancels an order" $ withContext do
             order <- createTestOrder "Ville Korhonen"
             response <- inApp $ httpPost ("/UpdateCancelOrder?orderId=" <> idToParam order.id) []

@@ -5,6 +5,8 @@ import qualified Data.Text as T
 
 import IHP.ControllerPrelude
 
+import Application.Localization
+
 -- Here you can add functions which are available in all your controllers
 
 -- | Lower-cased name with its words reversed, e.g. "Maija Virtanen"
@@ -27,7 +29,7 @@ isPhone text
     | wellFormed, "+" `T.isPrefixOf` stripped, digitsBetween 9 12 = Success
     | wellFormed, "3" `T.isPrefixOf` stripped, digitsBetween 9 12 = Success
     | wellFormed, "0" `T.isPrefixOf` stripped, digitsBetween 7 10 = Success
-    | otherwise = Failure "Puhelinnumero on virheellinen"
+    | otherwise = Failure (l10nText LInvalidPhone)
     where
         stripped = T.strip text
         number = fromMaybe stripped (T.stripPrefix "+" stripped)
