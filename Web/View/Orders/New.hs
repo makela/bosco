@@ -20,6 +20,7 @@ data NewView = NewView
     , actionUrl           :: Text
     , unavailable         :: [Product]
       -- ^ Ordered products that can no longer be ordered
+    , noProductsSelected  :: Bool
     }
 
 instance View NewView where
@@ -27,6 +28,7 @@ instance View NewView where
         <h1>{l10nText LOrderForm}</h1>
         <form method="POST" action={actionUrl}>
             {renderUnavailable unavailable}
+            {when noProductsSelected renderNoProductsSelected}
             <div class="flex flex-wrap">
                 {forEach producers (renderProducer orders productsByProducers)}
             </div>
@@ -45,6 +47,13 @@ renderUnavailable products = [hsx|
     </div>
 |]
     where renderName product = [hsx|<li>{product.name} ({product.package})</li>|]
+
+renderNoProductsSelected :: Html
+renderNoProductsSelected = [hsx|
+    <div class="unavailable-notice" role="alert">
+        <p>{l10nText LNoProductsSelected}</p>
+    </div>
+|]
 
 renderCustomerForm :: Customer -> Html
 renderCustomerForm customer = [hsx|

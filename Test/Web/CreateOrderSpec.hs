@@ -1,6 +1,7 @@
 module Test.Web.CreateOrderSpec where
 
 import Network.HTTP.Types (status200)
+import Network.Wai (Response)
 
 import IHP.ControllerPrelude
 import IHP.Hspec (responseBodyShouldContain, responseBodyShouldNotContain,
@@ -57,6 +58,28 @@ tests = aroundAll (withIHPApp WebApplication config) do
             response `responseBodyShouldNotContain` "eivät ole enää tilattavissa"
             orderedQuantities "unordered@example.com" `shouldReturn` [(honey.id, 1)]
 
+    describe "Web CreateOrderAction without products" do
+        it "refuses an order with no products" $ withContext do
+            _ <- setUp "empty"
+            response <- submitOrder "empty@example.com" []
+            response `responseStatusShouldBe` status200
+            response `responseBodyShouldContain` "Valitse vähintään yksi tuote"
+            response `responseBodyShouldContain` "value=\"empty@example.com\""
+            customerCount "empty@example.com" `shouldReturn` 0
+
+        it "refuses an order where every quantity is zero" $ withContext do
+            (_, oil, honey) <- setUp "zero"
+            response <- submitOrder "zero@example.com" [(oil, 0), (honey, 0)]
+            response `responseBodyShouldContain` "Valitse vähintään yksi tuote"
+            customerCount "zero@example.com" `shouldReturn` 0
+
+        it "asks only about unavailable products when those were all that was ordered" $ withContext do
+            (_, oil, _) <- setUp "only unavailable"
+            oil |> set #enabled False |> updateRecord
+            response <- submitOrder "onlyunavailable@example.com" [(oil, 1)]
+            response `responseBodyShouldContain` "eivät ole enää tilattavissa"
+            response `responseBodyShouldNotContain` "Valitse vähintään yksi tuote"
+
     describe "Web order prices" do
         it "keeps the price the order was placed at when the product's price changes" $ withContext do
             (_, oil, _) <- setUp "price"
@@ -95,12 +118,16 @@ setUp tag = do
     honey <- product "Testihunaja"
     pure (producer, oil, honey)
 
+submitOrder :: (ContextParameters WebApplication) => Text -> [(Product, Int)] -> IO Response
 submitOrder email quantities = callActionWithParams CreateOrderAction $
     [ ("name", "Maija Virtanen")
-    , ("email", email)
+    , ("email", cs email)
     , ("phone", "0401234567")
     , ("address", "Testikatu 1")
     ] <> map (\(product, n) -> (idToParam product.id, cs (tshow n))) quantities
+
+customerCount :: (?modelContext :: ModelContext) => Text -> IO Int
+customerCount email = query @Customer |> filterWhere (#email, email) |> fetchCount
 
 orderOf :: (?modelContext :: ModelContext) => Text -> IO Order
 orderOf email = do

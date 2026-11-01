@@ -42,6 +42,7 @@ instance Controller OrdersController where
         products <- fetchProducts producers
         let orders = mempty
             unavailable = []
+            noProductsSelected = False
         let productsByProducers = groupProducts products
         let customer = newRecord @Customer
         let actionUrl = pathTo CreateOrderAction
@@ -120,7 +121,6 @@ isEmail' text = case isEmail text of
 
 buildOrder order = order
     |> fill @'["customerId"]
-    -- TODO validate the order, empty orders are worth of nothing
 
 fetchProducers :: (?modelContext :: ModelContext) =>IO [Producer]
 fetchProducers = do
@@ -186,7 +186,8 @@ fetchLastWelcomeMessage = query @WelcomeMessage |> orderByDesc #publishedAt |> f
 
 -- | Saves the order for the given products. If any of the unorderable
 -- products were ordered too (they were disabled while the customer filled
--- in the form), nothing is saved and the form says which ones they were.
+-- in the form), or no products were ordered at all, nothing is saved and
+-- the form says why.
 createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> [Product] -> (Order -> IO ResponseReceived) -> IO ResponseReceived
 createOrder actionUrl producers products unorderable after = do
     let quantityOf x = paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)
@@ -194,9 +195,10 @@ createOrder actionUrl producers products unorderable after = do
             |> map (\x -> (x, quantityOf x))
             |> filter (\(_, i) -> i > 0)
     let unavailable = filter (\x -> quantityOf x > 0) unorderable
+    -- Only one notice at a time: unavailable products explain an empty order
+    let noProductsSelected = null params && null unavailable
     let orders = Map.fromList (map (\(x, i) -> (x.id, i)) params)
     let productsByProducers = groupProducts products
-    -- TODO if Map.isEmpty orders then render NewView { .. } else
     -- TODO save valid customer information for later use
     -- TODO match existing customer
     let customer = newRecord @Customer
@@ -205,7 +207,7 @@ createOrder actionUrl producers products unorderable after = do
         |> ifValid \case
             Left customer -> do
                 render NewView { .. }
-            Right customer | not (null unavailable) -> do
+            Right customer | not (null unavailable) || noProductsSelected -> do
                 render NewView { .. }
             Right customer -> do
                 let order = newRecord @Order

@@ -28,6 +28,7 @@ data Localizable
   | LCheckOrderAndResubmit
   | LOrderingClosed
   | LOrderingNotOpen
+  | LNoProductsSelected
 
 l10nText :: Localizable -> Text
 l10nText l = l10nText' l defaultLocale
@@ -67,3 +68,5 @@ l10nText' LOrderingClosed FI = "Tilaustasi ei lähetetty, koska tilaukset on sul
 l10nText' LOrderingClosed FR = "Your order was not sent because ordering has closed."
 l10nText' LOrderingNotOpen FI = "Tilaaminen ei ole tällä hetkellä mahdollista."
 l10nText' LOrderingNotOpen FR = "Ordering is not open at the moment."
+l10nText' LNoProductsSelected FI = "Valitse vähintään yksi tuote."
+l10nText' LNoProductsSelected FR = "Please choose at least one product."

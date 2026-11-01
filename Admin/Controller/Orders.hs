@@ -62,6 +62,7 @@ instance Controller OrdersController where
             customer = newRecord @Customer
             actionUrl = pathTo CreateOrderAction
             unavailable = []
+            noProductsSelected = False
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
