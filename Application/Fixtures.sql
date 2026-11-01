@@ -103,16 +103,9 @@ ALTER TABLE public.ordered_products DISABLE TRIGGER ALL;
 ALTER TABLE public.ordered_products ENABLE TRIGGER ALL;
 
 
-ALTER TABLE public.schema_migrations DISABLE TRIGGER ALL;
-
-
-
-ALTER TABLE public.schema_migrations ENABLE TRIGGER ALL;
-
-
 ALTER TABLE public.welcome_messages DISABLE TRIGGER ALL;
 
-INSERT INTO public.welcome_messages (id, text, picture, published_at) VALUES ('618c00ce-0c88-47f2-a863-b6198c94b6d7', 'Oliivinpoiminta on päättynyt ja oliiviöljyä ym. herkkuja on taas tilattavissa.
+INSERT INTO public.welcome_messages (id, text, published_at) VALUES ('618c00ce-0c88-47f2-a863-b6198c94b6d7', 'Oliivinpoiminta on päättynyt ja oliiviöljyä ym. herkkuja on taas tilattavissa.
 Punaviinietikkaamme ei ole tällä hetkellä tarjolla, sillä etikkabakteerimme on tänä vuonna ollut poikkeuksellisen hidas eikä etikka ole vielä valmista.
 Aurinkokuivattuja tomaatteja ei ole saatavilla huonon satovuoden johdosta.
 Oreganoa emme myöskään saaneet listalle.
@@ -128,7 +121,7 @@ Tilattavissa olevat herkut:
 
 
 
-Otamme tilauksia vastaan MARRASKUUN 12. päivään asti!', '', '2022-04-29 11:36:56.661449+03');
+Otamme tilauksia vastaan MARRASKUUN 12. päivään asti!', '2022-04-29 11:36:56.661449+03');
 
 
 ALTER TABLE public.welcome_messages ENABLE TRIGGER ALL;
