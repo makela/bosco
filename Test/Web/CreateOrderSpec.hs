@@ -1,6 +1,7 @@
 module Test.Web.CreateOrderSpec where
 
 import qualified Control.Exception as Exception
+import qualified Data.Text as T
 import Network.HTTP.Types (status200)
 import Network.Wai (Response)
 
@@ -102,6 +103,28 @@ tests = aroundAll (withIHPApp WebApplication config) do
             orderedQuantities "saved@example.com" `shouldReturn` [(oil.id, 1)]
             jobs <- query @EmailOrderJob |> filterWhere (#orderId, order.id) |> fetchCount
             jobs `shouldBe` 1
+
+    describe "Web producer order" do
+        it "lists producers the same way on the order form and the invoice" $ withContext do
+            _ <- setUp "producer order"
+            let fixtureProducers = ["Bosco Falconeria", "Bonomo & Giglio", "Lorcam", "Quetzal", "Stramondo", "Valdibella"]
+                -- First words only: the page escapes "&" as "&amp;"
+                shownAs = map (fromMaybe "" . head . T.words) fixtureProducers
+                appearsInOrder body = let positions = map (\name -> fst (T.breakOn name body)) shownAs
+                                      in map T.length positions == sort (map T.length positions)
+                                         && all (`T.isInfixOf` body) shownAs
+            form <- callAction NewOrderAction
+            formBody <- cs <$> responseBody form
+            formBody `shouldSatisfy` appearsInOrder
+            -- One product from each fixture producer
+            producers <- query @Producer |> fetch
+            ordered <- forM (filter (\p -> p.name `elem` fixtureProducers) producers) \p ->
+                query @Product |> filterWhere (#producerId, p.id) |> fetchOne
+            _ <- submitOrder "producerorder@example.com" (map (\x -> (x, 1)) ordered)
+            order <- orderOf "producerorder@example.com"
+            invoice <- callAction ShowOrderAction { orderId = order.id }
+            invoiceBody <- cs <$> responseBody invoice
+            invoiceBody `shouldSatisfy` appearsInOrder
 
     describe "Web order prices" do
         it "keeps the price the order was placed at when the product's price changes" $ withContext do

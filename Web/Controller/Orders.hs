@@ -6,6 +6,7 @@ module Web.Controller.Orders
     , groupProducts
     , isEmail'
     , nonEmptyOrWhitespace
+    , productOrder
     , setReverseName
     , sortProducers
     ) where
@@ -37,8 +38,7 @@ instance Controller OrdersController where
         unless (maybe False (.isOrderingEnabled) message) do
             setErrorMessage (l10nText LOrderingNotOpen)
             earlyReturn $ redirectTo OrdersAction
-        xs <- fetchProducers
-        let producers = sortProducers xs
+        producers <- fetchProducers
         products <- fetchProducts producers
         let orders = mempty
             unavailable = []
@@ -121,12 +121,13 @@ isEmail' text = case isEmail text of
 buildOrder order = order
     |> fill @'["customerId"]
 
-fetchProducers :: (?modelContext :: ModelContext) =>IO [Producer]
+-- | Enabled producers in display order.
+fetchProducers :: (?modelContext :: ModelContext) => IO [Producer]
 fetchProducers = do
     query @Producer
         |> filterWhere (#enabled, True)
-        |> orderByDesc #name
         |> fetch
+        |> fmap sortProducers
 
 -- | Products that can be ordered: enabled, from one of the given producers.
 fetchProducts :: (?modelContext :: ModelContext) => [Producer] -> IO [Product]
@@ -134,22 +135,31 @@ fetchProducts producers = do
     query @Product
         |> filterWhere (#enabled, True)
         |> filterWhereIn (#producerId, map (.id) producers)
-        |> orderByDesc #ordering
-        |> orderByDesc #name
         |> fetch
 
+-- | Products per producer, each list in display order (see 'productOrder').
 groupProducts :: [Product] -> ProductsByProducers
-groupProducts products = go products mempty
-    where go [] m     = m
-          go (x:xs) m = go xs (Map.insertWith (++) x.producerId [x] m)
+groupProducts products = products
+    |> map (\x -> (x.producerId, [x]))
+    |> Map.fromListWith (++)
+    |> Map.map (sortOn productOrder)
 
+-- | Order lines per producer, in the same order as on the order form.
 groupOrderedProducts :: [Include "productId" OrderedProduct] -> OrderedProductsByProducer
-groupOrderedProducts orderedProducts = go orderedProducts mempty
-    where go [] m     = m
-          go (x:xs) m = go xs (Map.insertWith (++) x.productId.producerId [x] m)
+groupOrderedProducts orderedProducts = orderedProducts
+    |> map (\x -> (x.productId.producerId, [x]))
+    |> Map.fromListWith (++)
+    |> Map.map (sortOn (\x -> productOrder x.productId))
 
+-- | Products with an ordering number come first, lowest first; then by name,
+-- and the cheaper (smaller) one first when two share a name.
+productOrder :: (HasField "ordering" product (Maybe Int), HasField "name" product Text, HasField "price" product Int)
+             => product -> (Bool, Maybe Int, Text, Int)
+productOrder x = (isNothing x.ordering, x.ordering, toLower x.name, x.price)
+
+-- | Bosco Falconeria first, then the other producers A to Z.
 sortProducers :: [Producer] -> [Producer]
-sortProducers xs = filter isBosco xs ++ filter (not . isBosco) xs
+sortProducers = sortOn (\x -> (not (isBosco x), toLower x.name))
 
 isBosco :: Producer -> Bool
 isBosco x = x.name == "Bosco Falconeria"

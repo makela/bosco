@@ -56,10 +56,9 @@ instance Controller OrdersController where
         render IndexView { .. }
 
     action NewOrderAction = do
-        xs <- fetchProducers
+        producers <- fetchProducers
         products <- fetchProducts
-        let producers = sortProducers xs
-            orders = mempty
+        let orders = mempty
             productsByProducers = groupProducts products
             customer = newRecord @Customer
             actionUrl = pathTo CreateOrderAction
@@ -171,14 +170,12 @@ queryYears = do
 fetchProducers :: (?modelContext :: ModelContext) => IO [Producer]
 fetchProducers = do
     query @Producer
-        |> orderByDesc #name
         |> fetch
+        |> fmap sortProducers
 
 fetchProducts :: (?modelContext :: ModelContext) => IO [Product]
 fetchProducts = do
     query @Product
-        |> orderByDesc #ordering
-        |> orderByDesc #name
         |> fetch
 
 priceForOrder :: (?modelContext :: ModelContext) => Include "customerId" Order -> IO (Id Order, Int)
