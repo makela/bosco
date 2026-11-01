@@ -8,7 +8,8 @@ import Admin.View.Customers.Index
 import Admin.View.Customers.New
 import Admin.View.Customers.Show
 
-import Web.Controller.Orders (isEmail', isPhone)
+import Web.Controller.Orders (isEmail', isPhone, nonEmptyOrWhitespace,
+                              setReverseName)
 
 instance Controller CustomersController where
     beforeAction = ensureIsUser
@@ -50,10 +51,7 @@ instance Controller CustomersController where
             |> ifValid \case
                 Left customer -> render EditView { .. }
                 Right customer -> do
-                    let reverseName = toLower . unwords . reverse $ words customer.name
-                    customer <- customer
-                        |> set #reverseName reverseName
-                        |> updateRecord
+                    customer <- customer |> updateRecord
                     setSuccessMessage "Customer updated"
                     redirectTo ShowCustomerAction { .. }
 
@@ -105,6 +103,8 @@ instance Controller CustomersController where
 
 buildCustomer customer = customer
     |> fill @["name","email","phone","address"]
+    |> validateField #name nonEmptyOrWhitespace
     |> validateField #email isEmail'
     |> validateField #phone isPhone
-    |> validateField #address nonEmpty
+    |> validateField #address nonEmptyOrWhitespace
+    |> setReverseName

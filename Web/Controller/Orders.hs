@@ -6,6 +6,8 @@ module Web.Controller.Orders
     , groupProducts
     , isEmail'
     , isPhone
+    , nonEmptyOrWhitespace
+    , setReverseName
     , sortProducers
     ) where
 
@@ -73,10 +75,7 @@ instance Controller OrdersController where
                 Left customer -> do
                     render NewEmailView { .. }
                 Right customer -> do
-                    let reverseName = toLower . unwords . reverse $ words customer.name
-                    customer <- customer
-                        |> set #reverseName reverseName
-                        |> createRecord
+                    _ <- customer |> createRecord
                     setSuccessMessage "Tiedot tallennettu"
                     redirectTo OrdersAction
 
@@ -86,11 +85,16 @@ buildCustomer customer = customer
     |> validateField #email isEmail'
     |> validateField #phone isPhone
     |> validateField #address nonEmptyOrWhitespace
+    |> setReverseName
 
 buildEmail customer = customer
     |> fill @["name","email"]
     |> validateField #name nonEmptyOrWhitespace
     |> validateField #email isEmail'
+    |> setReverseName
+
+setReverseName :: Customer -> Customer
+setReverseName customer = customer |> set #reverseName (reverseNameOf customer.name)
 
 nonEmptyOrWhitespace :: Text -> ValidatorResult
 nonEmptyOrWhitespace text = case nonEmpty $ T.strip text of
@@ -206,10 +210,7 @@ createOrder actionUrl producers products after = do
                             render NewView { .. }
                         Right order -> do
                             -- TODO transaction
-                            let reverseName = toLower . unwords . reverse $ words customer.name
-                            customer <- customer
-                                |> set #reverseName reverseName
-                                |> createRecord
+                            customer <- customer |> createRecord
                             order <- order
                                 |> set #customerId customer.id
                                 |> createRecord
