@@ -156,7 +156,7 @@ isBosco :: Producer -> Bool
 isBosco x = x.name == "Bosco Falconeria"
 
 countSum xs = xs
-    |> map (\x -> x.productId.price * x.quantity)
+    |> map (\x -> x.unitPrice * x.quantity)
     |> sum
 
 fetchShowOrderContext :: (?modelContext :: ModelContext)
@@ -172,7 +172,6 @@ fetchShowOrderContext orderId = do
         |> filterWhere (#orderId, orderId)
         |> fetch
         >>= collectionFetchRelated #productId
-    -- TODO We should fix total price at ordering, because prices can change
     let totalSum = countSum xs
     let orderedProductsByProducer = groupOrderedProducts xs
     xs <- query @Producer
@@ -192,10 +191,10 @@ createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respo
 createOrder actionUrl producers products unorderable after = do
     let quantityOf x = paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)
     let params = products
-            |> map (\x -> (x.id, quantityOf x))
+            |> map (\x -> (x, quantityOf x))
             |> filter (\(_, i) -> i > 0)
     let unavailable = filter (\x -> quantityOf x > 0) unorderable
-    let orders = Map.fromList params
+    let orders = Map.fromList (map (\(x, i) -> (x.id, i)) params)
     let productsByProducers = groupProducts products
     -- TODO if Map.isEmpty orders then render NewView { .. } else
     -- TODO save valid customer information for later use
@@ -222,10 +221,12 @@ createOrder actionUrl producers products unorderable after = do
                                 |> set #customerId customer.id
                                 |> createRecord
                             let orders = params
-                                    |> map (\(pid, count) ->
+                                    |> map (\(product, count) ->
                                           newRecord @OrderedProduct
                                               |> set #orderId order.id
-                                              |> set #productId pid
-                                              |> set #quantity count)
+                                              |> set #productId product.id
+                                              |> set #quantity count
+                                              -- Fixed now, so later price changes don't touch this order
+                                              |> set #unitPrice product.price)
                             forM_ orders createRecord
                             after order

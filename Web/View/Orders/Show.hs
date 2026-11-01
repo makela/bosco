@@ -67,9 +67,9 @@ renderOrderedProduct orderedProduct = [hsx|
         <td class="normal">{orderedProduct.productId.name} ({orderedProduct.productId.package})</td>
         <td>{orderedProduct.quantity}</td>
         <td>*</td>
-        <td>{formatMoney orderedProduct.productId.price}</td>
+        <td>{formatMoney orderedProduct.unitPrice}</td>
         <td>=</td>
-        <td class="last">{formatMoney (orderedProduct.productId.price * orderedProduct.quantity)}</td>
+        <td class="last">{formatMoney (orderedProduct.unitPrice * orderedProduct.quantity)}</td>
     </tr>
 |]
 

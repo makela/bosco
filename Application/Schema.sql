@@ -48,7 +48,8 @@ CREATE TABLE ordered_products (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
     order_id UUID NOT NULL,
     product_id UUID NOT NULL,
-    quantity INT NOT NULL
+    quantity INT NOT NULL,
+    unit_price INT NOT NULL
 );
 CREATE INDEX ordered_products_order_id_index ON ordered_products (order_id);
 CREATE INDEX ordered_products_product_id_index ON ordered_products (product_id);

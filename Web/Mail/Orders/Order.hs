@@ -58,8 +58,8 @@ instance BuildMail OrderMail where
                     <td>{orderedProduct.productId.name} ({orderedProduct.productId.package})</td>
                     <td>{orderedProduct.quantity}</td>
                     <td>*</td>
-                    <td>{formatMoney orderedProduct.productId.price}</td>
+                    <td>{formatMoney orderedProduct.unitPrice}</td>
                     <td>=</td>
-                    <td style="text-align: right">{formatMoney (orderedProduct.productId.price * orderedProduct.quantity)}</td>
+                    <td style="text-align: right">{formatMoney (orderedProduct.unitPrice * orderedProduct.quantity)}</td>
                 </tr>
             |]

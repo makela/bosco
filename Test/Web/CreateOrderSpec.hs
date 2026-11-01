@@ -57,6 +57,20 @@ tests = aroundAll (withIHPApp WebApplication config) do
             response `responseBodyShouldNotContain` "eivät ole enää tilattavissa"
             orderedQuantities "unordered@example.com" `shouldReturn` [(honey.id, 1)]
 
+    describe "Web order prices" do
+        it "keeps the price the order was placed at when the product's price changes" $ withContext do
+            (_, oil, _) <- setUp "price"
+            _ <- submitOrder "price@example.com" [(oil, 2)]
+            oil |> set #price 1500 |> updateRecord
+            order <- orderOf "price@example.com"
+            response <- callAction ShowOrderAction { orderId = order.id }
+            response `responseStatusShouldBe` status200
+            response `responseBodyShouldContain` "20 €"
+            response `responseBodyShouldNotContain` "15 €"
+            response `responseBodyShouldNotContain` "30 €"
+            ordered <- query @OrderedProduct |> filterWhere (#orderId, order.id) |> fetchOne
+            ordered.unitPrice `shouldBe` 1000
+
 -- | Opens ordering and creates a fresh producer with two products. Tests
 -- share one database, so the tag keeps their product names apart.
 setUp :: (?modelContext :: ModelContext) => Text -> IO (Producer, Product, Product)
@@ -87,6 +101,11 @@ submitOrder email quantities = callActionWithParams CreateOrderAction $
     , ("phone", "0401234567")
     , ("address", "Testikatu 1")
     ] <> map (\(product, n) -> (idToParam product.id, cs (tshow n))) quantities
+
+orderOf :: (?modelContext :: ModelContext) => Text -> IO Order
+orderOf email = do
+    customer <- query @Customer |> filterWhere (#email, email) |> fetchOne
+    query @Order |> filterWhere (#customerId, customer.id) |> fetchOne
 
 -- | What got ordered by the customer with this email, if anything.
 orderedQuantities :: (?modelContext :: ModelContext) => Text -> IO [(Id Product, Int)]

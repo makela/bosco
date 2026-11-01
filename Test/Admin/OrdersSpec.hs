@@ -46,6 +46,35 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             response `responseStatusShouldBe` status200
             response `responseBodyShouldContain` "Ville Korhonen"
             response `responseBodyShouldNotContain` "Maija (Mäki) Virtanen"
+
+    describe "Admin OrdersController prices" do
+        it "lists an order at the price it was placed at" $ withContext do
+            admin <- createAdmin
+            producer <- newRecord @Producer |> set #name "Hintatila" |> set #subject "" |> set #description "" |> createRecord
+            product <- newRecord @Product
+                |> set #producerId producer.id
+                |> set #name "Hintaöljy"
+                |> set #description ""
+                |> set #package "1 l"
+                |> set #price 1500
+                |> createRecord
+            customer <- newRecord @Customer
+                |> set #name "Hinta Asiakas"
+                |> set #email "price@example.com"
+                |> set #phone "0401234567"
+                |> set #address "Testikatu 1"
+                |> createRecord
+            order <- newRecord @Order |> set #customerId customer.id |> createRecord
+            _ <- newRecord @OrderedProduct
+                |> set #orderId order.id
+                |> set #productId product.id
+                |> set #quantity 2
+                |> set #unitPrice 1000
+                |> createRecord
+            response <- withUser admin $ search "hinta asiakas"
+            response `responseBodyShouldContain` "Hinta Asiakas"
+            response `responseBodyShouldContain` "20 €"
+            response `responseBodyShouldNotContain` "30 €"
   where
     search q = callActionWithParams OrdersAction [("q", q)]
 
