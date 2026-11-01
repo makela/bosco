@@ -15,6 +15,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Network.URI.Encode as E
 
+import Application.Localization
 import Web.Controller.Prelude hiding (createOrder)
 import Web.Mail.Orders.Order
 import Web.View.Orders.Index
@@ -52,7 +53,10 @@ instance Controller OrdersController where
 
     action CreateOrderAction = do
         message <- fetchLastWelcomeMessage
-        unless (maybe False (.isOrderingEnabled) message) (earlyReturn $ redirectTo OrdersAction)
+        -- Ordering can close while the customer is still filling in the form
+        unless (maybe False (.isOrderingEnabled) message) do
+            setErrorMessage (l10nText LOrderingClosed)
+            earlyReturn $ redirectTo OrdersAction
         producers <- fetchProducers
         products <- fetchProducts producers
         allProducts <- query @Product |> fetch

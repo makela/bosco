@@ -26,6 +26,7 @@ data Localizable
   | LPaymentSentToEmail
   | LNoLongerAvailable
   | LCheckOrderAndResubmit
+  | LOrderingClosed
 
 l10nText :: Localizable -> Text
 l10nText l = l10nText' l defaultLocale
@@ -61,3 +62,5 @@ l10nText' LNoLongerAvailable FI = "Tilausta ei lähetetty, koska nämä tuotteet
 l10nText' LNoLongerAvailable FR = "Your order was not sent because these products are no longer available:"
 l10nText' LCheckOrderAndResubmit FI = "Ne on poistettu lomakkeelta. Tarkista tilauksesi ja lähetä se uudelleen."
 l10nText' LCheckOrderAndResubmit FR = "They have been removed from the form. Please check your order and send it again."
+l10nText' LOrderingClosed FI = "Tilaustasi ei lähetetty, koska tilaukset on suljettu."
+l10nText' LOrderingClosed FR = "Your order was not sent because ordering has closed."

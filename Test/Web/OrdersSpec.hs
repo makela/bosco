@@ -1,7 +1,9 @@
 module Test.Web.OrdersSpec where
 
-import Network.HTTP.Types (methodGet, methodPost, status200, status404)
-import Network.Wai (defaultRequest, requestMethod)
+import Network.HTTP.Types (hContentType, methodGet, methodPost, status200,
+                          status302, status404)
+import Network.HTTP.Types.URI (renderSimpleQuery)
+import Network.Wai (defaultRequest, requestHeaders, requestMethod)
 import Network.Wai.Test (SRequest (..), SResponse (..), runSession, setPath,
                          srequest)
 
@@ -42,6 +44,35 @@ tests = aroundAll (withIHPApp WebApplication config) do
             simpleStatus response `shouldBe` status404
             order' <- fetch order.id
             order'.cancelledAt `shouldBe` Nothing
+
+        it "tells the customer when ordering closed before they sent the order" $ withContext do
+            _ <- newRecord @WelcomeMessage
+                |> set #text "Tilaukset on suljettu"
+                |> set #isOrderingEnabled False
+                |> createRecord
+            app <- initTestApplication ?mocking
+            -- One session, so the flash cookie from the POST reaches the next page
+            (submitted, frontPage) <- flip runSession app do
+                submitted <- srequest $ SRequest
+                    (setPath defaultRequest
+                        { requestMethod = methodPost
+                        , requestHeaders = [(hContentType, "application/x-www-form-urlencoded")]
+                        } "/CreateOrder")
+                    (cs $ renderSimpleQuery False
+                        [ ("name", "Late Customer")
+                        , ("email", "late@example.com")
+                        , ("phone", "0401234567")
+                        , ("address", "Testikatu 1")
+                        ])
+                -- Follow the redirect like a browser would
+                frontPage <- srequest (SRequest (setPath defaultRequest "/Orders") "")
+                pure (submitted, frontPage)
+            simpleStatus submitted `shouldBe` status302
+            lookup "Location" (simpleHeaders submitted) `shouldBe` Just "http://localhost/Orders"
+            simpleStatus frontPage `shouldBe` status200
+            cs (simpleBody frontPage) `shouldSatisfy` ("Tilaustasi ei lähetetty, koska tilaukset on suljettu" `isInfixOf`)
+            count <- query @Customer |> filterWhere (#email, "late@example.com") |> fetchCount
+            count `shouldBe` 0
 
 -- | Sends an unauthenticated request through the full app, router included.
 sendRequest method path = do
