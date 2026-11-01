@@ -38,6 +38,8 @@
                         mmark
                         password
                         ihp-mail
+                        hspec
+                        ihp-hspec
                     ];
                     devHaskellPackages = p: with p; [
                         cabal-install
