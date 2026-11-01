@@ -5,6 +5,7 @@ import Test.Hspec
 
 import qualified Test.Admin.CustomersSpec
 import qualified Test.Admin.DeleteSpec
+import qualified Test.Admin.OrderedProductsSpec
 import qualified Test.Admin.OrdersSpec
 import qualified Test.Web.CreateOrderSpec
 import qualified Test.Web.OrdersSpec
@@ -16,3 +17,4 @@ main = hspec do
     Test.Admin.CustomersSpec.tests
     Test.Admin.OrdersSpec.tests
     Test.Admin.DeleteSpec.tests
+    Test.Admin.OrderedProductsSpec.tests
