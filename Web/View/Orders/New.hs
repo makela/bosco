@@ -105,26 +105,29 @@ renderProducer orders productsByProducer producer = [hsx|
     <fieldset>
         <h2>{producer.name}</h2>
         <p>{renderMarkdown producer.description}</p>
-        <table class="whitespace-nowrap">
-        <tbody>
-        {forEach products (renderProduct orders)}
-        </tbody>
-        </table>
+        <div class="products">
+            {forEach products (renderProduct orders)}
+        </div>
     </fieldset>
 |]
     where products = fromMaybe [] $ Map.lookup producer.id productsByProducer
 
+-- | One product row. On phones: name and package/price on the left, the
+-- quantity on the right. On wider screens the parts line up in columns.
+-- See div.product in tailwind/app.css.
 renderProduct :: Orders -> Product -> Html
 renderProduct orders product = [hsx|
-    <tr class="product">
-        <td>{product.name}</td>
-        <td>{product.package}</td>
-        <td>{price}</td>
-        <td class="last"><input type="number" min="0" name={show product.id} value={count}> <span>kpl</span></td>
-    </tr>
-    <tr class="product-description">
-        <td colspan="4" class="normal">{product.description}</td>
-    </tr>
+    <div class="product">
+        <span class="product-name">{product.name}</span>
+        <span class="product-details">
+            <span class="product-package">{product.package}</span>
+            <span class="product-price">{price}</span>
+        </span>
+        <span class="product-quantity">
+            <input type="number" min="0" name={show product.id} value={count} aria-label={product.name <> ", " <> product.package}> kpl
+        </span>
+        <span class="product-description">{product.description}</span>
+    </div>
 |]
     where
         price = formatMoney product.price

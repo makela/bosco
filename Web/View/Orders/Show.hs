@@ -21,12 +21,14 @@ instance View ShowView where
     html ShowView { .. } = [hsx|
         <h1>{l10nText LInvoice}</h1>
         {renderCustomer order.customerId}
+        <div class="table-responsive">
         <table class="whitespace-nowrap">
         <tbody>
             {forEach producers (renderProducer orderedProductsByProducer)}
             {renderTotalSum totalSum}
         </tbody>
         </table>
+        </div>
         {renderPaymentInstruction order paymentInstruction}
         <p>{l10nText LPaymentSentToEmail}</p>
     |]
@@ -44,7 +46,7 @@ renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.ca
 
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|
-    <div class="flex">
+    <div class="flex flex-wrap">
       <p>{customer.name}</p>
       <p>{customer.email}</p>
       <p>{customer.phone}</p>

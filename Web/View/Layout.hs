@@ -64,6 +64,7 @@ scripts = do
 metaTags :: Html
 metaTags = [hsx|
     <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width"/>
     <meta property="og:title" content="Bosco Falconeria Öljytilaus"/>
     <meta property="og:type" content="website"/>
     <meta property="og:url" content="TODO"/>

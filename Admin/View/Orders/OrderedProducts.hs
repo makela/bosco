@@ -13,6 +13,7 @@ data OrderedProductsView = OrderedProductsView
 instance View OrderedProductsView where
     html OrderedProductsView { .. } = [hsx|
         {breadcrumb}
+        <div class="table-responsive">
         <table class="whitespace-nowrap">
         <thead>
             <tr>
@@ -24,6 +25,7 @@ instance View OrderedProductsView where
             {forEach producers (renderProducer years orderedProductsByYear)}
         </tbody>
         </table>
+        </div>
     |]
         where
             breadcrumb = renderBreadcrumb

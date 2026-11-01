@@ -3,7 +3,7 @@
 
 
 .container {
-  @apply p-2 pb-8 w-full mx-auto max-w-4xl min-w-sm;
+  @apply p-2 pb-8 w-full mx-auto max-w-4xl;
 }
 
 a {
@@ -39,16 +39,55 @@ pre code {
 }
 
 table th, table td {
-  @apply py-1 px-4 whitespace-nowrap text-left;
+  @apply py-1 px-2 sm:px-4 whitespace-nowrap text-left;
+}
+
+/* Wide tables scroll inside this box instead of widening the page */
+div.table-responsive {
+  @apply overflow-x-auto;
 }
 table td.normal {
-  @apply whitespace-normal;
+  /* Long product names (e.g. Basilikankukkaviinietikkaa) may break on phones */
+  @apply whitespace-normal hyphens-auto wrap-anywhere;
 }
-table tr.product td {
-  @apply pb-0;
+/* Order form products: two columns on phones, four on wider screens */
+div.products {
+  @apply px-2 sm:px-4 pb-2;
 }
-table tr.product-description td {
-  @apply text-sm px-8 pt-0;
+div.product {
+  @apply grid gap-x-4 items-center py-1;
+  grid-template-columns: 1fr 7rem;
+  grid-template-areas:
+    "name quantity"
+    "details quantity"
+    "description description";
+}
+div.product .product-name { grid-area: name; }
+div.product .product-details {
+  @apply text-sm text-gray-600 space-x-3;
+  grid-area: details;
+}
+div.product .product-quantity {
+  @apply whitespace-nowrap text-right;
+  grid-area: quantity;
+}
+div.product .product-quantity input {
+  @apply mr-1;
+}
+div.product .product-description {
+  @apply text-sm text-gray-600 sm:px-4;
+  grid-area: description;
+}
+@media (width >= 40rem) {
+  div.product {
+    grid-template-columns: 1fr 9rem 5rem 8rem;
+    grid-template-areas:
+      "name package price quantity"
+      "description description description description";
+  }
+  div.product .product-details { display: contents; }
+  div.product .product-package { @apply text-base text-black; grid-area: package; }
+  div.product .product-price { @apply text-base text-black text-right; grid-area: price; }
 }
 table td.last {
   @apply text-right;
@@ -58,7 +97,7 @@ table td span {
 }
 
 input[type=number] {
-  @apply w-24 h-8 border-gray-300 rounded-md;
+  @apply w-20 sm:w-24 h-8 border-gray-300 rounded-md;
 }
 
 a.link {
@@ -101,7 +140,8 @@ form input[type=submit], form button[type=submit] {
 }
 
 fieldset {
-  @apply rounded-sm border-2 border-gray-200 my-4 w-full;
+  /* Fieldsets don't shrink below their content by default; let long words break */
+  @apply rounded-sm border-2 border-gray-200 my-4 w-full min-w-0 wrap-break-word;
 }
 
 a.back-button {
