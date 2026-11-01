@@ -66,6 +66,10 @@ instance Controller ProducersController where
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
         producer <- fetch producerId
+        productCount <- query @Product |> filterWhere (#producerId, producerId) |> fetchCount
+        when (productCount > 0) do
+            setErrorMessage ("Producer “" <> producer.name <> "” cannot be deleted because it has products. Delete its products first, or disable the producer instead.")
+            earlyReturn $ redirectTo EditProducerAction { producerId }
         deleteRecord producer
         setSuccessMessage "Producer deleted"
         redirectTo ProducersAction

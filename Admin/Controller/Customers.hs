@@ -71,6 +71,10 @@ instance Controller CustomersController where
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
         customer <- fetch customerId
+        orderCount <- query @Order |> filterWhere (#customerId, customerId) |> fetchCount
+        when (orderCount > 0) do
+            setErrorMessage ("Customer “" <> customer.name <> "” cannot be deleted because they have orders.")
+            earlyReturn $ redirectTo EditCustomerAction { customerId }
         deleteRecord customer
         setSuccessMessage "Customer deleted"
         redirectTo CustomersAction

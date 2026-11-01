@@ -76,6 +76,11 @@ instance Controller ProductsController where
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
         product <- fetch productId
+        -- Ordered products are part of past orders, so they can only be disabled
+        timesOrdered <- query @OrderedProduct |> filterWhere (#productId, productId) |> fetchCount
+        when (timesOrdered > 0) do
+            setErrorMessage ("Product “" <> product.name <> "” cannot be deleted because it has been ordered. Disable it instead.")
+            earlyReturn $ redirectTo EditProductAction { productId }
         deleteRecord product
         setSuccessMessage "Product deleted"
         redirectTo ProductsAction
