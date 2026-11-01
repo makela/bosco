@@ -19,7 +19,10 @@
             systems = import systems;
             imports = [ ihp.flakeModules.default ];
 
-            perSystem = { pkgs, ... }: {
+            # Runs the site on a NixOS server, see nix/module.nix and the README
+            flake.nixosModules.default = ./nix/module.nix;
+
+            perSystem = { pkgs, self', ... }: {
                 ihp = {
                     appName = "bosco";
                     enable = true;
@@ -38,13 +41,28 @@
                         mmark
                         password
                         ihp-mail
+                    ];
+                    devHaskellPackages = p: with p; [
+                        # Only in the dev shell and `nix flake check`, not in production builds
+                        cabal-install
+                        hlint
                         hspec
                         ihp-hspec
                     ];
-                    devHaskellPackages = p: with p; [
-                        cabal-install
-                        hlint
-                    ];
+                };
+
+                checks.nixos-module = import ./nix/tests/module.nix {
+                    inherit pkgs;
+                    inherit (inputs.nixpkgs.lib) nixosSystem;
+                    inherit (inputs) self;
+                };
+
+                checks.deploy-migrations = import ./nix/tests/migrations.nix {
+                    inherit pkgs;
+                    inherit (self'.packages) migrate;
+                    bootstrapSchema = pkgs.callPackage ./nix/bootstrap-schema.nix { };
+                    src = ./.;
+                    ihpSchema = "${ihp}/ihp-schema-compiler/data/IHPSchema.sql";
                 };
 
                 devenv.shells.default = {

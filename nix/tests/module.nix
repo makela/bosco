@@ -1,0 +1,395 @@
+# Evaluates nix/module.nix with a Finnish, a French and a staging instance,
+# as in the README, and checks the users, databases, sockets and services it
+# makes. Nothing is built or started, so no virtual machine is needed.
+{
+  pkgs,
+  nixosSystem,
+  self,
+}:
+let
+  lib = pkgs.lib;
+  system = pkgs.stdenv.hostPlatform.system;
+
+  evaluate =
+    instances:
+    (nixosSystem {
+      modules = [
+        ../module.nix
+        {
+          nixpkgs.hostPlatform = system;
+          boot.isContainer = true;
+          system.stateVersion = "25.05";
+          services.bosco.instances = lib.mapAttrs (_: instance: { flake = self; } // instance) instances;
+        }
+      ];
+    }).config;
+
+  smtp = {
+    host = "smtp.example.com";
+    user = "tilaus@example.fi";
+    passwordFile = "/var/lib/secrets/bosco/smtp-password";
+  };
+
+  server = evaluate {
+    fi = {
+      baseUrl = "https://tilaus.example.fi";
+      locale = "fi";
+      minimumRevision = 1760540031;
+      inherit smtp;
+    };
+    fr = {
+      baseUrl = "https://commande.example.fr";
+      port = 3301;
+      locale = "fr";
+      bootstrapSchema = true;
+      smtp = smtp // {
+        user = "commande@example.fr";
+        passwordFile = "/var/lib/secrets/bosco/smtp-password-fr";
+      };
+    };
+    staging = {
+      baseUrl = "https://staging.tilaus.example.fi";
+      port = 3302;
+      bootstrapSchema = true;
+      sendEmails = false;
+    };
+  };
+
+  services = server.systemd.services;
+  ours = lib.filterAttrs (name: _: lib.hasPrefix "bosco-" name);
+  instanceNames = [
+    "fi"
+    "fr"
+    "staging"
+  ];
+  servicesOf = names: lib.concatMap (name: [ "bosco-${name}" "bosco-${name}-migrate" "bosco-${name}-worker" ]) names;
+
+  failedAssertions =
+    config:
+    map (assertion: assertion.message) (
+      lib.filter (
+        assertion: !assertion.assertion && lib.hasPrefix "services.bosco" assertion.message
+      ) config.assertions
+    );
+
+  anyMessage = text: messages: lib.any (lib.hasInfix text) messages;
+
+  # Instances that don't send emails, so only the setting under test matters
+  quiet = lib.mapAttrs (_: instance: { sendEmails = false; } // instance);
+
+  # Whether evaluating the instance's web service fails, e.g. on a bad option
+  fails = instance: !(builtins.tryEval (builtins.deepSeq (evaluate (quiet { fi = instance; })).systemd.services.bosco-fi.environment true)).success;
+
+  tests = {
+    testEachInstanceHasThreeServices = {
+      expr = lib.attrNames (ours services);
+      expected = lib.sort lib.lessThan (servicesOf instanceNames);
+    };
+
+    testInstancesListenLocallyOnTheirOwnPorts = {
+      expr = lib.mapAttrs (_: socket: socket.socketConfig.ListenStream) (ours server.systemd.sockets);
+      expected = {
+        bosco-fi = "127.0.0.1:3300";
+        bosco-fr = "127.0.0.1:3301";
+        bosco-staging = "127.0.0.1:3302";
+      };
+    };
+
+    testIPv6AddressesGetBrackets = {
+      expr =
+        (evaluate (quiet {
+          fi = {
+            baseUrl = "https://tilaus.example.fi";
+            host = "::1";
+          };
+        })).systemd.sockets.bosco-fi.socketConfig.ListenStream;
+      expected = "[::1]:3300";
+    };
+
+    testWebServerEnvironment = {
+      expr = lib.getAttrs [
+        "IHP_ENV"
+        "IHP_BASEURL"
+        "DATABASE_URL"
+        "IHP_SESSION_SECRET_FILE"
+        "IHP_REQUEST_LOGGER_IP_ADDR_SOURCE"
+        "IHP_SYSTEMD"
+      ] services.bosco-fi.environment;
+      expected = {
+        IHP_ENV = "Production";
+        IHP_BASEURL = "https://tilaus.example.fi";
+        DATABASE_URL = "postgresql:///bosco_fi?host=/run/postgresql";
+        IHP_SESSION_SECRET_FILE = "/var/lib/bosco-fi/session.aes";
+        IHP_REQUEST_LOGGER_IP_ADDR_SOURCE = "FromHeader";
+        IHP_SYSTEMD = "1";
+      };
+    };
+
+    testEachInstanceHasItsLanguage = {
+      expr = lib.genAttrs (lib.filter (name: !lib.hasSuffix "-migrate" name) (servicesOf instanceNames)) (
+        name: services.${name}.environment.APP_LOCALE
+      );
+      expected = {
+        bosco-fi = "fi";
+        bosco-fi-worker = "fi";
+        bosco-fr = "fr";
+        bosco-fr-worker = "fr";
+        bosco-staging = "fi";
+        bosco-staging-worker = "fi";
+      };
+    };
+
+    testUnknownLanguagesAreRefused = {
+      expr = fails {
+        baseUrl = "https://tilaus.example.fi";
+        locale = "sv";
+      };
+      expected = true;
+    };
+
+    testServicesRunTheSitesPrograms = {
+      expr = map (name: services.${name}.serviceConfig.ExecStart) [
+        "bosco-fi"
+        "bosco-fi-worker"
+        "bosco-fi-migrate"
+      ];
+      expected = [
+        "${self.packages.${system}.optimized-prod-server}/bin/RunProdServer"
+        "${self.packages.${system}.optimized-prod-server}/bin/RunJobs"
+        "${self.packages.${system}.migrate}/bin/migrate"
+      ];
+    };
+
+    testWebServerAndWorkerWaitForTheMigrations = {
+      expr = map (
+        name:
+        lib.elem "bosco-fi-migrate.service" services.${name}.requires
+        && lib.elem "bosco-fi-migrate.service" services.${name}.after
+      ) [ "bosco-fi" "bosco-fi-worker" ];
+      expected = [
+        true
+        true
+      ];
+    };
+
+    testMigrationsWaitForPostgres = {
+      expr = lib.elem "postgresql.service" services.bosco-fi-migrate.after;
+      expected = true;
+    };
+
+    testMigrationsComeFromTheCheckout = {
+      expr = services.bosco-fi-migrate.environment.IHP_MIGRATION_DIR;
+      expected = "${self}/Application/Migration/";
+    };
+
+    testMinimumRevisionIsPerInstance = {
+      expr = map (name: services."bosco-${name}-migrate".environment.MINIMUM_REVISION) instanceNames;
+      expected = [
+        "1760540031"
+        "0"
+        "0"
+      ];
+    };
+
+    testOnlyNewInstancesBootstrapTheirSchema = {
+      expr = map (name: lib.length services."bosco-${name}-migrate".serviceConfig.ExecStartPre) instanceNames;
+      expected = [
+        1
+        2
+        2
+      ];
+    };
+
+    testStagingBootstrapsFromTheCheckout = {
+      expr = {
+        program = lib.hasSuffix "/bin/bootstrap-schema" (lib.last services.bosco-staging-migrate.serviceConfig.ExecStartPre);
+        schema = services.bosco-staging-migrate.environment.APP_SCHEMA;
+      };
+      expected = {
+        program = true;
+        schema = "${self}/Application/Schema.sql";
+      };
+    };
+
+    testWorkerSendsThroughItsInstancesSmtp = {
+      expr = {
+        inherit (services.bosco-fr-worker.environment)
+          SEND_EMAILS
+          SMTP_HOST
+          SMTP_PORT
+          SMTP_ENCRYPTION
+          SMTP_USER
+          SMTP_PASSWORD_FILE
+          ;
+        inherit (services.bosco-fr-worker.serviceConfig) LoadCredential;
+      };
+      expected = {
+        SEND_EMAILS = "1";
+        SMTP_HOST = "smtp.example.com";
+        SMTP_PORT = "587";
+        SMTP_ENCRYPTION = "starttls";
+        SMTP_USER = "commande@example.fr";
+        SMTP_PASSWORD_FILE = "%d/smtp-password";
+        LoadCredential = "smtp-password:/var/lib/secrets/bosco/smtp-password-fr";
+      };
+    };
+
+    testStagingDoesNotSendEmails = {
+      expr = {
+        inherit (services.bosco-staging-worker.environment) SEND_EMAILS;
+        smtp = services.bosco-staging-worker.environment ? SMTP_HOST;
+        credential = services.bosco-staging-worker.serviceConfig ? LoadCredential;
+      };
+      expected = {
+        SEND_EMAILS = "0";
+        smtp = false;
+        credential = false;
+      };
+    };
+
+    testOnlyTheWorkerSeesTheSmtpPassword = {
+      expr = map (name: services.${name}.serviceConfig ? LoadCredential || services.${name}.environment ? SMTP_HOST) [
+        "bosco-fi"
+        "bosco-fi-migrate"
+      ];
+      expected = [
+        false
+        false
+      ];
+    };
+
+    testEachInstanceHasItsOwnDatabaseAndUser = {
+      expr = {
+        inherit (server.services.postgresql) enable ensureDatabases;
+        owners = map (user: user.name) (lib.filter (user: user.ensureDBOwnership) server.services.postgresql.ensureUsers);
+        systemUsers = map (name: server.users.users."bosco_${name}".isSystemUser) instanceNames;
+      };
+      expected = {
+        enable = true;
+        ensureDatabases = map (name: "bosco_${name}") instanceNames;
+        owners = map (name: "bosco_${name}") instanceNames;
+        systemUsers = [
+          true
+          true
+          true
+        ];
+      };
+    };
+
+    testServicesRunAsTheDatabaseOwner = {
+      expr = lib.mapAttrs (_: service: service.serviceConfig.User) (ours services);
+      expected = lib.listToAttrs (
+        lib.concatMap (
+          name:
+          map (service: lib.nameValuePair service "bosco_${name}") [
+            "bosco-${name}"
+            "bosco-${name}-migrate"
+            "bosco-${name}-worker"
+          ]
+        ) instanceNames
+      );
+    };
+
+    testServicesAreHardened = {
+      expr = lib.mapAttrs (
+        _: service:
+        lib.getAttrs [
+          "NoNewPrivileges"
+          "ProtectSystem"
+          "ProtectHome"
+          "CapabilityBoundingSet"
+          "StateDirectory"
+        ] service.serviceConfig
+      ) (lib.filterAttrs (name: _: lib.hasPrefix "bosco-fi" name) services);
+      expected = lib.genAttrs [ "bosco-fi" "bosco-fi-migrate" "bosco-fi-worker" ] (_: {
+        NoNewPrivileges = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        CapabilityBoundingSet = "";
+        StateDirectory = "bosco-fi";
+      });
+    };
+
+    testTheReadmeSetupPassesTheChecks = {
+      expr = failedAssertions server;
+      expected = [ ];
+    };
+
+    testTwoInstancesCannotShareAPort = {
+      expr = anyMessage "own port" (
+        failedAssertions (evaluate (quiet {
+          fi.baseUrl = "https://tilaus.example.fi";
+          fr.baseUrl = "https://commande.example.fr";
+        }))
+      );
+      expected = true;
+    };
+
+    testTwoInstancesCannotShareADatabase = {
+      expr = anyMessage "own database" (
+        failedAssertions (evaluate (quiet {
+          fi.baseUrl = "https://tilaus.example.fi";
+          fr = {
+            baseUrl = "https://commande.example.fr";
+            port = 3301;
+            database = "bosco_fi";
+          };
+        }))
+      );
+      expected = true;
+    };
+
+    testSendingEmailsNeedsAnSmtpServer = {
+      expr = anyMessage "smtp.host" (
+        failedAssertions (evaluate {
+          fi.baseUrl = "https://tilaus.example.fi";
+        })
+      );
+      expected = true;
+    };
+
+    testAnSmtpLoginNeedsBothUserAndPassword = {
+      expr = anyMessage "both smtp.user and smtp.passwordFile" (
+        failedAssertions (evaluate {
+          fi = {
+            baseUrl = "https://tilaus.example.fi";
+            smtp = {
+              host = "smtp.example.com";
+              user = "tilaus@example.fi";
+            };
+          };
+        })
+      );
+      expected = true;
+    };
+
+    testAnSmtpLoginNeedsEncryption = {
+      expr = anyMessage "needs encryption" (
+        failedAssertions (evaluate {
+          fi = {
+            baseUrl = "https://tilaus.example.fi";
+            smtp = smtp // {
+              encryption = "none";
+            };
+          };
+        })
+      );
+      expected = true;
+    };
+  };
+
+  failures = lib.runTests tests;
+in
+pkgs.runCommand "nixos-module-tests" { } (
+  if failures == [ ] then
+    ''
+      echo "${toString (lib.length (lib.attrNames tests))} tests passed"
+      touch $out
+    ''
+  else
+    ''
+      echo ${lib.escapeShellArg (lib.generators.toPretty { } failures)} >&2
+      echo "${toString (lib.length failures)} of ${toString (lib.length (lib.attrNames tests))} tests failed" >&2
+      exit 1
+    ''
+)
