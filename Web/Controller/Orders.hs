@@ -34,7 +34,10 @@ instance Controller OrdersController where
 
     action NewOrderAction = do
         message <- fetchLastWelcomeMessage
-        unless (maybe False (.isOrderingEnabled) message) (earlyReturn $ renderNotFound)
+        -- Old links to the order form keep working after ordering closes
+        unless (maybe False (.isOrderingEnabled) message) do
+            setErrorMessage (l10nText LOrderingNotOpen)
+            earlyReturn $ redirectTo OrdersAction
         xs <- fetchProducers
         let producers = sortProducers xs
         products <- fetchProducts producers

@@ -27,6 +27,7 @@ data Localizable
   | LNoLongerAvailable
   | LCheckOrderAndResubmit
   | LOrderingClosed
+  | LOrderingNotOpen
 
 l10nText :: Localizable -> Text
 l10nText l = l10nText' l defaultLocale
@@ -64,3 +65,5 @@ l10nText' LCheckOrderAndResubmit FI = "Ne on poistettu lomakkeelta. Tarkista til
 l10nText' LCheckOrderAndResubmit FR = "They have been removed from the form. Please check your order and send it again."
 l10nText' LOrderingClosed FI = "Tilaustasi ei lähetetty, koska tilaukset on suljettu."
 l10nText' LOrderingClosed FR = "Your order was not sent because ordering has closed."
+l10nText' LOrderingNotOpen FI = "Tilaaminen ei ole tällä hetkellä mahdollista."
+l10nText' LOrderingNotOpen FR = "Ordering is not open at the moment."

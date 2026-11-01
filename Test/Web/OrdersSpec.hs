@@ -74,6 +74,21 @@ tests = aroundAll (withIHPApp WebApplication config) do
             count <- query @Customer |> filterWhere (#email, "late@example.com") |> fetchCount
             count `shouldBe` 0
 
+        it "sends an order form link opened while ordering is closed to the front page" $ withContext do
+            _ <- newRecord @WelcomeMessage
+                |> set #text "Tilaukset on suljettu"
+                |> set #isOrderingEnabled False
+                |> createRecord
+            app <- initTestApplication ?mocking
+            (opened, frontPage) <- flip runSession app do
+                opened <- srequest (SRequest (setPath defaultRequest "/NewOrder") "")
+                frontPage <- srequest (SRequest (setPath defaultRequest "/Orders") "")
+                pure (opened, frontPage)
+            simpleStatus opened `shouldBe` status302
+            lookup "Location" (simpleHeaders opened) `shouldBe` Just "http://localhost/Orders"
+            simpleStatus frontPage `shouldBe` status200
+            cs (simpleBody frontPage) `shouldSatisfy` ("Tilaaminen ei ole tällä hetkellä mahdollista" `isInfixOf`)
+
 -- | Sends an unauthenticated request through the full app, router included.
 sendRequest method path = do
     app <- initTestApplication ?mocking
