@@ -5,7 +5,6 @@ module Web.Controller.Orders
     , groupOrderedProducts
     , groupProducts
     , isEmail'
-    , isPhone
     , nonEmptyOrWhitespace
     , setReverseName
     , sortProducers
@@ -118,18 +117,6 @@ isEmail' text = case isEmail text of
     Success       -> Success
     Failure _     -> Failure "Sähköposti on virheellinen"
     FailureHtml x -> FailureHtml x
-
-isPhone :: Text -> ValidatorResult
-isPhone text
-    | ("+" `isPrefixOf` text) && l > 9 && l < 14 && onlyNumbers = Success
-    -- allow country code even without missing +
-    | ("3" `isPrefixOf` text) && l > 8 && l < 13 && onlyNumbers = Success
-    | ("0" `isPrefixOf` text) && l > 6 && l < 11 && onlyNumbers = Success
-    | otherwise = Failure "Puhelinnumero on virheellinen"
-    where
-        l = T.length $ T.filter (' ' /=) text
-        validChars = "+0123456789 " :: String
-        onlyNumbers = T.all (`elem` validChars) text
 
 buildOrder order = order
     |> fill @'["customerId"]

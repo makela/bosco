@@ -3,6 +3,8 @@ module Test.Helper.ControllerSpec where
 import IHP.Prelude
 import Test.Hspec
 
+import IHP.ValidationSupport (ValidatorResult (..))
+
 import Application.Helper.Controller
 
 tests :: Spec
@@ -46,3 +48,31 @@ tests = describe "Application.Helper.Controller" do
             matchesSearch "[" "Maija Virtanen" `shouldBe` False
             matchesSearch "*" "Maija Virtanen" `shouldBe` False
             matchesSearch "m.ija" "Maija Virtanen" `shouldBe` False
+
+    describe "isPhone" do
+        let accepts phone = it ("accepts " <> cs (show phone)) (isValid (isPhone phone) `shouldBe` True)
+            rejects phone = it ("rejects " <> cs (show phone)) (isValid (isPhone phone) `shouldBe` False)
+            isValid = \case
+                Success -> True
+                _ -> False
+        accepts "0401234567"
+        accepts "040 123 4567"
+        accepts "040-1234567"
+        accepts "040-123 4567"
+        accepts "09 1234567"
+        accepts "+358 40 123 4567"
+        accepts "+358-40-123-4567"
+        accepts "358401234567"
+        rejects ""
+        rejects "0"
+        accepts "09 12345"
+        rejects "040123"
+        rejects "040 123 456 789 0"
+        rejects "+35840"
+        rejects "4012345678"
+        rejects "+++++++++++"
+        rejects "0+0+0+0+0"
+        rejects "040+1234567"
+        rejects "-0401234567"
+        rejects "------------"
+        rejects "040 abc 4567"

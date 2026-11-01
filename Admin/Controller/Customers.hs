@@ -8,8 +8,7 @@ import Admin.View.Customers.Index
 import Admin.View.Customers.New
 import Admin.View.Customers.Show
 
-import Web.Controller.Orders (isEmail', isPhone, nonEmptyOrWhitespace,
-                              setReverseName)
+import Web.Controller.Orders (isEmail', nonEmptyOrWhitespace, setReverseName)
 
 instance Controller CustomersController where
     beforeAction = ensureIsUser
