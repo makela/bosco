@@ -75,7 +75,7 @@ instance Controller OrdersController where
         producers <- fetchProducers
         products <- fetchProducts
         let actionUrl = pathTo CreateOrderAction
-        createOrder actionUrl producers products [] $ \order -> do
+        createOrder actionUrl producers products [] (\_ -> pure ()) \order -> do
             setSuccessMessage "Order created"
             redirectTo ShowOrderAction { orderId = order.id }
 

@@ -1,5 +1,6 @@
 module Test.Web.CreateOrderSpec where
 
+import qualified Control.Exception as Exception
 import Network.HTTP.Types (status200)
 import Network.Wai (Response)
 
@@ -79,6 +80,28 @@ tests = aroundAll (withIHPApp WebApplication config) do
             response <- submitOrder "onlyunavailable@example.com" [(oil, 1)]
             response `responseBodyShouldContain` "eivät ole enää tilattavissa"
             response `responseBodyShouldNotContain` "Valitse vähintään yksi tuote"
+
+    describe "Web CreateOrderAction saving" do
+        it "saves nothing when saving an order line fails" $ withContext do
+            (_, oil, honey) <- setUp "transaction"
+            ordersBefore <- query @Order |> fetchCount
+            jobsBefore <- query @EmailOrderJob |> fetchCount
+            -- Make the second step of saving fail: order lines with quantity 13
+            let failLines = sqlExecDiscardResult "ALTER TABLE ordered_products ADD CONSTRAINT test_fail_lines CHECK (quantity <> 13)" ()
+                allowLines = sqlExecDiscardResult "ALTER TABLE ordered_products DROP CONSTRAINT test_fail_lines" ()
+            _ <- Exception.bracket_ failLines allowLines do
+                Exception.try @Exception.SomeException (submitOrder "transaction@example.com" [(oil, 1), (honey, 13)])
+            customerCount "transaction@example.com" `shouldReturn` 0
+            (query @Order |> fetchCount) `shouldReturn` ordersBefore
+            (query @EmailOrderJob |> fetchCount) `shouldReturn` jobsBefore
+
+        it "saves the customer, order, lines and email job together" $ withContext do
+            (_, oil, _) <- setUp "saved"
+            _ <- submitOrder "saved@example.com" [(oil, 1)]
+            order <- orderOf "saved@example.com"
+            orderedQuantities "saved@example.com" `shouldReturn` [(oil.id, 1)]
+            jobs <- query @EmailOrderJob |> filterWhere (#orderId, order.id) |> fetchCount
+            jobs `shouldBe` 1
 
     describe "Web order prices" do
         it "keeps the price the order was placed at when the product's price changes" $ withContext do

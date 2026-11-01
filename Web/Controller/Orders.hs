@@ -66,12 +66,11 @@ instance Controller OrdersController where
         let orderable = map (.id) products
             unorderable = filter (\x -> x.id `notElem` orderable) allProducts
             actionUrl = pathTo CreateOrderAction
-        createOrder actionUrl producers products unorderable $ \order -> do
+        let queueEmail order = do
+                _ <- newRecord @EmailOrderJob |> set #orderId order.id |> createRecord
+                pure ()
+        createOrder actionUrl producers products unorderable queueEmail \order -> do
             setSuccessMessage "Tilaus lähetetty"
-            let email = newRecord @EmailOrderJob
-            email
-                |> set #orderId order.id
-                |> createRecord
             redirectTo ShowOrderAction { orderId = order.id }
 
     action NewEmailAction = do
@@ -188,8 +187,11 @@ fetchLastWelcomeMessage = query @WelcomeMessage |> orderByDesc #publishedAt |> f
 -- products were ordered too (they were disabled while the customer filled
 -- in the form), or no products were ordered at all, nothing is saved and
 -- the form says why.
-createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> [Product] -> (Order -> IO ResponseReceived) -> IO ResponseReceived
-createOrder actionUrl producers products unorderable after = do
+--
+-- The customer, the order, its lines and whatever @onSaved@ saves (e.g. the
+-- email job) are saved in one transaction: all of them or none.
+createOrder :: (?context::ControllerContext, ?modelContext::ModelContext, ?respond::Respond, ?request::Request) => Text -> [Producer] -> [Product] -> [Product] -> ((?modelContext::ModelContext) => Order -> IO ()) -> (Order -> IO ResponseReceived) -> IO ResponseReceived
+createOrder actionUrl producers products unorderable onSaved after = do
     let quantityOf x = paramOrDefault @Int 0 (x.id |> show |> E.encodeTextToBS)
     let params = products
             |> map (\x -> (x, quantityOf x))
@@ -217,18 +219,20 @@ createOrder actionUrl producers products unorderable after = do
                         Left order -> do
                             render NewView { .. }
                         Right order -> do
-                            -- TODO transaction
-                            customer <- customer |> createRecord
-                            order <- order
-                                |> set #customerId customer.id
-                                |> createRecord
-                            let orders = params
-                                    |> map (\(product, count) ->
-                                          newRecord @OrderedProduct
-                                              |> set #orderId order.id
-                                              |> set #productId product.id
-                                              |> set #quantity count
-                                              -- Fixed now, so later price changes don't touch this order
-                                              |> set #unitPrice product.price)
-                            forM_ orders createRecord
+                            order <- withTransaction do
+                                customer <- customer |> createRecord
+                                order <- order
+                                    |> set #customerId customer.id
+                                    |> createRecord
+                                let orders = params
+                                        |> map (\(product, count) ->
+                                              newRecord @OrderedProduct
+                                                  |> set #orderId order.id
+                                                  |> set #productId product.id
+                                                  |> set #quantity count
+                                                  -- Fixed now, so later price changes don't touch this order
+                                                  |> set #unitPrice product.price)
+                                forM_ orders createRecord
+                                onSaved order
+                                pure order
                             after order
