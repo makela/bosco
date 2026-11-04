@@ -67,7 +67,7 @@ metaTags = [hsx|
     <meta name="viewport" content="width=device-width"/>
     <meta property="og:title" content="App"/>
     <meta property="og:type" content="website"/>
-    <meta property="og:url" content="TODO"/>
+    <meta property="og:url" content="https://bosco.makela.in/admin/"/>
     <meta property="og:description" content="TODO"/>
     {autoRefreshMeta}
 |]
