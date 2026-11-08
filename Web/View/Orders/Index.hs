@@ -13,12 +13,14 @@ data IndexView = IndexView
 instance View IndexView where
     html IndexView { .. } = [hsx|
         <p>{renderMarkdown $ maybe "" (.text) message}</p>
-        {orderButton}
-        <a class="link" href={NewEmailAction} data-turbolinks="false">{l10nText LSubscribeToNewsLetter}</a>
+        <div class="front-actions">
+            {orderButton}
+            <a class="link" href={NewEmailAction} data-turbolinks="false">{l10nText LSubscribeToNewsLetter}</a>
+        </div>
     |]
         where
             orderButton = if maybe False (.isOrderingEnabled) message
-                          then [hsx|<a href={NewOrderAction} class="btn" data-turbolinks="false">{l10nText LFillOrder}</a>|]
+                          then [hsx|<a href={NewOrderAction} class="btn-small" data-turbolinks="false">{l10nText LFillOrder}</a>|]
                           else [hsx||]
 
 renderMarkdown text = case text |> MMark.parse "" of

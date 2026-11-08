@@ -217,3 +217,13 @@ a.btn-small.danger, button.btn-small.danger, input[type=submit].btn-small.danger
 .order-steps {
   @apply my-4 flex flex-wrap items-center gap-2 px-4;
 }
+
+/* The front page's order button and newsletter link in one row, lined up
+   with the welcome text */
+.front-actions {
+  @apply my-4 flex flex-wrap items-center gap-4 px-4;
+}
+
+.front-actions a.link {
+  @apply ml-0;
+}
