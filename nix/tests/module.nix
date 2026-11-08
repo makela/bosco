@@ -372,6 +372,40 @@ let
       };
     };
 
+    testADemoIsResetEveryNight = {
+      expr =
+        let
+          demo = evaluate {
+            demo = {
+              baseUrl = "https://demo.tilaus.example.fi";
+              demo = true;
+              sendEmails = false;
+            };
+          };
+          reset = demo.systemd.services.bosco-demo-reset-demo;
+        in
+        {
+          program = lib.hasSuffix "/bin/ResetDemo" reset.serviceConfig.ExecStart;
+          inherit (reset.environment) APP_DEMO SEND_EMAILS APP_FIXTURES;
+          user = reset.serviceConfig.User;
+          afterMigrations = lib.elem "bosco-demo-migrate.service" reset.after;
+          timer = demo.systemd.timers.bosco-demo-reset-demo.timerConfig.OnCalendar;
+          othersHaveNoReset = lib.attrNames (lib.filterAttrs (name: _: lib.hasSuffix "reset-demo" name) (ours services)) == [ ];
+          othersHaveNoTimer = lib.attrNames (ours server.systemd.timers) == [ ];
+        };
+      expected = {
+        program = true;
+        APP_DEMO = "1";
+        SEND_EMAILS = "0";
+        APP_FIXTURES = "${self}/Application/Fixtures.sql";
+        user = "bosco_demo";
+        afterMigrations = true;
+        timer = "*-*-* 03:00:00";
+        othersHaveNoReset = true;
+        othersHaveNoTimer = true;
+      };
+    };
+
     testADemoCannotSendEmails = {
       expr = anyMessage "a demo must not send emails" (
         failedAssertions (evaluate {

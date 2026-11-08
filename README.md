@@ -152,14 +152,26 @@ An instance with `demo = true` (`APP_DEMO=1`) is a public demo. Every page,
 the admin included, shows a banner and a "DEMO" ribbon, page titles start
 with "[Demo]", the invoice says not to pay it and search engines are asked
 not to index the site. A demo must have `sendEmails = false`; the module and
-the server both refuse to start one that sends emails. Give its payment
-instructions an obviously fake account, such as `FI00 0000 0000 0000 00`.
+the server both refuse to start one that sends emails.
 
 The demo's admin login page has one-click logins for everyone: an admin and
 a delivery person who only sees orders (`Application/Demo.hs`). Their users
 are made on first use with a random password nobody knows, so they can't be
 locked by typing wrong passwords, and their passwords can't be changed. Your
 own admin login, made with `CreateUser`, works as usual.
+
+Every night at 03:00 (`demoReset.time`), `bosco-<name>-reset-demo` resets
+the demo's data in one transaction (`Application/DemoData.hs`). It reloads
+the catalog from `Fixtures.sql`, adds fake payment details and makes up four
+seasons of orders, with more each year, returning customers and prices a
+few percent lower each year back. Logins are kept. The newest orders are
+still waiting to be invoiced, paid or delivered. The orders differ every
+day. The script refuses to run unless `APP_DEMO` is on. A new demo has no
+orders until the first reset, so run it once after the first deploy:
+
+```sh
+systemctl start bosco-demo-reset-demo
+```
 
 ### Secrets
 

@@ -164,8 +164,30 @@ let
             included, gets a banner and a "DEMO" ribbon, titles start with
             [Demo], the invoice says not to pay it and search engines are
             asked not to index the site. Its admin login page offers one-click
-            logins. Needs sendEmails = false.
+            logins, and its data is reset every night (see demoReset). Needs
+            sendEmails = false.
           '';
+        };
+
+        demoReset = {
+          time = lib.mkOption {
+            type = lib.types.str;
+            default = "*-*-* 03:00:00";
+            example = "*-*-* 04:30:00";
+            description = ''
+              When a demo's data is reset (systemd OnCalendar, the server's time
+              zone): the catalog from the fixtures, fake payment details and a few
+              seasons of made-up orders. Logins are kept. Run it now with
+              systemctl start bosco-<name>-reset-demo.
+            '';
+          };
+
+          package = lib.mkOption {
+            type = lib.types.package;
+            default = config.flake.packages.${system}.script-ResetDemo;
+            defaultText = lib.literalExpression "flake.packages.\${system}.script-ResetDemo";
+            description = "The ResetDemo program (Application/Script/ResetDemo.hs).";
+          };
         };
 
         smtp = {
@@ -385,6 +407,37 @@ let
             LoadCredential = "smtp-password:${instance.smtp.passwordFile}";
           };
       };
+    }
+    // lib.optionalAttrs instance.demo {
+      # Started by its timer, see demoTimers
+      "bosco-${name}-reset-demo" = {
+        description = "Bosco Falconeria demo data reset (${name})";
+        after = after ++ [ migrate ];
+        requires = [
+          "postgresql.service"
+          migrate
+        ];
+        environment = environment // {
+          SEND_EMAILS = "0";
+          APP_FIXTURES = "${instance.flake}/Application/Fixtures.sql";
+        };
+        serviceConfig = serviceConfig // {
+          Type = "oneshot";
+          ExecStart = "${instance.demoReset.package}/bin/ResetDemo";
+        };
+      };
+    };
+
+  demoTimers =
+    name: instance:
+    lib.nameValuePair "bosco-${name}-reset-demo" {
+      description = "Nightly Bosco Falconeria demo data reset (${name})";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = instance.demoReset.time;
+        # Catches up on a reset missed while the server was off
+        Persistent = true;
+      };
     };
 
   # Values two instances must not share
@@ -464,5 +517,6 @@ in
     ) instances;
 
     systemd.services = lib.mkMerge (lib.mapAttrsToList services instances);
+    systemd.timers = lib.mapAttrs' demoTimers (lib.filterAttrs (_: instance: instance.demo) instances);
   };
 }

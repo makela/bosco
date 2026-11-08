@@ -7,6 +7,7 @@ module Application.Demo
     , demoLogin
     , isDemoUser
     , ensureDemoUser
+    , demoPaymentDetails
     ) where
 
 import IHP.ControllerPrelude
@@ -61,4 +62,11 @@ ensureDemoUser login = do
                 |> set #isAdmin login.isAdmin
                 |> createRecord
 
--- | The only payment det
+-- | The payment details the demo's nightly reset stores: an obviously
+-- fake account, so nobody pays a demo invoice by mistake
+demoPaymentDetails :: Text
+demoPaymentDetails = intercalate "\n\n"
+    [ "Bosco Falconeria (demo)"
+    , "IBAN FI00 0000 0000 0000 00"
+    , "BIC DEMOFIHH"
+    ]
