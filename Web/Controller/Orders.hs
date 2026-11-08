@@ -15,6 +15,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Network.URI.Encode as E
 
+import Application.Demo (demoPaymentDetails, isDemo)
 import Application.Localization
 import Web.Controller.Prelude hiding (createOrder)
 import Web.Mail.Orders.Order
@@ -51,7 +52,10 @@ instance Controller OrdersController where
     action ShowOrderAction { orderId } = do
         (order, totalSum, orderedProductsByProducer, producers) <-
             fetchShowOrderContext orderId
-        paymentInstruction <- query @PaymentInstruction |> orderByDesc #publishedAt |> fetchOneOrNothing
+        stored <- query @PaymentInstruction |> orderByDesc #publishedAt |> fetchOneOrNothing
+        let paymentInstruction
+                | isDemo = Just (newRecord @PaymentInstruction |> set #text demoPaymentDetails)
+                | otherwise = stored
         render ShowView { .. }
 
     action CreateOrderAction = do

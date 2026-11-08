@@ -69,6 +69,24 @@ tests = do
                 user <- query @User |> filterWhere (#email, "admin@demo.invalid") |> fetchOne
                 verifyPassword user ("a new long password" :: Text) `shouldBe` False
 
+            it "can't change the payment details" $ withContext do
+                stored <- query @PaymentInstruction |> fetchCount
+                page <- inApp do
+                    _ <- httpPost "/admin/DemoLogin?role=admin" []
+                    httpPost "/admin/CreatePaymentInstruction" [("text", "IBAN FI12 3456 7890 1234 56")] >>= followRedirect
+                bodyText page `shouldSatisfy` ("payment details are fixed" `T.isInfixOf`)
+                query @PaymentInstruction |> fetchCount >>= (`shouldBe` stored)
+
+            it "show only the fake payment details on invoices, whatever is stored" $ withContext do
+                _ <- newRecord @PaymentInstruction |> set #text "IBAN FI12 3456 7890 1234 56" |> createRecord
+                customer <- newRecord @Customer
+                    |> set #name "Demo Customer" |> set #email "demo@example.com" |> set #phone "040 123 4567"
+                    |> createRecord
+                order <- newRecord @Order |> set #customerId customer.id |> createRecord
+                invoice <- inApp (httpGet ("/ShowOrder?orderId=" <> idToParam order.id))
+                bodyText invoice `shouldSatisfy` ("FI00 0000 0000 0000 00" `T.isInfixOf`)
+                bodyText invoice `shouldSatisfy` (not . ("FI12 3456" `T.isInfixOf`))
+
             it "refuse unknown roles" $ withContext do
                 response <- inApp (httpPost "/admin/DemoLogin?role=root" [])
                 statusCode (simpleStatus response) `shouldBe` 404

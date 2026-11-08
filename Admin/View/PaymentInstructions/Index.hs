@@ -20,11 +20,12 @@ instance View IndexView where
         </div>
     |]
         where
-            breadcrumb = renderBreadcrumb
+            -- A demo's payment details are fixed, see Application.Demo
+            breadcrumb = renderBreadcrumb $
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbText [hsx|<span>Payment Instructions</span>|]
-                , breadcrumbLink "New" NewPaymentInstructionAction
                 ]
+                <> [breadcrumbLink "New" NewPaymentInstructionAction | not isDemo]
 
 renderPaymentInstruction :: PaymentInstruction -> Html
 renderPaymentInstruction paymentInstruction = [hsx|

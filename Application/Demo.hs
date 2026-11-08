@@ -62,8 +62,9 @@ ensureDemoUser login = do
                 |> set #isAdmin login.isAdmin
                 |> createRecord
 
--- | The payment details the demo's nightly reset stores: an obviously
--- fake account, so nobody pays a demo invoice by mistake
+-- | The only payment details a demo shows: an obviously fake account. Its
+-- invoices show these whatever the database holds, and its admin can't
+-- change them, so nobody can put their own account on the demo's invoices.
 demoPaymentDetails :: Text
 demoPaymentDetails = intercalate "\n\n"
     [ "Bosco Falconeria (demo)"

@@ -5,6 +5,7 @@ import Admin.View.PaymentInstructions.Index
 import Admin.View.PaymentInstructions.New
 import Admin.View.PaymentInstructions.Edit
 import Admin.View.PaymentInstructions.Show
+import Application.Demo (isDemo)
 
 instance Controller PaymentInstructionsController where
     beforeAction = ensureIsUser
@@ -19,6 +20,7 @@ instance Controller PaymentInstructionsController where
     action NewPaymentInstructionAction = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
+        refuseOnDemo
         let paymentInstruction = newRecord
         render NewView { .. }
 
@@ -31,12 +33,14 @@ instance Controller PaymentInstructionsController where
     action EditPaymentInstructionAction { paymentInstructionId } = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
+        refuseOnDemo
         paymentInstruction <- fetch paymentInstructionId
         render EditView { .. }
 
     action UpdatePaymentInstructionAction { paymentInstructionId } = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
+        refuseOnDemo
         paymentInstruction <- fetch paymentInstructionId
         paymentInstruction
             |> buildPaymentInstruction
@@ -50,6 +54,7 @@ instance Controller PaymentInstructionsController where
     action CreatePaymentInstructionAction = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
+        refuseOnDemo
         let paymentInstruction = newRecord @PaymentInstruction
         paymentInstruction
             |> buildPaymentInstruction
@@ -63,6 +68,7 @@ instance Controller PaymentInstructionsController where
     action DeletePaymentInstructionAction { paymentInstructionId } = do
         user <- fetch currentUserId
         accessDeniedUnless user.isAdmin
+        refuseOnDemo
         paymentInstruction <- fetch paymentInstructionId
         deleteRecord paymentInstruction
         setSuccessMessage "PaymentInstruction deleted"
@@ -70,3 +76,10 @@ instance Controller PaymentInstructionsController where
 
 buildPaymentInstruction paymentInstruction = paymentInstruction
     |> fill @'["text"]
+
+-- | A demo's invoices always show its fake payment details, so changing the
+-- stored ones would do nothing but let a visitor put a real account here
+refuseOnDemo :: (?context :: ControllerContext, ?request :: Request, ?respond :: Respond) => IO ()
+refuseOnDemo = when isDemo do
+    setErrorMessage "The demo's payment details are fixed and can't be changed"
+    earlyReturn (redirectTo PaymentInstructionsAction)

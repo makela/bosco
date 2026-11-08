@@ -152,7 +152,11 @@ An instance with `demo = true` (`APP_DEMO=1`) is a public demo. Every page,
 the admin included, shows a banner and a "DEMO" ribbon, page titles start
 with "[Demo]", the invoice says not to pay it and search engines are asked
 not to index the site. A demo must have `sendEmails = false`; the module and
-the server both refuse to start one that sends emails.
+the server both refuse to start one that sends emails. Its invoices always
+show fake payment details (IBAN `FI00 0000 0000 0000 00`, from
+`Application/Demo.hs`) whatever the database holds, and its admin can't
+create, edit or delete payment instructions, so no visitor can put a real
+account on the demo's invoices.
 
 The demo's admin login page has one-click logins for everyone: an admin and
 a delivery person who only sees orders (`Application/Demo.hs`). Their users

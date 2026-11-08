@@ -11,9 +11,10 @@ instance View ShowView where
 
     |]
         where
-            breadcrumb = renderBreadcrumb
+            -- A demo's payment details are fixed, see Application.Demo
+            breadcrumb = renderBreadcrumb $
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbLink "Payment Instructions" PaymentInstructionsAction
                 , breadcrumbText (timeAgo paymentInstruction.publishedAt)
-                , breadcrumbLink "Edit" (EditPaymentInstructionAction paymentInstruction.id)
                 ]
+                <> [breadcrumbLink "Edit" (EditPaymentInstructionAction paymentInstruction.id) | not isDemo]
