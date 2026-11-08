@@ -19,6 +19,8 @@ data SessionsController
     = NewSessionAction
     | CreateSessionAction
     | DeleteSessionAction
+    -- | Logs in as one of the demo's logins (Application.Demo), on a demo only
+    | DemoLoginAction { role :: !Text }
     deriving (Eq, Show, Data)
 
 data ProducersController

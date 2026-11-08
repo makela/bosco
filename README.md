@@ -155,6 +155,12 @@ not to index the site. A demo must have `sendEmails = false`; the module and
 the server both refuse to start one that sends emails. Give its payment
 instructions an obviously fake account, such as `FI00 0000 0000 0000 00`.
 
+The demo's admin login page has one-click logins for everyone: an admin and
+a delivery person who only sees orders (`Application/Demo.hs`). Their users
+are made on first use with a random password nobody knows, so they can't be
+locked by typing wrong passwords, and their passwords can't be changed. Your
+own admin login, made with `CreateUser`, works as usual.
+
 ### Secrets
 
 None of these go into the Nix store, which every user of the server can read.

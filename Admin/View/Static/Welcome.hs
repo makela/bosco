@@ -1,17 +1,20 @@
 module Admin.View.Static.Welcome where
 import Admin.View.Prelude
 
+import Application.Demo (isDemoUser)
+
 data WelcomeView = WelcomeView { user :: !User }
 
 instance View WelcomeView where
     html WelcomeView { .. } = [hsx|
         <a class="js-delete js-delete-no-confirm back-button float-right p-2" href={DeleteSessionAction}>Logout</a>
-        <a class="float-right p-2" href={NewPasswordAction}>Change password</a>
+        {unless (isDemoUser user) changePassword}
         <ol class="my-4">
             {links}
         </ol>
 |]
-        where links = if user.isAdmin
+        where changePassword = [hsx|<a class="float-right p-2" href={NewPasswordAction}>Change password</a>|]
+              links = if user.isAdmin
                       then [hsx|
                           <li><a href={OrderedProductsAction}>All ordered products</a></li>
                           <li><a href={CustomersAction}>Customers</a></li>

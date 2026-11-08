@@ -4,6 +4,7 @@ import IHP.Prelude
 import Test.Hspec
 
 import qualified Test.Admin.CustomersSpec
+import qualified Test.Admin.DemoSpec
 import qualified Test.Admin.DeleteSpec
 import qualified Test.Admin.OrderedProductsSpec
 import qualified Test.Admin.OrdersSpec
@@ -22,3 +23,4 @@ main = hspec do
     Test.Admin.DeleteSpec.tests
     Test.Admin.OrderedProductsSpec.tests
     Test.Admin.ProductsSpec.tests
+    Test.Admin.DemoSpec.tests

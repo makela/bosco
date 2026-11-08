@@ -163,7 +163,8 @@ let
             Whether this is a public demo (APP_DEMO). Every page, the admin
             included, gets a banner and a "DEMO" ribbon, titles start with
             [Demo], the invoice says not to pay it and search engines are
-            asked not to index the site. Needs sendEmails = false.
+            asked not to index the site. Its admin login page offers one-click
+            logins. Needs sendEmails = false.
           '';
         };
 
