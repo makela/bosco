@@ -30,19 +30,22 @@ instance View ShowView where
         </table>
         </div>
         {renderPaymentInstruction order paymentInstruction}
-        <p>{l10nText LPaymentSentToEmail}</p>
+        <p>{l10nText (if isDemo then LDemoNoEmail else LPaymentSentToEmail)}</p>
     |]
 
 renderPaymentInstruction :: Include "customerId" Order -> Maybe PaymentInstruction -> Html
 renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.cancelledAt) of
     (Nothing, Nothing) -> [hsx|
             <h2>{l10nText LPaymentInstructions}</h2>
+            {doNotPay}
             {instructions}
         |]
     (_, Just _) -> [hsx|<p class="font-bold">{l10nText LInvoiceCancelled}</p>|]
     (Just _, _) -> [hsx|<p class="font-bold">{l10nText LInvoicePaid}</p>|]
 
-    where instructions = fmap (\x -> renderMarkdown x.text) paymentInstruction
+    where
+        instructions = fmap (\x -> renderMarkdown x.text) paymentInstruction
+        doNotPay = when isDemo [hsx|<p class="demo-do-not-pay">{l10nText LDemoDoNotPay}</p>|]
 
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|

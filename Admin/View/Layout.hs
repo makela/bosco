@@ -19,9 +19,10 @@ defaultLayout inner = [hsx|
     {stylesheets}
     {scripts}
 
-    <title>{pageTitleOrDefault "Manage Bosco Falconeria"}</title>
+    <title>{demoTitle (pageTitleOrDefault "Manage Bosco Falconeria")}</title>
 </head>
 <body>
+    {demoStamp "This is a demo admin. Everyone using the demo sees your changes, and none of the orders are real."}
     <div class="container admin-container">
         {renderFlashMessages}
         {inner}
@@ -69,5 +70,6 @@ metaTags = [hsx|
     <meta property="og:type" content="website"/>
     <meta property="og:url" content="https://bosco.makela.in/admin/"/>
     <meta property="og:description" content="TODO"/>
+    {demoHead}
     {autoRefreshMeta}
 |]

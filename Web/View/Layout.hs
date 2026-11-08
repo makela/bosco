@@ -20,9 +20,10 @@ defaultLayout inner = [hsx|
     {stylesheets}
     {scripts}
 
-    <title>{pageTitleOrDefault (l10nText LSiteTitle)}</title>
+    <title>{demoTitle (pageTitleOrDefault (l10nText LSiteTitle))}</title>
 </head>
 <body>
+    {demoStamp (l10nText LDemoBanner)}
     <div class="container">
         <a href="http://www.boscofalconeria.it/">
             <img src="/img/logo.jpg" alt="Bosco Falconeria logo" />
@@ -70,5 +71,6 @@ metaTags = [hsx|
     <meta property="og:type" content="website"/>
     <meta property="og:url" content="https://bosco.makela.in/"/>
     <meta property="og:description" content={l10nText LSiteDescription}/>
+    {demoHead}
     {autoRefreshMeta}
 |]

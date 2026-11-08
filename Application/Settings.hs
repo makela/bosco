@@ -2,6 +2,8 @@
 -- environment in Config.hs. The NixOS module (nix/module.nix) sets them.
 module Application.Settings
     ( EmailsEnabled (..)
+    , DemoMode (..)
+    , checkDemoMode
     , smtpServer
     ) where
 
@@ -13,6 +15,18 @@ import IHP.Prelude
 -- | Whether this instance sends emails (SEND_EMAILS, on by default). A
 -- staging instance turns it off, and its email jobs only log the email.
 newtype EmailsEnabled = EmailsEnabled Bool
+
+-- | Whether this instance is a public demo (APP_DEMO, off by default). A
+-- demo marks every page as one, keeps search engines out and tells
+-- customers not to pay its invoices.
+newtype DemoMode = DemoMode Bool
+
+-- | A demo must not send emails: anyone could make it email any address,
+-- and its invoices must not reach anyone's inbox.
+checkDemoMode :: Bool -> Bool -> Either Text ()
+checkDemoMode demo sendEmails
+    | demo && sendEmails = Left "APP_DEMO needs SEND_EMAILS=0: a demo must not send emails"
+    | otherwise = Right ()
 
 -- | The SMTP server from SMTP_HOST, SMTP_PORT, SMTP_USER, the password in
 -- SMTP_PASSWORD_FILE and SMTP_ENCRYPTION (starttls, tls or none).

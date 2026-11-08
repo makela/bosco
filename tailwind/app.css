@@ -174,3 +174,18 @@ div.unavailable-notice ul {
 ul {
   @apply px-10 list-disc;
 }
+
+/* A demo instance (APP_DEMO): a banner on top of every page, a ribbon in
+   the corner and a stamp on the invoice's payment instructions */
+.demo-banner {
+  @apply bg-amber-300 text-amber-950 text-center font-semibold px-4 py-2;
+}
+
+.demo-ribbon {
+  @apply fixed top-6 -right-10 z-50 w-40 rotate-45 bg-red-700 py-1 text-center text-sm font-bold tracking-widest text-white shadow-md pointer-events-none select-none;
+}
+
+.demo-do-not-pay {
+  @apply inline-block border-4 border-red-700 text-red-700 font-bold uppercase tracking-wide px-4 py-2 -rotate-2;
+}
+

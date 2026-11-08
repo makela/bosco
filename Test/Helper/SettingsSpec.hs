@@ -7,7 +7,7 @@ import IHP.Prelude
 import Test.Hspec
 
 import Application.Localization (Locale (..), parseLocale)
-import Application.Settings (smtpServer)
+import Application.Settings (checkDemoMode, smtpServer)
 
 tests :: Spec
 tests = describe "Instance settings" do
@@ -21,6 +21,14 @@ tests = describe "Instance settings" do
         it "rejects other values and lists the valid ones" do
             parseLocale "FR" `shouldBe` Left "APP_LOCALE should be one of fi, en, fr, got FR"
             parseLocale "sv" `shouldSatisfy` isLeft
+
+    describe "checkDemoMode (APP_DEMO)" do
+        it "allows a demo that doesn't send emails, and any other instance" do
+            checkDemoMode True False `shouldBe` Right ()
+            checkDemoMode False True `shouldBe` Right ()
+
+        it "refuses a demo that sends emails" do
+            checkDemoMode True True `shouldSatisfy` isLeft
 
     describe "smtpServer" do
         it "uses STARTTLS with a user and password" do

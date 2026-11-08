@@ -28,6 +28,13 @@
 #       bootstrapSchema = true;
 #       sendEmails = false;
 #     };
+#     demo = {
+#       baseUrl = "https://demo.tilaus.example.fi";
+#       port = 3303;
+#       bootstrapSchema = true;
+#       demo = true;
+#       sendEmails = false;
+#     };
 #   };
 #
 # Each instance <name> has three services, all running as the system user
@@ -149,6 +156,17 @@ let
           '';
         };
 
+        demo = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = ''
+            Whether this is a public demo (APP_DEMO). Every page, the admin
+            included, gets a banner and a "DEMO" ribbon, titles start with
+            [Demo], the invoice says not to pay it and search engines are
+            asked not to index the site. Needs sendEmails = false.
+          '';
+        };
+
         smtp = {
           host = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
@@ -262,6 +280,7 @@ let
         PORT = toString instance.port;
         GHCRTS = instance.rtsFlags;
         APP_LOCALE = instance.locale;
+        APP_DEMO = if instance.demo then "1" else "0";
       };
 
       serviceConfig = hardening // {
@@ -392,6 +411,10 @@ in
     ]
     ++ lib.concatLists (
       lib.mapAttrsToList (name: instance: [
+        {
+          assertion = !(instance.demo && instance.sendEmails);
+          message = "services.bosco.instances.${name}: a demo must not send emails, set sendEmails = false.";
+        }
         {
           assertion = !instance.sendEmails || instance.smtp.host != null;
           message = "services.bosco.instances.${name}: set smtp.host, or sendEmails = false.";

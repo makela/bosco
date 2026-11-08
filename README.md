@@ -146,6 +146,15 @@ The sender is `postmaster@boscofalconeria.it` with replies to
 account must be allowed to send as it, and the domain's SPF and DKIM records
 should cover the SMTP server, or the emails end up as spam.
 
+### Demo
+
+An instance with `demo = true` (`APP_DEMO=1`) is a public demo. Every page,
+the admin included, shows a banner and a "DEMO" ribbon, page titles start
+with "[Demo]", the invoice says not to pay it and search engines are asked
+not to index the site. A demo must have `sendEmails = false`; the module and
+the server both refuse to start one that sends emails. Give its payment
+instructions an obviously fake account, such as `FI00 0000 0000 0000 00`.
+
 ### Secrets
 
 None of these go into the Nix store, which every user of the server can read.

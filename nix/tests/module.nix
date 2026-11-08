@@ -339,6 +339,52 @@ let
       expected = true;
     };
 
+    testOnlyADemoIsMarkedAsOne = {
+      expr =
+        let
+          demo = evaluate {
+            demo = {
+              baseUrl = "https://demo.tilaus.example.fi";
+              demo = true;
+              sendEmails = false;
+            };
+          };
+        in
+        {
+          demo = map (name: demo.systemd.services.${name}.environment.APP_DEMO) [
+            "bosco-demo"
+            "bosco-demo-worker"
+          ];
+          others = map (name: services."bosco-${name}".environment.APP_DEMO) instanceNames;
+          failed = failedAssertions demo;
+        };
+      expected = {
+        demo = [
+          "1"
+          "1"
+        ];
+        others = [
+          "0"
+          "0"
+          "0"
+        ];
+        failed = [ ];
+      };
+    };
+
+    testADemoCannotSendEmails = {
+      expr = anyMessage "a demo must not send emails" (
+        failedAssertions (evaluate {
+          fi = {
+            baseUrl = "https://tilaus.example.fi";
+            demo = true;
+            inherit smtp;
+          };
+        })
+      );
+      expected = true;
+    };
+
     testSendingEmailsNeedsAnSmtpServer = {
       expr = anyMessage "smtp.host" (
         failedAssertions (evaluate {

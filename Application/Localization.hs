@@ -66,6 +66,9 @@ data Localizable
   | LPieces
   | LSiteTitle
   | LSiteDescription
+  | LDemoBanner
+  | LDemoDoNotPay
+  | LDemoNoEmail
   deriving (Eq, Show, Enum, Bounded)
 
 l10nText :: Localizable -> Text
@@ -156,3 +159,12 @@ l10nText' LSiteTitle FR = "Bosco Falconeria – Commande d'huile d'olive"
 l10nText' LSiteDescription FI = "Bosco Falconerian öljytilauslomake"
 l10nText' LSiteDescription EN = "Bosco Falconeria olive oil order form"
 l10nText' LSiteDescription FR = "Bon de commande d'huile d'olive Bosco Falconeria"
+l10nText' LDemoBanner FI = "Tämä on esittelyversio. Tilaukset eivät ole oikeita, eikä mitään toimiteta tai laskuteta. Käytä keksittyjä tietoja."
+l10nText' LDemoBanner EN = "This is a demo. Orders are not real, and nothing will be shipped or billed. Please use made-up details."
+l10nText' LDemoBanner FR = "Ceci est une démo. Les commandes ne sont pas réelles\160: rien ne sera livré ni facturé. Utilisez des coordonnées fictives."
+l10nText' LDemoDoNotPay FI = "Esittelylasku – älä maksa."
+l10nText' LDemoDoNotPay EN = "Demo invoice – do not pay."
+l10nText' LDemoDoNotPay FR = "Facture de démonstration – ne pas payer."
+l10nText' LDemoNoEmail FI = "Esittelyversio ei lähetä laskua sähköpostiin."
+l10nText' LDemoNoEmail EN = "The demo does not send the invoice to your email."
+l10nText' LDemoNoEmail FR = "La démo n'envoie pas la facture par e-mail."

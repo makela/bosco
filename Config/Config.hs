@@ -26,6 +26,9 @@ config = do
     _ <- liftIO (evaluate defaultLocale) -- stops here if APP_LOCALE is wrong
     sendEmails <- envOrDefault "SEND_EMAILS" True
     option (EmailsEnabled sendEmails)
+    demo <- envOrDefault "APP_DEMO" False
+    either (error . cs) pure (checkDemoMode demo sendEmails)
+    option (DemoMode demo)
     smtpHost <- envOrNothing "SMTP_HOST"
     case smtpHost of
         Nothing -> option Sendmail
