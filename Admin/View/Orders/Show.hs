@@ -34,7 +34,7 @@ instance View ShowView where
             markPaid = case (user.isAdmin, order.paidAt) of
                 (True, Nothing) -> [hsx|
                     <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
-                        <input type="submit" value="Mark as paid" />
+                        <input type="submit" class="btn-small" value="Mark as paid" />
                     </form>
                 |]
                 (_, _) -> pure ()
@@ -42,26 +42,28 @@ instance View ShowView where
                 Just _ -> pure ()
                 Nothing -> [hsx|
                     <form method="POST" action={UpdateDeliverOrderAction order.id}>
-                        <input type="submit" value="Mark as delivered" />
+                        <input type="submit" class="btn-small" value="Mark as delivered" />
                     </form>
                 |]
             markInvoiced = case order.invoicedAt of
                 Just _ -> pure ()
                 Nothing -> [hsx|
                     <form method="POST" action={UpdateInvoiceOrderAction order.id}>
-                        <input type="submit" value="Mark as invoiced" />
+                        <input type="submit" class="btn-small" value="Mark as invoiced" />
                     </form>
                 |]
             cancelOrder = case (user.isAdmin, order.paidAt) of
                 (True, Nothing) -> [hsx|
-                    <p><a href={DeleteCancelOrderAction order.id} class="js-delete back-button">Cancel order</a></p>
+                    <a href={DeleteCancelOrderAction order.id} class="js-delete btn-small danger">Cancel order</a>
                 |]
                 (_, _) -> pure ()
             cancelledOrControls = case order.cancelledAt of
                 Just x -> [hsx|<p>Cancelled {formatUTCTime x}</p>|]
                 Nothing -> [hsx|
-                    {markInvoiced}
-                    {markPaid}
-                    {markDelivered}
-                    {cancelOrder}
+                    <div class="order-steps">
+                        {markInvoiced}
+                        {markPaid}
+                        {markDelivered}
+                        {cancelOrder}
+                    </div>
                 |]

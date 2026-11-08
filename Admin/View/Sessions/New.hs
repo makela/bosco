@@ -43,6 +43,6 @@ renderDemoLogins = [hsx|
   where
     renderDemoLogin demo = [hsx|
         <form method="POST" action={DemoLoginAction demo.role}>
-            <button type="submit" class="demo-login">{demo.label}</button>
+            <button type="submit" class="btn-small">{demo.label}</button>
         </form>
     |]

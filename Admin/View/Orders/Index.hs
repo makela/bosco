@@ -111,7 +111,7 @@ showOrMarkPaid isAdmin order =
       Nothing | not isAdmin -> mempty
       Nothing     -> [hsx|
                     <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
-                        <input type="submit" value="Mark as paid" />
+                        <input type="submit" class="btn-small" value="Mark as paid" />
                     </form>
       |]
 

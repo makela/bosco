@@ -202,6 +202,18 @@ ul {
   @apply mt-2 flex flex-wrap gap-2;
 }
 
-button.demo-login {
-  @apply whitespace-nowrap rounded-sm border border-blue-500 bg-white px-3 py-1 text-sm text-blue-600 cursor-pointer hover:bg-blue-50;
+/* Small outlined buttons for secondary actions in the admin, e.g. an
+   order's steps and the demo's logins. Selectors are specific enough to
+   override input[type=submit] above. */
+a.btn-small, button.btn-small, input[type=submit].btn-small {
+  @apply m-0 inline-block whitespace-nowrap rounded-sm border border-blue-500 bg-white px-3 py-1 text-sm text-blue-600 no-underline cursor-pointer hover:bg-blue-50;
+}
+
+a.btn-small.danger, button.btn-small.danger, input[type=submit].btn-small.danger {
+  @apply border-red-500 text-red-600 hover:bg-red-50;
+}
+
+/* An order's steps side by side */
+.order-steps {
+  @apply my-4 flex flex-wrap items-center gap-2 px-4;
 }
