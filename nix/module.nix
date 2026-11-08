@@ -304,6 +304,9 @@ let
         GHCRTS = instance.rtsFlags;
         APP_LOCALE = instance.locale;
         APP_DEMO = if instance.demo then "1" else "0";
+        # Every program reads it at startup (Config.hs), and a demo refuses
+        # to start without SEND_EMAILS=0
+        SEND_EMAILS = if instance.sendEmails then "1" else "0";
       };
 
       serviceConfig = hardening // {
@@ -383,9 +386,6 @@ let
         ];
         environment =
           environment
-          // {
-            SEND_EMAILS = if instance.sendEmails then "1" else "0";
-          }
           // lib.optionalAttrs instance.sendEmails {
             SMTP_HOST = instance.smtp.host;
             SMTP_PORT = toString instance.smtp.port;
@@ -418,7 +418,6 @@ let
           migrate
         ];
         environment = environment // {
-          SEND_EMAILS = "0";
           APP_FIXTURES = "${instance.flake}/Application/Fixtures.sql";
         };
         serviceConfig = serviceConfig // {

@@ -406,6 +406,30 @@ let
       };
     };
 
+    # Config.hs refuses to start a demo without SEND_EMAILS=0, so every
+    # program of a demo needs both settings, not only the worker
+    testEveryDemoProgramKnowsItIsADemoWithoutEmails = {
+      expr =
+        let
+          demo = evaluate {
+            demo = {
+              baseUrl = "https://demo.tilaus.example.fi";
+              demo = true;
+              sendEmails = false;
+            };
+          };
+        in
+        map (name: lib.getAttrs [ "APP_DEMO" "SEND_EMAILS" ] demo.systemd.services.${name}.environment) [
+          "bosco-demo"
+          "bosco-demo-worker"
+          "bosco-demo-reset-demo"
+        ];
+      expected = lib.genList (_: {
+        APP_DEMO = "1";
+        SEND_EMAILS = "0";
+      }) 3;
+    };
+
     testADemoCannotSendEmails = {
       expr = anyMessage "a demo must not send emails" (
         failedAssertions (evaluate {
