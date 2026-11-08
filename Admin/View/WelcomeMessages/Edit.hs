@@ -10,10 +10,11 @@ instance View EditView where
         {renderForm welcomeMessage}
     |]
         where
-            breadcrumb = renderBreadcrumb
+            breadcrumb = renderBreadcrumb $
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbLink "Welcome Messages" WelcomeMessagesAction
                 , breadcrumbLink (timeAgo welcomeMessage.publishedAt) (ShowWelcomeMessageAction welcomeMessage.id)
                 , breadcrumbText "Edit"
-                , breadcrumbLink [hsx|<a href={DeleteWelcomeMessageAction welcomeMessage.id} class="js-delete back-button">Delete</a>|] (DeleteWelcomeMessageAction welcomeMessage.id)
                 ]
+                -- A demo's welcome message can't be deleted, see the controller
+                <> [breadcrumbLink [hsx|<a href={DeleteWelcomeMessageAction welcomeMessage.id} class="js-delete back-button">Delete</a>|] (DeleteWelcomeMessageAction welcomeMessage.id) | not isDemo]

@@ -87,6 +87,23 @@ tests = do
                 bodyText invoice `shouldSatisfy` ("FI00 0000 0000 0000 00" `T.isInfixOf`)
                 bodyText invoice `shouldSatisfy` (not . ("FI12 3456" `T.isInfixOf`))
 
+            it "can't change the welcome message's text, only open and close ordering" $ withContext do
+                message <- newRecord @WelcomeMessage
+                    |> set #text "Tervetuloa tilaamaan!"
+                    |> set #isOrderingEnabled True
+                    |> createRecord
+                count <- query @WelcomeMessage |> fetchCount
+                (created, _) <- inApp do
+                    _ <- httpPost "/admin/DemoLogin?role=admin" []
+                    created <- httpPost "/admin/CreateWelcomeMessage" [("text", "Pay to IBAN FI12 3456"), ("isOrderingEnabled", "on")] >>= followRedirect
+                    updated <- httpPost ("/admin/UpdateWelcomeMessage?welcomeMessageId=" <> idToParam message.id)
+                        [("text", "Pay to IBAN FI12 3456"), ("isOrderingEnabled", "off")]
+                    pure (created, updated)
+                bodyText created `shouldSatisfy` ("welcome message is fixed" `T.isInfixOf`)
+                query @WelcomeMessage |> fetchCount >>= (`shouldBe` count)
+                updated <- fetch message.id
+                (updated.text, updated.isOrderingEnabled) `shouldBe` ("Tervetuloa tilaamaan!", False)
+
             it "refuse unknown roles" $ withContext do
                 response <- inApp (httpPost "/admin/DemoLogin?role=root" [])
                 statusCode (simpleStatus response) `shouldBe` 404

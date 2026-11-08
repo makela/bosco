@@ -156,7 +156,9 @@ the server both refuse to start one that sends emails. Its invoices always
 show fake payment details (IBAN `FI00 0000 0000 0000 00`, from
 `Application/Demo.hs`) whatever the database holds, and its admin can't
 create, edit or delete payment instructions, so no visitor can put a real
-account on the demo's invoices.
+account on the demo's invoices. For the same reason the welcome message's
+text is fixed: visitors can open and close ordering, but not create, delete
+or reword messages.
 
 The demo's admin login page has one-click logins for everyone: an admin and
 a delivery person who only sees orders (`Application/Demo.hs`). Their users

@@ -17,7 +17,7 @@ instance View NewView where
 
 renderForm :: WelcomeMessage -> Html
 renderForm welcomeMessage = formFor welcomeMessage [hsx|
-    {(textareaField #text)}
+    {(textareaField #text) { disabled = isDemo, helpText = if isDemo then "The demo's welcome text is fixed. You can still open and close ordering." else "" }}
     {(checkboxField #isOrderingEnabled)}
     {submitButton}
 

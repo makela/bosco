@@ -23,11 +23,12 @@ instance View IndexView where
         </div>
     |]
         where
-            breadcrumb = renderBreadcrumb
+            -- A demo's welcome text is fixed, see the controller
+            breadcrumb = renderBreadcrumb $
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbText [hsx|<span>Welcome Messages</span>|]
-                , breadcrumbLink "New" NewWelcomeMessageAction
                 ]
+                <> [breadcrumbLink "New" NewWelcomeMessageAction | not isDemo]
 
 renderWelcomeMessage :: WelcomeMessage -> Html
 renderWelcomeMessage welcomeMessage = [hsx|
