@@ -1,8 +1,12 @@
 module Admin.View.Products.Show where
 import Admin.View.Prelude
+import Admin.View.TextHistory (renderTextHistory)
 import Web.View.Orders.New (formatMoney)
 
-data ShowView = ShowView { product :: Include "producerId" Product }
+data ShowView = ShowView
+    { product :: Include "producerId" Product
+    , textChanges :: [Include "userId" TextChange]
+    }
 
 instance View ShowView where
     html ShowView { .. } = [hsx|
@@ -10,6 +14,7 @@ instance View ShowView where
         <p class="font-bold">{product.producerId.name}</p>
         <p>{product.description}</p>
         <p>{formatMoney product.price} / {product.package}</p>
+        {renderTextHistory textChanges}
 
     |]
         where

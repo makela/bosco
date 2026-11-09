@@ -1,6 +1,7 @@
 module Admin.Controller.Products where
 
 import Admin.Controller.Prelude
+import Application.TextHistory (productTextChanges)
 import Web.Controller.Orders (productOrder, sortProducers)
 import Admin.View.Products.Edit
 import Admin.View.Products.Index
@@ -31,6 +32,11 @@ instance Controller ProductsController where
     action ShowProductAction { productId } = do
         _ <- requirePermission EditShopTexts
         product <- fetch productId >>= fetchRelated #producerId
+        textChanges <- query @TextChange
+            |> filterWhere (#productId, Just productId)
+            |> orderByDesc #createdAt
+            |> fetch
+            >>= collectionFetchRelated #userId
         render ShowView { .. }
 
     action EditProductAction { productId } = do
@@ -43,15 +49,17 @@ instance Controller ProductsController where
     action UpdateProductAction { productId } = do
         user <- requirePermission EditShopTexts
         let canManageShop = can user ManageShop
-        product <- fetch productId
-        product
+        before <- fetch productId
+        before
             |> (if canManageShop then buildProduct else buildProductTexts)
             |> ifValid \case
                 Left product -> do
                     producers <- query @Producer |> fetch
                     render EditView { .. }
                 Right product -> do
-                    product <- product |> updateRecord
+                    product <- withTransaction do
+                        _ <- createMany (productTextChanges user before product)
+                        product |> updateRecord
                     setSuccessMessage "Product updated"
                     redirectTo ShowProductAction { .. }
 

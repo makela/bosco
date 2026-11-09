@@ -192,6 +192,10 @@ A login has one or more roles, and may do whatever any of them allows
   and packages, producers' subjects and descriptions. Not prices, producer
   names, or which products and producers there are and are shown.
 
+Every change to a product's or producer's texts, by anyone, is kept with who
+made it, when, and the text before and after (`text_changes`). A product's
+and a producer's page in the admin list them, newest first.
+
 Only an admin marks orders invoiced or paid, cancels them, emails invoices
 again and manages the shop. `CreateUser` makes logins, on the server as the
 instance's user:

@@ -127,6 +127,43 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             product' <- fetch product.id
             product'.name `shouldBe` product.name
 
+    describe "Admin text history" do
+        it "records who changed which product text, from what to what" $ withContext do
+            user <- createPromoter
+            (_, product) <- createTextsProduct "history"
+            _ <- withUser user $ callActionWithParams UpdateProductAction { productId = product.id }
+                [("name", cs product.name), ("description", "From Sicily"), ("package", "3 l can"), ("price", "1")]
+            changes <- query @TextChange |> filterWhere (#productId, Just product.id) |> orderBy #fieldName |> fetch
+            map (\c -> (c.userId, c.fieldName, c.textBefore, c.textAfter)) changes `shouldBe`
+                [ (user.id, "description", "Sisiliasta", "From Sicily")
+                , (user.id, "package", "3 l kanisteri", "3 l can")
+                ]
+            page <- withUser user $ callAction ShowProductAction { productId = product.id }
+            page `responseBodyShouldContain` "admin@example.com: description"
+            page `responseBodyShouldContain` "Was: Sisiliasta"
+            page `responseBodyShouldContain` "Now: From Sicily"
+
+        it "records nothing when no text changed" $ withContext do
+            admin <- createUserWithRoles True False False
+            (_, product) <- createTextsProduct "unchanged"
+            _ <- withUser admin $ callActionWithParams UpdateProductAction { productId = product.id }
+                [ ("name", cs product.name), ("description", cs product.description), ("package", cs product.package)
+                , ("price", "1200"), ("producerId", cs (tshow product.producerId)), ("enabled", "on")
+                ]
+            (query @TextChange |> filterWhere (#productId, Just product.id) |> fetchCount) `shouldReturn` 0
+            page <- withUser admin $ callAction ShowProductAction { productId = product.id }
+            page `responseBodyShouldContain` "The texts haven"
+
+        it "records an admin renaming a producer" $ withContext do
+            admin <- createUserWithRoles True False False
+            (producer, _) <- createTextsProduct "renamed producer"
+            _ <- withUser admin $ callActionWithParams UpdateProducerAction { producerId = producer.id }
+                [("name", "Uusi nimi"), ("subject", cs producer.subject), ("description", cs producer.description), ("enabled", "on")]
+            changes <- query @TextChange |> filterWhere (#producerId, Just producer.id) |> fetch
+            map (\c -> (c.fieldName, c.textBefore, c.textAfter)) changes `shouldBe` [("name", producer.name, "Uusi nimi")]
+            page <- withUser admin $ callAction ShowProducerAction { producerId = producer.id }
+            page `responseBodyShouldContain` "Now: Uusi nimi"
+
     describe "Admin roles: a delivery person who is also a promoter" do
         it "may do what either may" $ withContext do
             user <- createUserWithRoles False True True

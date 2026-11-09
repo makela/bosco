@@ -1,6 +1,7 @@
 module Admin.Controller.Producers where
 
 import Admin.Controller.Prelude
+import Application.TextHistory (producerTextChanges)
 import Admin.View.Producers.Index
 import Admin.View.Producers.New
 import Admin.View.Producers.Edit
@@ -26,6 +27,11 @@ instance Controller ProducersController where
     action ShowProducerAction { producerId } = do
         _ <- requirePermission EditShopTexts
         producer <- fetch producerId
+        textChanges <- query @TextChange
+            |> filterWhere (#producerId, Just producerId)
+            |> orderByDesc #createdAt
+            |> fetch
+            >>= collectionFetchRelated #userId
         render ShowView { .. }
 
     action EditProducerAction { producerId } = do
@@ -37,13 +43,15 @@ instance Controller ProducersController where
     action UpdateProducerAction { producerId } = do
         user <- requirePermission EditShopTexts
         let canManageShop = can user ManageShop
-        producer <- fetch producerId
-        producer
+        before <- fetch producerId
+        before
             |> (if canManageShop then buildProducer else buildProducerTexts)
             |> ifValid \case
                 Left producer -> render EditView { .. }
                 Right producer -> do
-                    producer <- producer |> updateRecord
+                    producer <- withTransaction do
+                        _ <- createMany (producerTextChanges user before producer)
+                        producer |> updateRecord
                     setSuccessMessage "Producer updated"
                     redirectTo ShowProducerAction { .. }
 

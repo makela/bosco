@@ -57,7 +57,7 @@ resetDemoData fixtures seed now = withTransaction do
   where
     -- Children before parents, for the foreign keys
     emptiedTables =
-        [ "email_order_jobs", "ordered_products", "orders", "customers"
+        [ "text_changes", "email_order_jobs", "ordered_products", "orders", "customers"
         , "products", "producers", "welcome_messages", "payment_instructions"
         ]
 
