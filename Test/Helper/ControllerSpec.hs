@@ -76,3 +76,19 @@ tests = describe "Application.Helper.Controller" do
         rejects "-0401234567"
         rejects "------------"
         rejects "040 abc 4567"
+        -- Other countries' numbers, with the country code
+        accepts "+39 333 123 4567"      -- Italian mobile
+        accepts "+39 06 1234 5678"      -- Rome
+        accepts "+33 6 12 34 56 78"     -- French mobile
+        accepts "+1 555-123-4567"       -- North America
+        accepts "+49 30 1234567"        -- Berlin
+        accepts "+683 4002"             -- Niue, 7 digits
+        accepts "+86 138 0013 8000 1"   -- 14 digits
+        accepts "0039 333 123 4567"
+        accepts "00358 40 123 4567"
+        rejects "+39 333"
+        rejects "+39 333 123 4567 89012" -- 16 digits
+        rejects "+039 333 123 4567"
+        rejects "000 123 4567"
+        rejects "00"
+        rejects "+"

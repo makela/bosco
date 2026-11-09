@@ -21,21 +21,27 @@ matchesSearch :: Text -> Text -> Bool
 matchesSearch q text = T.null q' || toLower q' `T.isInfixOf` toLower text
     where q' = T.strip q
 
--- | A Finnish or international phone number: an optional leading +, then
--- digits, which spaces or hyphens may split into groups. Numbers starting
--- with + or a country code (3...) have 9-12 digits, local ones (0...) 7-10.
+-- | A phone number of any country with its country code, or a Finnish one
+-- without. Spaces or hyphens may split the digits into groups.
+--
+-- * International: + or 00, then the country code (which never starts with
+--   0) and the number, 7-15 digits in all, e.g. "+39 333 123 4567" or
+--   "0039 333 123 4567".
+-- * Finnish with the country code but no +: 358..., 9-12 digits.
+-- * Finnish local: 0..., 7-10 digits.
 isPhone :: Text -> ValidatorResult
 isPhone text
-    | wellFormed, "+" `T.isPrefixOf` stripped, digitsBetween 9 12 = Success
-    | wellFormed, "3" `T.isPrefixOf` stripped, digitsBetween 9 12 = Success
-    | wellFormed, "0" `T.isPrefixOf` stripped, digitsBetween 7 10 = Success
-    | otherwise = Failure (l10nText LInvalidPhone)
+    | Just rest <- international, wellFormed rest, not ("0" `T.isPrefixOf` rest), digitsBetween rest 7 15 = Success
+    | Just _ <- international = invalid
+    | wellFormed stripped, "3" `T.isPrefixOf` stripped, digitsBetween stripped 9 12 = Success
+    | wellFormed stripped, "0" `T.isPrefixOf` stripped, digitsBetween stripped 7 10 = Success
+    | otherwise = invalid
     where
+        invalid = Failure (l10nText LInvalidPhone)
         stripped = T.strip text
-        number = fromMaybe stripped (T.stripPrefix "+" stripped)
-        wellFormed = not (T.null number)
+        international = T.stripPrefix "+" stripped <|> T.stripPrefix "00" stripped
+        wellFormed number = not (T.null number)
             && isDigit (T.head number)
             && isDigit (T.last number)
             && T.all (\c -> isDigit c || c == ' ' || c == '-') number
-        digitCount = T.length (T.filter isDigit number)
-        digitsBetween lo hi = digitCount >= lo && digitCount <= hi
+        digitsBetween number lo hi = let n = T.length (T.filter isDigit number) in n >= lo && n <= hi
