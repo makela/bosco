@@ -4,6 +4,10 @@
 -- split needs fixing, and a later migration drops them. reverse_name, the
 -- sort key, is now made of the last and first name.
 --
+-- Text is handled with the Finnish ICU collation ("fi-x-icu"), so that ä, ö
+-- and å are letters and change case whatever locale the database was created
+-- with: with the C locale initcap('BILLNÄS') would be 'BillnÄS'.
+--
 -- The rules follow scripts/profile-customers.sql's results from production
 -- (833 customers, November 2026); scripts/check-customer-split.sql lists what
 -- is left to fix by hand.
@@ -24,7 +28,7 @@ SET first_name = CASE WHEN n ~ ' ' THEN regexp_replace(n, ' [^ ]+$', '') ELSE n 
 FROM (
     SELECT id,
         CASE WHEN n = lower(n) OR n = upper(n) THEN initcap(n) ELSE n END AS n
-    FROM (SELECT id, regexp_replace(btrim(name), '\s+', ' ', 'g') AS n FROM customers) t
+    FROM (SELECT id, regexp_replace(btrim(name), '\s+', ' ', 'g') COLLATE "fi-x-icu" AS n FROM customers) t
 ) s
 WHERE customers.id = s.id;
 
@@ -54,7 +58,7 @@ FROM (
         ) AS p
     FROM (
         SELECT id,
-            regexp_replace(btrim(address, E' \t\r\n'), '[,[:space:]]*(Finland|Suomi)\.?$', '', 'i') AS a
+            regexp_replace(btrim(address, E' \t\r\n') COLLATE "fi-x-icu", '[,[:space:]]*(Finland|Suomi)\.?$', '', 'i') AS a
         FROM customers
     ) t
 ) s
@@ -68,9 +72,9 @@ SET city = CASE
         WHEN c = upper(c) THEN initcap(c)
         ELSE c
     END
-FROM (SELECT id, btrim(regexp_replace(city, '\s+', ' ', 'g')) AS c FROM customers) s
+FROM (SELECT id, btrim(regexp_replace(city, '\s+', ' ', 'g')) COLLATE "fi-x-icu" AS c FROM customers) s
 WHERE customers.id = s.id AND customers.city <> '';
 
 -- "virtanen maija", as reverseNameOf in Application/Customer.hs
 UPDATE customers
-SET reverse_name = lower(btrim(regexp_replace(last_name || ' ' || first_name, '\s+', ' ', 'g')));
+SET reverse_name = lower(btrim(regexp_replace(last_name || ' ' || first_name, '\s+', ' ', 'g')) COLLATE "fi-x-icu");

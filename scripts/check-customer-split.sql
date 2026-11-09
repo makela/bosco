@@ -27,23 +27,25 @@ CREATE FUNCTION pg_temp.shape(t text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
             WHEN tok ~ '^\s+$' THEN '␣␣'
             ELSE tok
         END, '' ORDER BY n), '')
-    FROM regexp_matches(t, '[0-9]+|[[:alpha:]]+|\s+|.', 'g') WITH ORDINALITY AS m(tok_, n),
-         LATERAL (SELECT tok_[1] AS tok) x
+    FROM regexp_matches(t COLLATE "fi-x-icu", '[0-9]+|[[:alpha:]]+|\s+|.', 'g') WITH ORDINALITY AS m(tok_, n),
+         LATERAL (SELECT tok_[1] COLLATE "fi-x-icu" AS tok) x
 $$;
 
+-- The checks below use the Finnish ICU collation, so that ä, ö and å are
+-- letters whatever locale the database was created with.
 CREATE TEMP VIEW c AS
 SELECT customers.*,
     EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = customers.id) AS has_orders,
     concat_ws(', ',
         CASE WHEN last_name = '' THEN 'one-word name' END,
-        CASE WHEN first_name ~ ' ' AND first_name !~ '^[[:upper:]][[:alpha:]-]* [[:upper:]][[:alpha:]-]*$' THEN 'unusual name' END,
-        CASE WHEN first_name || last_name ~ '[^[:alpha:] .''-]' THEN 'name has digits or punctuation' END,
+        CASE WHEN first_name ~ ' ' AND first_name COLLATE "fi-x-icu" !~ '^[[:upper:]][[:alpha:]-]* [[:upper:]][[:alpha:]-]*$' THEN 'unusual name' END,
+        CASE WHEN (first_name || last_name) COLLATE "fi-x-icu" ~ '[^[:alpha:] .''-]' THEN 'name has digits or punctuation' END,
         CASE WHEN address <> '' AND postal_code = '' AND city = '' THEN 'street only' END,
         CASE WHEN postal_code <> '' AND city = '' THEN 'no city' END,
         CASE WHEN postal_code = '' AND city <> '' THEN 'no postal code' END,
         CASE WHEN street_address <> '' AND street_address !~ '[0-9]' THEN 'street without number' END,
         CASE WHEN street_address ~ ',' THEN 'comma in street' END,
-        CASE WHEN city ~ '[^[:alpha:] -]' OR city ~ ' ' THEN 'unusual city' END
+        CASE WHEN city COLLATE "fi-x-icu" ~ '[^[:alpha:] -]' OR city ~ ' ' THEN 'unusual city' END
     ) AS issues
 FROM customers;
 

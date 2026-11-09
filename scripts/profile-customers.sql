@@ -17,8 +17,9 @@
 \set ON_ERROR_STOP on
 \pset footer off
 
--- Letters are recognised by the database's ctype; with a C ctype "ä" would not
--- be a letter and would show up as itself in the shapes.
+-- Shapes use the Finnish ICU collation, so ä, ö and å are letters whatever
+-- the database's locale. The checks further down still use the database's
+-- own; this shows which it is.
 SELECT datctype FROM pg_database WHERE datname = current_database();
 
 CREATE FUNCTION pg_temp.shape(t text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
@@ -36,8 +37,8 @@ CREATE FUNCTION pg_temp.shape(t text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
             WHEN tok ~ '^\s+$' THEN '␣␣'   -- several spaces or a tab
             ELSE tok
         END, '' ORDER BY n), '')
-    FROM regexp_matches(t, '[0-9]+|[[:alpha:]]+|\s+|.', 'g') WITH ORDINALITY AS m(tok_, n),
-         LATERAL (SELECT tok_[1] AS tok) x
+    FROM regexp_matches(t COLLATE "fi-x-icu", '[0-9]+|[[:alpha:]]+|\s+|.', 'g') WITH ORDINALITY AS m(tok_, n),
+         LATERAL (SELECT tok_[1] COLLATE "fi-x-icu" AS tok) x
 $$;
 
 CREATE TEMP VIEW c AS
