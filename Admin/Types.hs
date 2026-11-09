@@ -64,6 +64,7 @@ data OrdersController
     | DeleteCancelOrderAction { orderId :: !(Id Order) }
     | UpdateDeliverOrderAction { orderId :: !(Id Order) }
     | UpdateInvoiceOrderAction { orderId :: !(Id Order) }
+    | UpdateSendInvoiceOrderAction { orderId :: !(Id Order) }
     | OrderedProductsAction
     deriving (Eq, Show, Data)
 

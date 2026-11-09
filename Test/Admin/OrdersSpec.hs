@@ -1,8 +1,10 @@
 module Test.Admin.OrdersSpec where
 
+import qualified Control.Exception as Exception
 import Network.HTTP.Types (status200)
 
 import IHP.ControllerPrelude
+import IHP.Job.Types (JobStatus (..))
 import IHP.Hspec (responseBodyShouldContain, responseBodyShouldNotContain,
                   responseStatusShouldBe, withIHPApp)
 import IHP.Test.Mocking
@@ -63,6 +65,50 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             userView `responseBodyShouldContain` "Ville Korhonen"
             userView `responseBodyShouldNotContain` "Mark as paid"
 
+    describe "Admin OrdersController sending the invoice again" do
+        it "queues the invoice email for the order" $ withContext do
+            admin <- createAdmin
+            order <- createEmailOrder "send@example.com"
+            _ <- withUser admin $ callAction UpdateSendInvoiceOrderAction { orderId = order.id }
+            emailJobCount order `shouldReturn` 1
+            -- Sending again is how the invoice is sent to a corrected address
+            _ <- withUser admin $ callAction UpdateSendInvoiceOrderAction { orderId = order.id }
+            emailJobCount order `shouldReturn` 2
+            order' <- fetch order.id
+            order'.invoicedAt `shouldBe` Nothing
+
+        it "doesn't let a user who isn't an admin send it" $ withContext do
+            user <- createTestUser False
+            order <- createEmailOrder "notadmin@example.com"
+            _ <- Exception.try @Exception.SomeException $
+                withUser user $ callAction UpdateSendInvoiceOrderAction { orderId = order.id }
+            emailJobCount order `shouldReturn` 0
+            page <- withUser user $ callAction ShowOrderAction { orderId = order.id }
+            page `responseBodyShouldNotContain` "Send invoice"
+
+        it "doesn't send a cancelled order's invoice" $ withContext do
+            admin <- createAdmin
+            order <- createEmailOrder "cancelled@example.com"
+            now <- getCurrentTime
+            order |> set #cancelledAt (Just now) |> updateRecord
+            _ <- withUser admin $ callAction UpdateSendInvoiceOrderAction { orderId = order.id }
+            emailJobCount order `shouldReturn` 0
+
+        it "shows when the invoice was emailed, and failures with their error" $ withContext do
+            admin <- createAdmin
+            order <- createEmailOrder "history@example.com"
+            before <- withUser admin $ callAction ShowOrderAction { orderId = order.id }
+            before `responseBodyShouldContain` "The invoice hasn't been emailed."
+            forM_ [(JobStatusSucceeded, Nothing), (JobStatusFailed, Just "SMTP said no")] \(status, lastError) ->
+                newRecord @EmailOrderJob
+                    |> set #orderId order.id |> set #status status |> set #lastError lastError
+                    |> createRecord
+            page <- withUser admin $ callAction ShowOrderAction { orderId = order.id }
+            page `responseStatusShouldBe` status200
+            page `responseBodyShouldContain` "Send invoice"
+            page `responseBodyShouldContain` "Emailed "
+            page `responseBodyShouldContain` ": SMTP said no"
+
     describe "Admin OrdersController prices" do
         it "lists an order at the price it was placed at" $ withContext do
             admin <- createAdmin
@@ -109,3 +155,16 @@ setUp = do
                 |> createRecord
             newRecord @Order |> set #customerId customer.id |> createRecord
     createAdmin
+
+-- | An order of a customer of its own, so its email jobs are its own
+createEmailOrder :: (?modelContext :: ModelContext) => Text -> IO Order
+createEmailOrder email = do
+    customer <- newRecord @Customer
+        |> set #firstName "Laskun" |> set #lastName "Saaja"
+        |> set #email email
+        |> set #phone "0401234567"
+        |> createRecord
+    newRecord @Order |> set #customerId customer.id |> createRecord
+
+emailJobCount :: (?modelContext :: ModelContext) => Order -> IO Int
+emailJobCount order = query @EmailOrderJob |> filterWhere (#orderId, order.id) |> fetchCount

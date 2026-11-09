@@ -1,4 +1,6 @@
 module Admin.View.Orders.Show where
+import IHP.Job.Types (JobStatus (..))
+
 import Admin.View.Orders.Index (formatUTCTime)
 import Admin.View.Prelude
 import Web.View.Orders.New (formatMoney)
@@ -11,6 +13,9 @@ data ShowView = ShowView
     , orderedProductsByProducer :: OrderedProductsByProducer
     , totalSum                  :: Int
     , user                      :: User
+    , emailJobs                 :: [EmailOrderJob]
+      -- ^ Every time the invoice was emailed, or is to be, oldest first
+    , emailsEnabled             :: Bool
     }
 
 instance View ShowView where
@@ -24,6 +29,7 @@ instance View ShowView where
         </tbody>
         </table>
         {cancelledOrControls}
+        {renderEmailHistory emailsEnabled emailJobs}
     |]
         where
             breadcrumb = renderBreadcrumb
@@ -52,6 +58,11 @@ instance View ShowView where
                         <input type="submit" class="btn-small" value="Mark as invoiced" />
                     </form>
                 |]
+            sendInvoice = when user.isAdmin [hsx|
+                <form method="POST" action={UpdateSendInvoiceOrderAction order.id}>
+                    <input type="submit" class="btn-small" value="Send invoice" />
+                </form>
+            |]
             cancelOrder = case (user.isAdmin, order.paidAt) of
                 (True, Nothing) -> [hsx|
                     <a href={DeleteCancelOrderAction order.id} class="js-delete btn-small danger">Cancel order</a>
@@ -61,9 +72,40 @@ instance View ShowView where
                 Just x -> [hsx|<p>Cancelled {formatUTCTime x}</p>|]
                 Nothing -> [hsx|
                     <div class="order-steps">
+                        {sendInvoice}
                         {markInvoiced}
                         {markPaid}
                         {markDelivered}
                         {cancelOrder}
                     </div>
                 |]
+
+-- | When the invoice was emailed to the customer: on ordering, and whenever
+-- an admin sent it again
+renderEmailHistory :: Bool -> [EmailOrderJob] -> Html
+renderEmailHistory _ [] = [hsx|<p id="email-history">The invoice hasn't been emailed.</p>|]
+renderEmailHistory emailsEnabled jobs = [hsx|
+    <div id="email-history">
+        <h2>Invoice emails</h2>
+        {emailsOff}
+        <ul>{forEach jobs renderEmailJob}</ul>
+    </div>
+|]
+    where
+        emailsOff = unless emailsEnabled [hsx|
+            <p>Emails are off for this instance, so none of these was actually sent.</p>
+        |]
+
+renderEmailJob :: EmailOrderJob -> Html
+renderEmailJob job = [hsx|<li>{describe job.status}</li>|]
+    where
+        time :: UTCTime -> Text
+        time = cs . formatUTCTime
+        describe :: JobStatus -> Text
+        describe = \case
+            JobStatusSucceeded -> "Emailed " <> time job.updatedAt
+            JobStatusFailed -> "Failed " <> time job.updatedAt <> ": " <> fromMaybe "" job.lastError
+            JobStatusTimedOut -> "Timed out " <> time job.updatedAt
+            JobStatusRetry -> "Failed " <> time job.updatedAt <> ", trying again: " <> fromMaybe "" job.lastError
+            JobStatusRunning -> "Sending, queued " <> time job.createdAt
+            JobStatusNotStarted -> "Queued " <> time job.createdAt

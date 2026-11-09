@@ -6,6 +6,7 @@ import Data.Ord
 
 import Admin.Controller.Prelude hiding (createOrder)
 import Application.Customer (fullName)
+import Application.Settings (EmailsEnabled (..))
 import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
@@ -76,6 +77,11 @@ instance Controller OrdersController where
         user <- fetch currentUserId
         (order, totalSum, orderedProductsByProducer, producers) <-
             fetchShowOrderContext orderId
+        emailJobs <- query @EmailOrderJob
+            |> filterWhere (#orderId, orderId)
+            |> orderBy #createdAt
+            |> fetch
+        let EmailsEnabled emailsEnabled = getAppConfig @EmailsEnabled
         render ShowView { .. }
 
     action CreateOrderAction = do
@@ -124,6 +130,19 @@ instance Controller OrdersController where
             |> setJust #invoicedAt now
             |> updateRecord
         setSuccessMessage "Order invoiced"
+        redirectTo ShowOrderAction { orderId }
+
+    -- | Emails the invoice to the customer again, e.g. after their email
+    -- address was corrected. The worker sends it, as on ordering.
+    action UpdateSendInvoiceOrderAction { orderId } = do
+        user <- fetch currentUserId
+        accessDeniedUnless user.isAdmin
+        order <- fetch orderId >>= fetchRelated #customerId
+        when (isJust order.cancelledAt) do
+            setErrorMessage "A cancelled order's invoice can't be sent"
+            earlyReturn $ redirectTo ShowOrderAction { orderId }
+        _ <- newRecord @EmailOrderJob |> set #orderId orderId |> createRecord
+        setSuccessMessage ("Invoice queued for sending to " <> order.customerId.email)
         redirectTo ShowOrderAction { orderId }
 
     action OrderedProductsAction = do
