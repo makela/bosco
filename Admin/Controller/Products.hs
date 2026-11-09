@@ -11,7 +11,8 @@ instance Controller ProductsController where
     beforeAction = ensureIsUser
 
     action ProductsAction = do
-        _ <- requirePermission ManageShop
+        user <- requirePermission EditShopTexts
+        let canManageShop = can user ManageShop
         -- The whole catalog on one page, grouped by producer in the order
         -- the order form uses
         producers <- query @Producer |> fetch
@@ -28,21 +29,23 @@ instance Controller ProductsController where
         render NewView { .. }
 
     action ShowProductAction { productId } = do
-        _ <- requirePermission ManageShop
+        _ <- requirePermission EditShopTexts
         product <- fetch productId >>= fetchRelated #producerId
         render ShowView { .. }
 
     action EditProductAction { productId } = do
-        _ <- requirePermission ManageShop
+        user <- requirePermission EditShopTexts
+        let canManageShop = can user ManageShop
         producers <- query @Producer |> fetch
         product <- fetch productId
         render EditView { .. }
 
     action UpdateProductAction { productId } = do
-        _ <- requirePermission ManageShop
+        user <- requirePermission EditShopTexts
+        let canManageShop = can user ManageShop
         product <- fetch productId
         product
-            |> buildProduct
+            |> (if canManageShop then buildProduct else buildProductTexts)
             |> ifValid \case
                 Left product -> do
                     producers <- query @Producer |> fetch
@@ -80,3 +83,8 @@ instance Controller ProductsController where
 
 buildProduct product = product
     |> fill @["producerId","name","description","package","price","ordering","enabled"]
+
+-- | What a promoter may change: the texts, never the price, the producer,
+-- the order on the page or whether the product is shown
+buildProductTexts product = product
+    |> fill @["name","description","package"]

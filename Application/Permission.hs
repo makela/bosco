@@ -20,6 +20,9 @@ data Permission
     | ManageOrders
       -- ^ Mark invoiced or paid, cancel, email the invoice again
     | SeeEmailLists
+    | EditShopTexts
+      -- ^ Product names, descriptions and packages, producers' subjects and
+      -- descriptions: what a translator needs, not prices or the catalog
     | ManageShop
       -- ^ Products, producers, customers, the shop's texts and payment
       -- instructions, the ordered products summary
@@ -32,7 +35,7 @@ can user permission =
     || (user.isPromoter && permission `elem` promoter)
   where
     deliverer = [SeeOrders, CreateOrders, MarkDelivered]
-    promoter = [SeeOrders, SeeEmailLists]
+    promoter = [SeeOrders, SeeEmailLists, EditShopTexts]
 
 -- | A user without any role can log in but do nothing
 hasAnyRole :: User -> Bool

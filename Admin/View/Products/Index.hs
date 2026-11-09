@@ -4,7 +4,9 @@ import Admin.View.Prelude
 import Web.View.Orders.New (formatMoney)
 
 data IndexView = IndexView
-    { products :: [Include "producerId" Product] }
+    { products :: [Include "producerId" Product]
+    , canManageShop :: Bool
+    }
 
 instance View IndexView where
     html IndexView { .. } = [hsx|
@@ -27,10 +29,9 @@ instance View IndexView where
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Home" WelcomeAction
+                ([ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbText [hsx|<span>Products</span>|]
-                , breadcrumbLink "New" NewProductAction
-                ]
+                ] <> [breadcrumbLink "New" NewProductAction | canManageShop])
 
 renderProduct :: Include "producerId" Product -> Html
 renderProduct product = [hsx|

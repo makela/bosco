@@ -3,7 +3,11 @@ import Admin.View.Prelude
 
 import Admin.View.CheckMark (isEnabled)
 
-data IndexView = IndexView { producers :: [Producer] , pagination :: Pagination }
+data IndexView = IndexView
+    { producers :: [Producer]
+    , pagination :: Pagination
+    , canManageShop :: Bool
+    }
 
 instance View IndexView where
     html IndexView { .. } = [hsx|
@@ -24,10 +28,9 @@ instance View IndexView where
     |]
         where
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Home" WelcomeAction
+                ([ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbText [hsx|<span>Producers</span>|]
-                , breadcrumbLink "New" NewProducerAction
-                ]
+                ] <> [breadcrumbLink "New" NewProducerAction | canManageShop])
 
 renderProducer :: Producer -> Html
 renderProducer producer = [hsx|

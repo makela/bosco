@@ -187,7 +187,10 @@ A login has one or more roles, and may do whatever any of them allows
 - admin: everything;
 - deliverer: sees orders and their details, takes orders for customers in
   the admin and marks orders delivered;
-- promoter: sees orders and their details, and the email lists.
+- promoter: sees orders and their details, and the email lists, and edits
+  the shop's texts, e.g. to translate them: products' names, descriptions
+  and packages, producers' subjects and descriptions. Not prices, producer
+  names, or which products and producers there are and are shown.
 
 Only an admin marks orders invoiced or paid, cancels them, emails invoices
 again and manages the shop. `CreateUser` makes logins, on the server as the

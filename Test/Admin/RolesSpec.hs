@@ -12,6 +12,8 @@ import Test.Hspec
 
 import Admin.Controller.Customers ()
 import Admin.Controller.Orders ()
+import Admin.Controller.Producers ()
+import Admin.Controller.Products ()
 import Admin.Controller.Static ()
 import Admin.FrontController ()
 import Admin.Types
@@ -59,7 +61,9 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             menu <- withUser user $ callAction WelcomeAction
             menu `responseBodyShouldContain` "Emails for news letter"
             menu `responseBodyShouldContain` "Orders"
-            menu `responseBodyShouldNotContain` "Producers"
+            menu `responseBodyShouldContain` "Products"
+            menu `responseBodyShouldNotContain` "Customers"
+            menu `responseBodyShouldNotContain` "Payment Instructions"
 
         it "doesn't change orders or the shop" $ withContext do
             user <- createPromoter
@@ -72,6 +76,56 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             denied (withUser user $ callAction CustomersAction) `shouldReturn` True
             order' <- fetch order.id
             order'.deliveredAt `shouldBe` Nothing
+
+    describe "Admin roles: a promoter editing the shop's texts" do
+        it "changes a product's name, description and package, nothing else" $ withContext do
+            user <- createPromoter
+            (producer, product) <- createTextsProduct "product"
+            other <- newRecord @Producer |> set #name "Toinen tila" |> set #subject "" |> set #description "" |> createRecord
+            form <- withUser user $ callAction EditProductAction { productId = product.id }
+            form `responseStatusShouldBe` status200
+            form `responseBodyShouldContain` "Price: 10 €"
+            form `responseBodyShouldNotContain` "name=\"price\""
+            form `responseBodyShouldNotContain` "Delete"
+            -- A crafted request with the other fields too changes only the texts
+            _ <- withUser user $ callActionWithParams UpdateProductAction { productId = product.id }
+                [ ("name", "Olive oil"), ("description", "From Sicily"), ("package", "3 l can")
+                , ("price", "1"), ("enabled", "off"), ("ordering", "99"), ("producerId", cs (tshow other.id))
+                ]
+            product' <- fetch product.id
+            (product'.name, product'.description, product'.package) `shouldBe` ("Olive oil", "From Sicily", "3 l can")
+            (product'.price, product'.enabled, product'.ordering, product'.producerId) `shouldBe` (1000, True, Nothing, producer.id)
+
+        it "changes a producer's subject and description, not its name" $ withContext do
+            user <- createPromoter
+            (producer, _) <- createTextsProduct "producer"
+            form <- withUser user $ callAction EditProducerAction { producerId = producer.id }
+            form `responseBodyShouldContain` ("Name: " <> producer.name)
+            _ <- withUser user $ callActionWithParams UpdateProducerAction { producerId = producer.id }
+                [("name", "Renamed"), ("subject", "Olive oil from Sicily"), ("description", "A farm"), ("enabled", "off")]
+            producer' <- fetch producer.id
+            (producer'.name, producer'.subject, producer'.description, producer'.enabled)
+                `shouldBe` (producer.name, "Olive oil from Sicily", "A farm", True)
+
+        it "doesn't add or delete products and producers" $ withContext do
+            user <- createPromoter
+            (producer, product) <- createTextsProduct "catalog"
+            list <- withUser user $ callAction ProductsAction
+            list `responseStatusShouldBe` status200
+            list `responseBodyShouldNotContain` "/admin/NewProduct"
+            denied (withUser user $ callAction NewProductAction) `shouldReturn` True
+            denied (withUser user $ callAction NewProducerAction) `shouldReturn` True
+            denied (withUser user $ callAction DeleteProductAction { productId = product.id }) `shouldReturn` True
+            denied (withUser user $ callAction DeleteProducerAction { producerId = producer.id }) `shouldReturn` True
+            (query @Product |> filterWhere (#id, product.id) |> fetchCount) `shouldReturn` 1
+
+        it "is not for a delivery person" $ withContext do
+            user <- createDeliverer
+            (_, product) <- createTextsProduct "deliverer"
+            denied (withUser user $ callAction EditProductAction { productId = product.id }) `shouldReturn` True
+            denied (withUser user $ callActionWithParams UpdateProductAction { productId = product.id } [("name", "x")]) `shouldReturn` True
+            product' <- fetch product.id
+            product'.name `shouldBe` product.name
 
     describe "Admin roles: a delivery person who is also a promoter" do
         it "may do what either may" $ withContext do
@@ -107,3 +161,17 @@ createRoleOrder email = do
         |> set #streetAddress "Testikatu 1"
         |> createRecord
     newRecord @Order |> set #customerId customer.id |> createRecord
+
+createTextsProduct :: (?modelContext :: ModelContext) => Text -> IO (Producer, Product)
+createTextsProduct tag = do
+    producer <- newRecord @Producer
+        |> set #name ("Tekstitila " <> tag) |> set #subject "Oliiviöljyä" |> set #description "Tila"
+        |> createRecord
+    product <- newRecord @Product
+        |> set #producerId producer.id
+        |> set #name ("Oliiviöljyä " <> tag)
+        |> set #description "Sisiliasta"
+        |> set #package "3 l kanisteri"
+        |> set #price 1000
+        |> createRecord
+    pure (producer, product)

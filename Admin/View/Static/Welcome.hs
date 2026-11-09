@@ -27,8 +27,8 @@ instance View WelcomeView where
                   , (SeeEmailLists, "Emails for news letter", pathTo EmailsForNewsLetterAction)
                   , (SeeOrders, "Orders", pathTo OrdersAction)
                   , (ManageShop, "Payment Instructions", pathTo PaymentInstructionsAction)
-                  , (ManageShop, "Producers", pathTo ProducersAction)
-                  , (ManageShop, "Products", pathTo ProductsAction)
+                  , (EditShopTexts, "Producers", pathTo ProducersAction)
+                  , (EditShopTexts, "Products", pathTo ProductsAction)
                   , (ManageShop, "Welcome Messages", pathTo WelcomeMessagesAction)
                   ] :: [(Permission, Text, Text)]
               renderLink (_, label, url) = [hsx|<li><a href={url}>{label}</a></li>|]

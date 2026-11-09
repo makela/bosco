@@ -10,7 +10,8 @@ instance Controller ProducersController where
     beforeAction = ensureIsUser
 
     action ProducersAction = do
-        _ <- requirePermission ManageShop
+        user <- requirePermission EditShopTexts
+        let canManageShop = can user ManageShop
         (producersQ, pagination) <- query @Producer
             |> orderBy #name
             |> paginate
@@ -23,20 +24,22 @@ instance Controller ProducersController where
         render NewView { .. }
 
     action ShowProducerAction { producerId } = do
-        _ <- requirePermission ManageShop
+        _ <- requirePermission EditShopTexts
         producer <- fetch producerId
         render ShowView { .. }
 
     action EditProducerAction { producerId } = do
-        _ <- requirePermission ManageShop
+        user <- requirePermission EditShopTexts
+        let canManageShop = can user ManageShop
         producer <- fetch producerId
         render EditView { .. }
 
     action UpdateProducerAction { producerId } = do
-        _ <- requirePermission ManageShop
+        user <- requirePermission EditShopTexts
+        let canManageShop = can user ManageShop
         producer <- fetch producerId
         producer
-            |> buildProducer
+            |> (if canManageShop then buildProducer else buildProducerTexts)
             |> ifValid \case
                 Left producer -> render EditView { .. }
                 Right producer -> do
@@ -69,3 +72,8 @@ instance Controller ProducersController where
 
 buildProducer producer = producer
     |> fill @["name","subject","description","enabled"]
+
+-- | What a promoter may change. Not the name: it is a proper name, and the
+-- order form finds Bosco Falconeria by it to list it first.
+buildProducerTexts producer = producer
+    |> fill @["subject","description"]
