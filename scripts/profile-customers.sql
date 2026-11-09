@@ -1,7 +1,7 @@
 -- How customers' names and addresses are written, before they are split into
 -- first_name/last_name and street_address/postal_code/city.
 --
---   sudo -u bosco_fi psql bosco_fi -f profile-customers.sql
+--   sudo -u bosco_fi psql bosco_fi < profile-customers.sql
 --
 -- It only reads. It prints counts and "shapes", never a name or an address: in
 -- a shape every word becomes Aa (capitalised), aa, AA, A (single letter) or aA
