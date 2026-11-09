@@ -3,8 +3,8 @@ module Test.Admin.CustomersSpec where
 import Network.HTTP.Types (status200)
 
 import IHP.ControllerPrelude
-import IHP.Hspec (responseBodyShouldContain, responseStatusShouldBe,
-                  withIHPApp)
+import IHP.Hspec (responseBodyShouldContain, responseBodyShouldNotContain,
+                  responseStatusShouldBe, withIHPApp)
 import IHP.Test.Mocking
 import Test.Hspec
 
@@ -65,6 +65,33 @@ tests = aroundAll (withIHPApp AdminApplication config) do
                 response `responseBodyShouldContain` "Oliivi Oy"
             shown <- withUser admin (callAction (ShowCustomerAction customer.id))
             shown `responseBodyShouldContain` "<p>33100 Tampere</p>"
+
+        it "shows the name and address as written before the split, when there are any" $ withContext do
+            admin <- createAdmin
+            let customer = newRecord @Customer
+                    |> set #firstName "Matti" |> set #lastName "Virtanen"
+                    |> set #email "original@example.com" |> set #phone "0401234567"
+            migrated <- customer
+                |> set #name "matti virtanen" |> set #address "Testikatu 1, 00100 Hki"
+                |> createRecord
+            new <- customer |> createRecord
+            migratedForm <- withUser admin (callAction (EditCustomerAction migrated.id))
+            migratedForm `responseBodyShouldContain` "Name: matti virtanen"
+            migratedForm `responseBodyShouldContain` "Address: Testikatu 1, 00100 Hki"
+            newForm <- withUser admin (callAction (EditCustomerAction new.id))
+            newForm `responseBodyShouldNotContain` "original-details"
+
+        it "keeps the name and address as written when the customer is edited" $ withContext do
+            admin <- createAdmin
+            customer <- newRecord @Customer
+                |> set #name "matti virtanen" |> set #address "Testikatu 1, 00100 Hki"
+                |> set #email "keep@example.com" |> set #phone "0401234567"
+                |> createRecord
+            _ <- withUser admin do
+                callActionWithParams UpdateCustomerAction { customerId = customer.id }
+                    (customerParams "Matti" "Virtanen" "keep@example.com")
+            customer' <- fetch customer.id
+            (customer'.name, customer'.address, customer'.firstName) `shouldBe` ("matti virtanen", "Testikatu 1, 00100 Hki", "Matti")
 
         it "rejects a customer with a blank first name" $ withContext do
             admin <- createAdmin
