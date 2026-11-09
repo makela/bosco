@@ -2,6 +2,7 @@ module Admin.View.Static.Welcome where
 import Admin.View.Prelude
 
 import Application.Demo (isDemoUser)
+import Application.Permission (Permission (..), can, hasAnyRole)
 
 data WelcomeView = WelcomeView { user :: !User }
 
@@ -14,17 +15,21 @@ instance View WelcomeView where
         </ol>
 |]
         where changePassword = [hsx|<a class="float-right p-2" href={NewPasswordAction}>Change password</a>|]
-              links = if user.isAdmin
-                      then [hsx|
-                          <li><a href={OrderedProductsAction}>All ordered products</a></li>
-                          <li><a href={CustomersAction}>Customers</a></li>
-                          <li><a href={EmailsForDeliveryInfoAction}>Emails for delivery info</a></li>
-                          <li><a href={EmailsForNewsLetterAction}>Emails for news letter</a></li>
-                          <li><a href={OrdersAction}>Orders</a></li>
-                          <li><a href={PaymentInstructionsAction}>Payment Instructions</a></li>
-                          <li><a href={ProducersAction}>Producers</a></li>
-                          <li><a href={ProductsAction}>Products</a></li>
-                          <li><a href={WelcomeMessagesAction}>Welcome Messages</a></li>
-                      |] else [hsx|
-                          <li><a href={OrdersAction}>Orders</a></li>
-                      |]
+              links = [hsx|
+                  {forEach (filter (\(permission, _, _) -> can user permission) menu) renderLink}
+                  {noRole}
+              |]
+              -- Alphabetical, as the menu always was
+              menu =
+                  [ (ManageShop, "All ordered products", pathTo OrderedProductsAction)
+                  , (ManageShop, "Customers", pathTo CustomersAction)
+                  , (SeeEmailLists, "Emails for delivery info", pathTo EmailsForDeliveryInfoAction)
+                  , (SeeEmailLists, "Emails for news letter", pathTo EmailsForNewsLetterAction)
+                  , (SeeOrders, "Orders", pathTo OrdersAction)
+                  , (ManageShop, "Payment Instructions", pathTo PaymentInstructionsAction)
+                  , (ManageShop, "Producers", pathTo ProducersAction)
+                  , (ManageShop, "Products", pathTo ProductsAction)
+                  , (ManageShop, "Welcome Messages", pathTo WelcomeMessagesAction)
+                  ] :: [(Permission, Text, Text)]
+              renderLink (_, label, url) = [hsx|<li><a href={url}>{label}</a></li>|]
+              noRole = unless (hasAnyRole user) [hsx|<li>Your login has no role yet: ask an admin for one.</li>|]

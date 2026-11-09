@@ -11,35 +11,30 @@ instance Controller PaymentInstructionsController where
     beforeAction = ensureIsUser
 
     action PaymentInstructionsAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         (paymentInstructionsQ, pagination) <- query @PaymentInstruction |> paginate
         paymentInstructions <- paymentInstructionsQ |> fetch
         render IndexView { .. }
 
     action NewPaymentInstructionAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         let paymentInstruction = newRecord
         render NewView { .. }
 
     action ShowPaymentInstructionAction { paymentInstructionId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         paymentInstruction <- fetch paymentInstructionId
         render ShowView { .. }
 
     action EditPaymentInstructionAction { paymentInstructionId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         paymentInstruction <- fetch paymentInstructionId
         render EditView { .. }
 
     action UpdatePaymentInstructionAction { paymentInstructionId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         paymentInstruction <- fetch paymentInstructionId
         paymentInstruction
@@ -52,8 +47,7 @@ instance Controller PaymentInstructionsController where
                     redirectTo ShowPaymentInstructionAction { .. }
 
     action CreatePaymentInstructionAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         let paymentInstruction = newRecord @PaymentInstruction
         paymentInstruction
@@ -66,8 +60,7 @@ instance Controller PaymentInstructionsController where
                     redirectTo $ ShowPaymentInstructionAction paymentInstruction.id
 
     action DeletePaymentInstructionAction { paymentInstructionId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         paymentInstruction <- fetch paymentInstructionId
         deleteRecord paymentInstruction

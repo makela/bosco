@@ -35,8 +35,9 @@ data IndexView = IndexView
     , excludeDelivered :: Bool
     , year             :: Integer
     , years            :: [Integer]
-    , isAdmin          :: Bool
-      -- ^ Only admins can mark orders paid
+    , canManageOrders  :: Bool
+      -- ^ Whether the user may mark orders paid
+    , canCreateOrders  :: Bool
     }
 
 instance View IndexView where
@@ -70,10 +71,9 @@ instance View IndexView where
         where
             n = length orders
             breadcrumb = renderBreadcrumb
-                [ breadcrumbLink "Home" WelcomeAction
+                ([ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbText "Orders"
-                , breadcrumbLink "New" NewOrderAction
-                ]
+                ] <> [breadcrumbLink "New" NewOrderAction | canCreateOrders])
             tableOrNot = unless (n == 0) [hsx|
                 <div class="table-responsive">
                     <table class="table">
@@ -87,28 +87,28 @@ instance View IndexView where
                                 <th>Delivered</th>
                             </tr>
                         </thead>
-                        <tbody>{forEach orders (renderOrder isAdmin priceMap)}</tbody>
+                        <tbody>{forEach orders (renderOrder canManageOrders priceMap)}</tbody>
                     </table>
                 </div>
             |]
 
 renderOrder :: Bool -> Map (Id Order) Int -> Include "customerId" Order -> Html
-renderOrder isAdmin priceMap order = [hsx|
+renderOrder canManageOrders priceMap order = [hsx|
     <tr>
         <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
         <td class="normal">{fullName order.customerId}</td>
         <td>{fmap formatUTCTime order.invoicedAt}</td>
         <td>{fmap formatMoney $ Map.lookup order.id priceMap}</td>
-        <td>{showOrMarkPaid isAdmin order}</td>
+        <td>{showOrMarkPaid canManageOrders order}</td>
         <td>{fmap formatUTCTime order.deliveredAt}</td>
     </tr>
 |]
 
 showOrMarkPaid :: Bool -> Include "customerId" Order -> Html
-showOrMarkPaid isAdmin order =
+showOrMarkPaid canManageOrders order =
     case order.paidAt of
       Just paidAt -> [hsx|{formatUTCTime paidAt}|]
-      Nothing | not isAdmin -> mempty
+      Nothing | not canManageOrders -> mempty
       Nothing     -> [hsx|
                     <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
                         <input type="submit" class="btn-small" value="Mark as paid" />

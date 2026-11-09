@@ -11,8 +11,7 @@ instance Controller ProductsController where
     beforeAction = ensureIsUser
 
     action ProductsAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         -- The whole catalog on one page, grouped by producer in the order
         -- the order form uses
         producers <- query @Producer |> fetch
@@ -23,28 +22,24 @@ instance Controller ProductsController where
         render IndexView { .. }
 
     action NewProductAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         producers <- query @Producer |> fetch
         let product = newRecord
         render NewView { .. }
 
     action ShowProductAction { productId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         product <- fetch productId >>= fetchRelated #producerId
         render ShowView { .. }
 
     action EditProductAction { productId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         producers <- query @Producer |> fetch
         product <- fetch productId
         render EditView { .. }
 
     action UpdateProductAction { productId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         product <- fetch productId
         product
             |> buildProduct
@@ -58,8 +53,7 @@ instance Controller ProductsController where
                     redirectTo ShowProductAction { .. }
 
     action CreateProductAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         let product = newRecord @Product
         product
             |> buildProduct
@@ -73,8 +67,7 @@ instance Controller ProductsController where
                     redirectTo $ ShowProductAction product.id
 
     action DeleteProductAction { productId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         product <- fetch productId
         -- Ordered products are part of past orders, so they can only be disabled
         timesOrdered <- query @OrderedProduct |> filterWhere (#productId, productId) |> fetchCount

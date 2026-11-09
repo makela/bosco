@@ -26,12 +26,15 @@ data DemoLogin = DemoLogin
     , label :: Text
     , email :: Text
     , isAdmin :: Bool
+    , isDeliverer :: Bool
+    , isPromoter :: Bool
     }
 
 demoLogins :: [DemoLogin]
 demoLogins =
-    [ DemoLogin { role = "admin", label = "Admin", email = "admin@demo.invalid", isAdmin = True }
-    , DemoLogin { role = "orders", label = "Delivery person", email = "orders@demo.invalid", isAdmin = False }
+    [ DemoLogin { role = "admin", label = "Admin", email = "admin@demo.invalid", isAdmin = True, isDeliverer = False, isPromoter = False }
+    , DemoLogin { role = "orders", label = "Delivery person", email = "orders@demo.invalid", isAdmin = False, isDeliverer = True, isPromoter = False }
+    , DemoLogin { role = "promoter", label = "Promoter", email = "promoter@demo.invalid", isAdmin = False, isDeliverer = False, isPromoter = True }
     ]
 
 demoLogin :: Text -> Maybe DemoLogin
@@ -49,7 +52,7 @@ ensureDemoUser login = do
     existing <- query @User |> filterWhere (#email, login.email) |> fetchOneOrNothing
     case existing of
         Just user -> user
-            |> set #isAdmin login.isAdmin
+            |> setRoles
             |> set #lockedAt Nothing
             |> set #failedLoginAttempts 0
             |> updateRecord
@@ -59,8 +62,13 @@ ensureDemoUser login = do
             newRecord @User
                 |> set #email login.email
                 |> set #passwordHash passwordHash
-                |> set #isAdmin login.isAdmin
+                |> setRoles
                 |> createRecord
+  where
+    setRoles user = user
+        |> set #isAdmin login.isAdmin
+        |> set #isDeliverer login.isDeliverer
+        |> set #isPromoter login.isPromoter
 
 -- | The only payment details a demo shows: an obviously fake account. Its
 -- invoices show these whatever the database holds, and its admin can't

@@ -48,7 +48,7 @@ tests = do
                 bodyText page `shouldSatisfy` ("Orders" `T.isInfixOf`)
                 bodyText page `shouldSatisfy` (not . ("Producers" `T.isInfixOf`))
                 user <- fetch locked.id
-                (user.lockedAt, user.failedLoginAttempts, user.isAdmin) `shouldBe` (Nothing, 0, False)
+                (user.lockedAt, user.failedLoginAttempts, user.isAdmin, user.isDeliverer) `shouldBe` (Nothing, 0, False, True)
 
             it "log in as an admin with one click, reusing the same user" $ withContext do
                 page <- inApp (httpPost "/admin/DemoLogin?role=admin" [] >>= followRedirect)

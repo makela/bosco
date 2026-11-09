@@ -160,8 +160,8 @@ account on the demo's invoices. For the same reason the welcome message's
 text is fixed: visitors can open and close ordering, but not create, delete
 or reword messages.
 
-The demo's admin login page has one-click logins for everyone: an admin and
-a delivery person who only sees orders (`Application/Demo.hs`). Their users
+The demo's admin login page has one-click logins for everyone: an admin, a
+delivery person and a promoter (`Application/Demo.hs`). Their users
 are made on first use with a random password nobody knows, so they can't be
 locked by typing wrong passwords, and their passwords can't be changed. Your
 own admin login, made with `CreateUser`, works as usual.
@@ -178,6 +178,28 @@ orders until the first reset, so run it once after the first deploy:
 ```sh
 systemctl start bosco-demo-reset-demo
 ```
+
+### Users and roles
+
+A login has one or more roles, and may do whatever any of them allows
+(`Application/Permission.hs`):
+
+- admin: everything;
+- deliverer: sees orders and their details, takes orders for customers in
+  the admin and marks orders delivered;
+- promoter: sees orders and their details, and the email lists.
+
+Only an admin marks orders invoiced or paid, cancels them, emails invoices
+again and manages the shop. `CreateUser` makes logins, on the server as the
+instance's user:
+
+```sh
+read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
+ADMIN_EMAIL=someone@example.com ROLES=deliverer,promoter run-script Application/Script/CreateUser.hs
+```
+
+`ROLES` is `admin` when not given. An existing login's roles change in SQL,
+e.g. `UPDATE users SET is_promoter = true WHERE email = '...'`.
 
 ### Secrets
 

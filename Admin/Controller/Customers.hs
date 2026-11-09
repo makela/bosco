@@ -17,8 +17,7 @@ instance Controller CustomersController where
     beforeAction = ensureIsUser
 
     action CustomersAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         (customersQ, pagination) <- query @Customer
             |> distinctOn #reverseName
             |> orderBy #reverseName
@@ -27,26 +26,22 @@ instance Controller CustomersController where
         render IndexView { .. }
 
     action NewCustomerAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         let customer = newRecord
         render NewView { .. }
 
     action ShowCustomerAction { customerId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         customer <- fetch customerId
         render ShowView { .. }
 
     action EditCustomerAction { customerId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         customer <- fetch customerId
         render EditView { .. }
 
     action UpdateCustomerAction { customerId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         customer <- fetch customerId
         customer
             |> buildCustomer
@@ -58,8 +53,7 @@ instance Controller CustomersController where
                     redirectTo ShowCustomerAction { .. }
 
     action CreateCustomerAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         let customer = newRecord @Customer
         customer
             |> buildCustomer
@@ -71,8 +65,7 @@ instance Controller CustomersController where
                     redirectTo $ ShowCustomerAction customer.id
 
     action DeleteCustomerAction { customerId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         customer <- fetch customerId
         orderCount <- query @Order |> filterWhere (#customerId, customerId) |> fetchCount
         when (orderCount > 0) do
@@ -83,8 +76,7 @@ instance Controller CustomersController where
         redirectTo CustomersAction
 
     action EmailsForDeliveryInfoAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission SeeEmailLists
         (yearNow, years) <- queryYears
         let year = paramOrDefault @Integer yearNow "year"
         let dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
@@ -99,8 +91,7 @@ instance Controller CustomersController where
         render YearlyEmailView { .. }
 
     action EmailsForNewsLetterAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission SeeEmailLists
         customers <- query @Customer
             |> distinctOn #email
             |> fetch

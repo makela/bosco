@@ -3,6 +3,7 @@ import IHP.Job.Types (JobStatus (..))
 
 import Admin.View.Orders.Index (formatUTCTime)
 import Admin.View.Prelude
+import Application.Permission (Permission (..), can)
 import Web.View.Orders.New (formatMoney)
 import Web.View.Orders.Show (OrderedProductsByProducer, renderCustomer,
                              renderProducer, renderTotalSum)
@@ -37,33 +38,33 @@ instance View ShowView where
                 , breadcrumbLink "Orders" OrdersAction
                 , breadcrumbText [hsx|{formatUTCTime order.orderedAt}|]
                 ]
-            markPaid = case (user.isAdmin, order.paidAt) of
+            markPaid = case (can user ManageOrders, order.paidAt) of
                 (True, Nothing) -> [hsx|
                     <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
                         <input type="submit" class="btn-small" value="Mark as paid" />
                     </form>
                 |]
                 (_, _) -> pure ()
-            markDelivered = case order.deliveredAt of
-                Just _ -> pure ()
-                Nothing -> [hsx|
+            markDelivered = case (can user MarkDelivered, order.deliveredAt) of
+                (True, Nothing) -> [hsx|
                     <form method="POST" action={UpdateDeliverOrderAction order.id}>
                         <input type="submit" class="btn-small" value="Mark as delivered" />
                     </form>
                 |]
-            markInvoiced = case order.invoicedAt of
-                Just _ -> pure ()
-                Nothing -> [hsx|
+                (_, _) -> pure ()
+            markInvoiced = case (can user ManageOrders, order.invoicedAt) of
+                (True, Nothing) -> [hsx|
                     <form method="POST" action={UpdateInvoiceOrderAction order.id}>
                         <input type="submit" class="btn-small" value="Mark as invoiced" />
                     </form>
                 |]
-            sendInvoice = when user.isAdmin [hsx|
+                (_, _) -> pure ()
+            sendInvoice = when (can user ManageOrders) [hsx|
                 <form method="POST" action={UpdateSendInvoiceOrderAction order.id}>
                     <input type="submit" class="btn-small" value="Send invoice" />
                 </form>
             |]
-            cancelOrder = case (user.isAdmin, order.paidAt) of
+            cancelOrder = case (can user ManageOrders, order.paidAt) of
                 (True, Nothing) -> [hsx|
                     <a href={DeleteCancelOrderAction order.id} class="js-delete btn-small danger">Cancel order</a>
                 |]

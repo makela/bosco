@@ -11,34 +11,29 @@ instance Controller WelcomeMessagesController where
     beforeAction = ensureIsUser
 
     action WelcomeMessagesAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         (welcomeMessagesQ, pagination) <- query @WelcomeMessage |> orderByDesc #publishedAt |> paginate
         welcomeMessages <- welcomeMessagesQ |> fetch
         render IndexView { .. }
 
     action NewWelcomeMessageAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         let welcomeMessage = newRecord |> set #isOrderingEnabled True
         render NewView { .. }
 
     action ShowWelcomeMessageAction { welcomeMessageId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         welcomeMessage <- fetch welcomeMessageId
         render ShowView { .. }
 
     action EditWelcomeMessageAction { welcomeMessageId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         welcomeMessage <- fetch welcomeMessageId
         render EditView { .. }
 
     action UpdateWelcomeMessageAction { welcomeMessageId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         welcomeMessage <- fetch welcomeMessageId
         welcomeMessage
             |> buildWelcomeMessage
@@ -50,8 +45,7 @@ instance Controller WelcomeMessagesController where
                     redirectTo ShowWelcomeMessageAction { .. }
 
     action CreateWelcomeMessageAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         let welcomeMessage = newRecord @WelcomeMessage
         welcomeMessage
@@ -64,8 +58,7 @@ instance Controller WelcomeMessagesController where
                     redirectTo $ ShowWelcomeMessageAction welcomeMessage.id
 
     action DeleteWelcomeMessageAction { welcomeMessageId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         refuseOnDemo
         welcomeMessage <- fetch welcomeMessageId
         deleteRecord welcomeMessage

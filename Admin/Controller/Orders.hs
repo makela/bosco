@@ -19,8 +19,9 @@ instance Controller OrdersController where
     beforeAction = ensureIsUser
 
     action OrdersAction = do
-        user <- fetch currentUserId
-        let isAdmin = user.isAdmin
+        user <- requirePermission SeeOrders
+        let canManageOrders = can user ManageOrders
+            canCreateOrders = can user CreateOrders
         (yearNow, years) <- queryYears
         let year = paramOrDefault @Integer yearNow "year"
             q = paramOrDefault @Text "" "q"
@@ -63,6 +64,7 @@ instance Controller OrdersController where
         render IndexView { .. }
 
     action NewOrderAction = do
+        _ <- requirePermission CreateOrders
         producers <- fetchProducers
         products <- fetchProducts
         let orders = mempty
@@ -74,7 +76,7 @@ instance Controller OrdersController where
         render NewView { .. }
 
     action ShowOrderAction { orderId } = do
-        user <- fetch currentUserId
+        user <- requirePermission SeeOrders
         (order, totalSum, orderedProductsByProducer, producers) <-
             fetchShowOrderContext orderId
         emailJobs <- query @EmailOrderJob
@@ -85,6 +87,7 @@ instance Controller OrdersController where
         render ShowView { .. }
 
     action CreateOrderAction = do
+        _ <- requirePermission CreateOrders
         producers <- fetchProducers
         products <- fetchProducts
         let actionUrl = pathTo CreateOrderAction
@@ -93,8 +96,7 @@ instance Controller OrdersController where
             redirectTo ShowOrderAction { orderId = order.id }
 
     action UpdateMarkPaidOrderAction { orderId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageOrders
         now <- getCurrentTime
         order <- fetch orderId
         order
@@ -104,8 +106,7 @@ instance Controller OrdersController where
         redirectTo OrdersAction
 
     action DeleteCancelOrderAction { orderId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageOrders
         now <- getCurrentTime
         order <- fetch orderId
         order
@@ -115,6 +116,7 @@ instance Controller OrdersController where
         redirectTo OrdersAction
 
     action UpdateDeliverOrderAction { orderId } = do
+        _ <- requirePermission MarkDelivered
         now <- getCurrentTime
         order <- fetch orderId
         order
@@ -124,6 +126,7 @@ instance Controller OrdersController where
         redirectTo ShowOrderAction { orderId }
 
     action UpdateInvoiceOrderAction { orderId } = do
+        _ <- requirePermission ManageOrders
         now <- getCurrentTime
         order <- fetch orderId
         order
@@ -135,8 +138,7 @@ instance Controller OrdersController where
     -- | Emails the invoice to the customer again, e.g. after their email
     -- address was corrected. The worker sends it, as on ordering.
     action UpdateSendInvoiceOrderAction { orderId } = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageOrders
         order <- fetch orderId >>= fetchRelated #customerId
         when (isJust order.cancelledAt) do
             setErrorMessage "A cancelled order's invoice can't be sent"
@@ -146,8 +148,7 @@ instance Controller OrdersController where
         redirectTo ShowOrderAction { orderId }
 
     action OrderedProductsAction = do
-        user <- fetch currentUserId
-        accessDeniedUnless user.isAdmin
+        _ <- requirePermission ManageShop
         (_, ascendingYears) <- queryYears
         let years = reverse ascendingYears
         orderedProductsByYear <- fmap Map.fromList $ forM years $ \year -> do
