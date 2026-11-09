@@ -12,17 +12,20 @@ instance View EditView where
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbLink "Customers" CustomersAction
-                , breadcrumbLink [hsx|{customer.name}|] (ShowCustomerAction customer.id)
+                , breadcrumbLink [hsx|{fullName customer}|] (ShowCustomerAction customer.id)
                 , breadcrumbText "Edit"
                 , breadcrumbLink [hsx|<a href={DeleteCustomerAction customer.id} class="js-delete back-button">Delete</a>|] (DeleteCustomerAction customer.id)
                 ]
 
 renderForm :: Customer -> Html
 renderForm customer = formFor customer [hsx|
-    {(textField #name) { required = True, autofocus = True }}
+    {(textField #firstName) { required = True, autofocus = True }}
+    {textField #lastName}
     {(textField #email) { required = True }}
     {(textField #phone) { required = True }}
-    {(textField #address) { required = True }}
+    {textField #streetAddress}
+    {textField #postalCode}
+    {textField #city}
     {submitButton}
 
 |]

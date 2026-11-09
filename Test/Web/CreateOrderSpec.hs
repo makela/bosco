@@ -104,6 +104,34 @@ tests = aroundAll (withIHPApp WebApplication config) do
             jobs <- query @EmailOrderJob |> filterWhere (#orderId, order.id) |> fetchCount
             jobs `shouldBe` 1
 
+    describe "Web CreateOrderAction customer details" do
+        it "saves the name and address in their parts, and shows them on the invoice" $ withContext do
+            (_, oil, _) <- setUp "parts"
+            _ <- submitOrderWith "parts@example.com"
+                [("firstName", " Anna-Liisa "), ("streetAddress", "Kotitie 12 B 4"), ("postalCode", "33100"), ("city", "Tampere")]
+                [(oil, 1)]
+            customer <- query @Customer |> filterWhere (#email, "parts@example.com") |> fetchOne
+            (customer.firstName, customer.lastName, customer.reverseName) `shouldBe` ("Anna-Liisa", "Virtanen", "virtanen anna-liisa")
+            (customer.streetAddress, customer.postalCode, customer.city) `shouldBe` ("Kotitie 12 B 4", "33100", "Tampere")
+            order <- orderOf "parts@example.com"
+            invoice <- callAction ShowOrderAction { orderId = order.id }
+            invoice `responseBodyShouldContain` "<p>Anna-Liisa Virtanen</p>"
+            invoice `responseBodyShouldContain` "<p>Kotitie 12 B 4</p>"
+            invoice `responseBodyShouldContain` "<p>33100 Tampere</p>"
+
+        it "accepts an order without a last name" $ withContext do
+            (_, oil, _) <- setUp "one name"
+            _ <- submitOrderWith "onename@example.com" [("lastName", "")] [(oil, 1)]
+            orderedQuantities "onename@example.com" `shouldReturn` [(oil.id, 1)]
+
+        forM_ [("streetAddress", ""), ("postalCode", ""), ("postalCode", "1234"), ("postalCode", "00100 Helsinki"), ("city", " ")] \(field, value) ->
+            it (cs ("refuses an order with " <> cs field <> " " <> tshow value)) $ withContext do
+                (_, oil, _) <- setUp ("refused " <> cs field <> cs value)
+                let email = "refused" <> cs field <> T.filter (/= ' ') (cs value) <> "@example.com"
+                response <- submitOrderWith email [(field, value)] [(oil, 1)]
+                response `responseStatusShouldBe` status200
+                customerCount email `shouldReturn` 0
+
     describe "Web producer order" do
         it "lists producers the same way on the order form and the invoice" $ withContext do
             _ <- setUp "producer order"
@@ -165,12 +193,21 @@ setUp tag = do
     pure (producer, oil, honey)
 
 submitOrder :: (ContextParameters WebApplication) => Text -> [(Product, Int)] -> IO Response
-submitOrder email quantities = callActionWithParams CreateOrderAction $
-    [ ("name", "Maija Virtanen")
-    , ("email", cs email)
-    , ("phone", "0401234567")
-    , ("address", "Testikatu 1")
-    ] <> map (\(product, n) -> (idToParam product.id, cs (tshow n))) quantities
+submitOrder email = submitOrderWith email []
+
+-- | An order with some of the customer's fields replaced
+submitOrderWith :: (ContextParameters WebApplication) => Text -> [(ByteString, ByteString)] -> [(Product, Int)] -> IO Response
+submitOrderWith email replaced quantities = callActionWithParams CreateOrderAction $
+    map (\(k, v) -> (k, fromMaybe v (lookup k replaced)))
+        [ ("firstName", "Maija")
+        , ("lastName", "Virtanen")
+        , ("email", cs email)
+        , ("phone", "0401234567")
+        , ("streetAddress", "Testikatu 1")
+        , ("postalCode", "00100")
+        , ("city", "Helsinki")
+        ]
+    <> map (\(product, n) -> (idToParam product.id, cs (tshow n))) quantities
 
 customerCount :: (?modelContext :: ModelContext) => Text -> IO Int
 customerCount email = query @Customer |> filterWhere (#email, email) |> fetchCount

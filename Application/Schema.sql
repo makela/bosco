@@ -26,7 +26,7 @@ CREATE TABLE products (
 );
 CREATE TABLE customers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL,
+    name TEXT DEFAULT '' NOT NULL,
     email TEXT NOT NULL,
     phone TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,

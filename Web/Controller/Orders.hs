@@ -8,6 +8,7 @@ module Web.Controller.Orders
     , nonEmptyOrWhitespace
     , productOrder
     , setReverseName
+    , trimCustomer
     , sortProducers
     ) where
 
@@ -15,6 +16,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Network.URI.Encode as E
 
+import Application.Customer (reverseNameOf)
 import Application.Demo (demoPaymentDetails, isDemo)
 import Application.Localization
 import Web.Controller.Prelude hiding (createOrder)
@@ -93,22 +95,38 @@ instance Controller OrdersController where
                     setSuccessMessage (l10nText LDetailsSaved)
                     redirectTo OrdersAction
 
+-- | An order needs the whole address. The last name is optional, for the few
+-- who have only one name.
 buildCustomer customer = customer
-    |> fill @["name","email","phone","address"]
-    |> validateField #name nonEmptyOrWhitespace
+    |> fill @["firstName","lastName","email","phone","streetAddress","postalCode","city"]
+    |> validateField #firstName nonEmptyOrWhitespace
     |> validateField #email isEmail'
     |> validateField #phone isPhone
-    |> validateField #address nonEmptyOrWhitespace
+    |> validateField #streetAddress nonEmptyOrWhitespace
+    |> validateField #postalCode isPostalCode
+    |> validateField #city nonEmptyOrWhitespace
+    |> trimCustomer
     |> setReverseName
 
 buildEmail customer = customer
-    |> fill @["name","email"]
-    |> validateField #name nonEmptyOrWhitespace
+    |> fill @["firstName","lastName","email"]
+    |> validateField #firstName nonEmptyOrWhitespace
     |> validateField #email isEmail'
+    |> trimCustomer
     |> setReverseName
 
 setReverseName :: Customer -> Customer
-setReverseName customer = customer |> set #reverseName (reverseNameOf customer.name)
+setReverseName customer = customer
+    |> set #reverseName (reverseNameOf customer.firstName customer.lastName)
+
+-- | Drops the spaces around the name and address fields
+trimCustomer :: Customer -> Customer
+trimCustomer customer = customer
+    |> modify #firstName T.strip
+    |> modify #lastName T.strip
+    |> modify #streetAddress T.strip
+    |> modify #postalCode T.strip
+    |> modify #city T.strip
 
 nonEmptyOrWhitespace :: Text -> ValidatorResult
 nonEmptyOrWhitespace text = case nonEmpty $ T.strip text of

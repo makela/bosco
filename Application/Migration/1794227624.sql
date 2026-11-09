@@ -1,7 +1,8 @@
 -- Splits a customer's name into first and last name and the address into
--- street address, postal code and city. The old name, address and
--- reverse_name stay until the code no longer uses them; a later migration
--- drops them.
+-- street address, postal code and city. The code no longer uses name and
+-- address; they stay, with what customers wrote, for a release in case the
+-- split needs fixing, and a later migration drops them. reverse_name, the
+-- sort key, is now made of the last and first name.
 --
 -- The rules follow scripts/profile-customers.sql's results from production
 -- (833 customers, November 2026); scripts/check-customer-split.sql lists what
@@ -11,7 +12,8 @@ ALTER TABLE customers
     ADD COLUMN last_name TEXT DEFAULT '' NOT NULL,
     ADD COLUMN street_address TEXT DEFAULT '' NOT NULL,
     ADD COLUMN postal_code TEXT DEFAULT '' NOT NULL,
-    ADD COLUMN city TEXT DEFAULT '' NOT NULL;
+    ADD COLUMN city TEXT DEFAULT '' NOT NULL,
+    ALTER COLUMN name SET DEFAULT '';
 
 -- The last word is the last name, the words before it the first name; a
 -- one-word name goes to first_name. A name written all in lower or upper
@@ -68,3 +70,7 @@ SET city = CASE
     END
 FROM (SELECT id, btrim(regexp_replace(city, '\s+', ' ', 'g')) AS c FROM customers) s
 WHERE customers.id = s.id AND customers.city <> '';
+
+-- "virtanen maija", as reverseNameOf in Application/Customer.hs
+UPDATE customers
+SET reverse_name = lower(btrim(regexp_replace(last_name || ' ' || first_name, '\s+', ' ', 'g')));

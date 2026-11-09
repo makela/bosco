@@ -40,10 +40,13 @@ localeCode FR = "fr"
 data Localizable
   = LSubmit
   | LOrderForm
-  | LName
+  | LFirstName
+  | LLastName
   | LEmail
   | LPhone
-  | LAddress
+  | LStreetAddress
+  | LPostalCode
+  | LCity
   | LSubscribe
   | LSubscribeToNewsLetter
   | LFillOrder
@@ -63,6 +66,7 @@ data Localizable
   | LFieldRequired
   | LInvalidEmail
   | LInvalidPhone
+  | LInvalidPostalCode
   | LPieces
   | LSiteTitle
   | LSiteDescription
@@ -81,18 +85,27 @@ l10nText' LSubmit FR = "Commander"
 l10nText' LOrderForm FI = "Tilauslomake"
 l10nText' LOrderForm EN = "Order form"
 l10nText' LOrderForm FR = "Bon de commande"
-l10nText' LName FI = "Nimi"
-l10nText' LName EN = "Name"
-l10nText' LName FR = "Nom"
+l10nText' LFirstName FI = "Etunimi"
+l10nText' LFirstName EN = "First name"
+l10nText' LFirstName FR = "Prénom"
+l10nText' LLastName FI = "Sukunimi"
+l10nText' LLastName EN = "Last name"
+l10nText' LLastName FR = "Nom"
 l10nText' LEmail FI = "Sähköposti"
 l10nText' LEmail EN = "Email"
 l10nText' LEmail FR = "E-mail"
 l10nText' LPhone FI = "Puhelinnumero"
 l10nText' LPhone EN = "Phone"
 l10nText' LPhone FR = "Téléphone"
-l10nText' LAddress FI = "Osoite"
-l10nText' LAddress EN = "Address"
-l10nText' LAddress FR = "Adresse"
+l10nText' LStreetAddress FI = "Katuosoite"
+l10nText' LStreetAddress EN = "Street address"
+l10nText' LStreetAddress FR = "Adresse"
+l10nText' LPostalCode FI = "Postinumero"
+l10nText' LPostalCode EN = "Postal code"
+l10nText' LPostalCode FR = "Code postal"
+l10nText' LCity FI = "Postitoimipaikka"
+l10nText' LCity EN = "City"
+l10nText' LCity FR = "Ville"
 l10nText' LSubscribeToNewsLetter FI = "Tilaa uutiskirje"
 l10nText' LSubscribeToNewsLetter EN = "Subscribe to news letter"
 l10nText' LSubscribeToNewsLetter FR = "S'abonner à la newsletter"
@@ -150,6 +163,9 @@ l10nText' LInvalidEmail FR = "Adresse e-mail invalide"
 l10nText' LInvalidPhone FI = "Puhelinnumero on virheellinen"
 l10nText' LInvalidPhone EN = "Invalid phone number"
 l10nText' LInvalidPhone FR = "Numéro de téléphone invalide"
+l10nText' LInvalidPostalCode FI = "Postinumerossa on viisi numeroa"
+l10nText' LInvalidPostalCode EN = "A postal code has five digits"
+l10nText' LInvalidPostalCode FR = "Un code postal a cinq chiffres"
 l10nText' LPieces FI = "kpl"
 l10nText' LPieces EN = "pcs"
 l10nText' LPieces FR = "pcs"

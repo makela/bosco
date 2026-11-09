@@ -17,10 +17,13 @@ instance View NewView where
 
 renderForm :: Customer -> Html
 renderForm customer = formFor customer [hsx|
-    {(textField #name) { required = True, autofocus = True }}
+    {(textField #firstName) { required = True, autofocus = True }}
+    {textField #lastName}
     {(textField #email) { required = True }}
     {(textField #phone) { required = True }}
-    {(textField #address) { required = True }}
+    {textField #streetAddress}
+    {textField #postalCode}
+    {textField #city}
     {submitButton}
 
 |]

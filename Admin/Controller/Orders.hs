@@ -5,6 +5,7 @@ import qualified Data.Map as Map
 import Data.Ord
 
 import Admin.Controller.Prelude hiding (createOrder)
+import Application.Customer (fullName)
 import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
@@ -40,7 +41,7 @@ instance Controller OrdersController where
             >>= collectionFetchRelated #customerId
         let orders' = xs
                 -- TODO should filter in database
-                |> filter (\x -> matchesSearch q x.customerId.name)
+                |> filter (\x -> matchesSearch q (fullName x.customerId) || matchesSearch q x.customerId.reverseName)
                 |> filter (\x -> not excludeInvoiced || isNothing x.invoicedAt)
                 |> filter (\x -> not excludePaid || isNothing x.paidAt)
                 |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)
@@ -52,7 +53,7 @@ instance Controller OrdersController where
                 map (\x -> (x.id, 0)) orders'
                 <> map (\x -> (x.orderId, x.unitPrice * x.quantity)) orderLines
         let orders'' = case ordering of
-                        OrderByName      -> orders' |> sortOn (toLower . (.customerId.name))
+                        OrderByName      -> orders' |> sortOn (.customerId.reverseName)
                         OrderByOrderedAt -> orders' |> sortOn (.orderedAt)
                         OrderByPrice -> orders' |> sortOn (\x -> Map.lookup x.id priceMap)
         let orders = case orderDir of

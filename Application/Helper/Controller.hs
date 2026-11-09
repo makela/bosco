@@ -9,12 +9,6 @@ import Application.Localization
 
 -- Here you can add functions which are available in all your controllers
 
--- | Lower-cased name with its words reversed, e.g. "Maija Virtanen"
--- becomes "virtanen maija". Customers are listed and de-duplicated by
--- this, so every code path that saves a customer must set it.
-reverseNameOf :: Text -> Text
-reverseNameOf = toLower . unwords . reverse . words
-
 -- | Case-insensitive substring search. The query is plain text, not a
 -- pattern, so any characters (parentheses, dots, ...) are safe.
 matchesSearch :: Text -> Text -> Bool
@@ -45,3 +39,10 @@ isPhone text
             && isDigit (T.last number)
             && T.all (\c -> isDigit c || c == ' ' || c == '-') number
         digitsBetween number lo hi = let n = T.length (T.filter isDigit number) in n >= lo && n <= hi
+
+-- | A Finnish postal code: five digits
+isPostalCode :: Text -> ValidatorResult
+isPostalCode text
+    | T.length stripped == 5 && T.all isDigit stripped = Success
+    | otherwise = Failure (l10nText LInvalidPostalCode)
+    where stripped = T.strip text

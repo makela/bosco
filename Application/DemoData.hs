@@ -32,7 +32,7 @@ import Data.Word (Word64)
 import IHP.ControllerPrelude
 
 import Application.Demo (demoPaymentDetails)
-import Application.Helper.Controller (reverseNameOf)
+import Application.Customer (reverseNameOf)
 import Application.Localization
 import Generated.Types
 
@@ -52,7 +52,7 @@ resetDemoData fixtures seed now = withTransaction do
     let catalog = map (\p -> CatalogItem { productId = p.id, name = p.name, price = p.price }) products
         orders = demoOrders seed now catalog
     forM_ orders createDemoOrder
-    forM_ newsletterSubscribers \customer -> createDemoCustomer customer { phone = "", address = "" }
+    forM_ newsletterSubscribers (createDemoCustomer . subscriberOnly)
     pure (length orders)
   where
     -- Children before parents, for the foreign keys
@@ -102,13 +102,21 @@ createDemoOrder demo = do
         |> set #unitPrice line.unitPrice
         |> createRecord
 
+-- | A newsletter subscriber gives only a name and an email
+subscriberOnly :: DemoCustomer -> DemoCustomer
+subscriberOnly DemoCustomer { firstName, lastName, email } = DemoCustomer
+    { firstName, lastName, email, phone = "", streetAddress = "", postalCode = "", city = "" }
+
 createDemoCustomer :: (?modelContext :: ModelContext) => DemoCustomer -> IO Customer
 createDemoCustomer customer = newRecord @Customer
-    |> set #name customer.name
-    |> set #reverseName (reverseNameOf customer.name)
+    |> set #firstName customer.firstName
+    |> set #lastName customer.lastName
+    |> set #reverseName (reverseNameOf customer.firstName customer.lastName)
     |> set #email customer.email
     |> set #phone customer.phone
-    |> set #address customer.address
+    |> set #streetAddress customer.streetAddress
+    |> set #postalCode customer.postalCode
+    |> set #city customer.city
     |> createRecord
 
 -- | A seed that changes every day, so each night's orders differ
@@ -125,10 +133,13 @@ data CatalogItem = CatalogItem
     }
 
 data DemoCustomer = DemoCustomer
-    { name :: Text
+    { firstName :: Text
+    , lastName :: Text
     , email :: Text
     , phone :: Text
-    , address :: Text
+    , streetAddress :: Text
+    , postalCode :: Text
+    , city :: Text
     } deriving (Eq, Show)
 
 data DemoLine = DemoLine
@@ -241,11 +252,12 @@ genCustomer = do
     stair <- genPick ["A", "B", "C"]
     door <- genInt 1 40
     phone <- genPhone
-    let name = first <> " " <> lastName
-        address = street <> " " <> tshow number
+    let streetAddress = street <> " " <> tshow number
             <> (if flat then " " <> stair <> " " <> tshow door else "")
-            <> ", " <> postcode <> " " <> city
-    pure DemoCustomer { name, email = emailFor name, phone, address }
+    pure DemoCustomer
+        { firstName = first, lastName, email = emailFor (first <> " " <> lastName), phone
+        , streetAddress, postalCode = postcode, city
+        }
 
 genPhone :: Gen Text
 genPhone = do

@@ -30,10 +30,10 @@ tests = do
         aroundAll withEmailsOff do
             it "finishes without sending" $ withContext do
                 customer <- newRecord @Customer
-                    |> set #name "Staging Customer"
+                    |> set #firstName "Staging Customer"
                     |> set #email "staging@example.com"
                     |> set #phone "0401234567"
-                    |> set #address "Testikatu 1"
+                    |> set #streetAddress "Testikatu 1"
                     |> createRecord
                 order <- newRecord @Order |> set #customerId customer.id |> createRecord
                 job <- newRecord @EmailOrderJob |> set #orderId order.id |> createRecord

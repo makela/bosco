@@ -46,10 +46,13 @@ tests = aroundAll (withIHPApp WebApplication config) do
                 |> createRecord
             (submitted, frontPage) <- inApp do
                 submitted <- httpPost "/CreateOrder"
-                    [ ("name", "Late Customer")
+                    [ ("firstName", "Late")
+                    , ("lastName", "Customer")
                     , ("email", "late@example.com")
                     , ("phone", "0401234567")
-                    , ("address", "Testikatu 1")
+                    , ("streetAddress", "Testikatu 1")
+                    , ("postalCode", "00100")
+                    , ("city", "Helsinki")
                     ]
                 frontPage <- followRedirect submitted
                 pure (submitted, frontPage)
@@ -77,10 +80,10 @@ tests = aroundAll (withIHPApp WebApplication config) do
 createTestOrder :: (?modelContext :: ModelContext) => Text -> IO Order
 createTestOrder name = do
     customer <- newRecord @Customer
-        |> set #name name
+        |> set #firstName name
         |> set #email "test@example.com"
         |> set #phone "0401234567"
-        |> set #address "Testikatu 1"
+        |> set #streetAddress "Testikatu 1"
         |> createRecord
     newRecord @Order
         |> set #customerId customer.id

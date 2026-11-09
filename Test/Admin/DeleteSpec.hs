@@ -93,10 +93,10 @@ createTestProduct producer name = newRecord @Product
 
 createTestCustomer :: (?modelContext :: ModelContext) => Text -> IO Customer
 createTestCustomer name = newRecord @Customer
-    |> set #name name
+    |> set #firstName name
     |> set #email "customer@example.com"
     |> set #phone "0401234567"
-    |> set #address "Testikatu 1"
+    |> set #streetAddress "Testikatu 1"
     |> createRecord
 
 -- | A customer with one order for one product of a new producer.

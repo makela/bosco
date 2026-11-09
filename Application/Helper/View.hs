@@ -3,12 +3,15 @@ module Application.Helper.View
     , demoTitle
     , demoHead
     , demoStamp
+    , renderAddressLines
     ) where
 
 import IHP.FrameworkConfig (ConfigProvider)
 import IHP.ViewPrelude
 
+import Application.Customer (addressLines)
 import Application.Demo (isDemo)
+import Generated.Types
 
 -- | Marks the page title of a demo, so tabs and bookmarks say it too
 demoTitle :: (?context :: context, ConfigProvider context) => Text -> Text
@@ -27,3 +30,7 @@ demoStamp text = when isDemo [hsx|
     <div class="demo-banner" role="note">{text}</div>
     <div class="demo-ribbon" aria-hidden="true">DEMO</div>
 |]
+
+-- | The customer's address, a paragraph per line
+renderAddressLines :: Customer -> Html
+renderAddressLines customer = forEach (addressLines customer) \line -> [hsx|<p>{line}</p>|]

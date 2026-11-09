@@ -8,13 +8,13 @@ instance View ShowView where
         {breadcrumb}
         <p>{customer.email}</p>
         <p>{customer.phone}</p>
-        <p>{customer.address}</p>
+        {renderAddressLines customer}
 
     |]
         where
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbLink "Customers" CustomersAction
-                , breadcrumbText [hsx|{customer.name}|]
+                , breadcrumbText [hsx|{fullName customer}|]
                 , breadcrumbLink "Edit" (EditCustomerAction customer.id)
                 ]

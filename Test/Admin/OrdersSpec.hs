@@ -68,10 +68,10 @@ tests = aroundAll (withIHPApp AdminApplication config) do
                 |> set #price 1500
                 |> createRecord
             customer <- newRecord @Customer
-                |> set #name "Hinta Asiakas"
+                |> set #firstName "Hinta" |> set #lastName "Asiakas"
                 |> set #email "price@example.com"
                 |> set #phone "0401234567"
-                |> set #address "Testikatu 1"
+                |> set #streetAddress "Testikatu 1"
                 |> createRecord
             order <- newRecord @Order |> set #customerId customer.id |> createRecord
             _ <- newRecord @OrderedProduct
@@ -94,10 +94,10 @@ setUp = do
     when (existing == 0) do
         forM_ ["Maija (Mäki) Virtanen", "Ville Korhonen"] \name -> do
             customer <- newRecord @Customer
-                |> set #name name
+                |> set #firstName name
                 |> set #email "test@example.com"
                 |> set #phone "0401234567"
-                |> set #address "Testikatu 1"
+                |> set #streetAddress "Testikatu 1"
                 |> createRecord
             newRecord @Order |> set #customerId customer.id |> createRecord
     createAdmin

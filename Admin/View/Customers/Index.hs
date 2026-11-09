@@ -31,7 +31,7 @@ instance View IndexView where
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|
     <tr>
-        <td><a href={ShowCustomerAction customer.id}>{customer.name}</a></td>
+        <td><a href={ShowCustomerAction customer.id}>{fullName customer}</a></td>
         <td>{customer.email}</td>
         <td>{customer.phone}</td>
     </tr>

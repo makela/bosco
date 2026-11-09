@@ -1,5 +1,6 @@
 module Web.Mail.Orders.Order where
 import IHP.MailPrelude
+import Application.Customer (addressLines, fullName)
 import Web.View.Orders.Index (renderMarkdown)
 import Web.View.Orders.New (formatMoney)
 import Web.View.Orders.Show (OrderedProductsByProducer)
@@ -19,16 +20,16 @@ data OrderMail = OrderMail
 
 instance BuildMail OrderMail where
     subject = l10nText LSiteTitle
-    to OrderMail { .. } = Address { addressName = Just order.customerId.name, addressEmail = order.customerId.email }
+    to OrderMail { .. } = Address { addressName = Just (fullName order.customerId), addressEmail = order.customerId.email }
     from = "postmaster@boscofalconeria.it"
     replyTo OrderMail { .. } = Just Address { addressName = Just "Olive Oil Bosco Falconeria", addressEmail = "oliveoil@boscofalconeria.it" }
     html OrderMail { .. } = [hsx|
         <h1>{l10nText LInvoice}</h1>
         <div>
-          <p>{order.customerId.name}</p>
+          <p>{fullName order.customerId}</p>
           <p>{order.customerId.email}</p>
           <p>{order.customerId.phone}</p>
-          <p>{order.customerId.address}</p>
+          {forEach (addressLines order.customerId) renderLine}
         </div>
         <table style="white-space: nowrap">
         <tbody>
@@ -48,6 +49,7 @@ instance BuildMail OrderMail where
     |]
         where
             instructions = fmap (\x -> renderMarkdown x.text) paymentInstruction
+            renderLine line = [hsx|<p>{line}</p>|]
             renderProducer orderedProductsByProducer producer =
                 case Map.lookup producer.id orderedProductsByProducer of
                     Nothing -> pure ()

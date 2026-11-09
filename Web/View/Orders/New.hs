@@ -1,5 +1,7 @@
 module Web.View.Orders.New where
 import Numeric
+import GHC.Records (HasField (getField))
+import GHC.TypeLits (KnownSymbol)
 import Web.View.Prelude
 
 import qualified Data.Map as Map
@@ -57,46 +59,32 @@ renderNoProductsSelected = [hsx|
 
 renderCustomerForm :: Customer -> Html
 renderCustomerForm customer = [hsx|
-    <div class="flex flex-col my-6 space-y-2" id="form-group-customer_name">
-        <label class="font-medium text-gray-700 " for="customer_name">{l10nText LName}</label>
-        <input type="text" name="name" placeholder="" id="customer_name" required="required" value={customer.name}
-               class={classes ["form-control", ("is-invalid", isInvalidName)]}>
-        {nameFeedback}
-    </div>
-    <div class="flex flex-col my-6 space-y-2" id="form-group-customer_email">
-        <label class="font-medium text-gray-700 " for="customer_email">{l10nText LEmail}</label>
-        <input type="text" name="email" placeholder="" id="customer_email" required="required" value={customer.email}
-               class={classes ["form-control", ("is-invalid", isInvalidEmail)]}>
-        {emailFeedback}
-    </div>
-    <div class="flex flex-col my-6 space-y-2" id="form-group-customer_phone">
-        <label class="font-medium text-gray-700 " for="customer_phone">{l10nText LPhone}</label>
-        <input type="text" name="phone" placeholder="" id="customer_phone" required="required" value={customer.phone}
-               class={classes ["form-control", ("is-invalid", isInvalidPhone)]}>
-        {phoneFeedback}
-    </div>
-    <div class="flex flex-col my-6 space-y-2" id="form-group-customer_address">
-        <label class="font-medium text-gray-700 " for="customer_address">{l10nText LAddress}</label>
-        <input type="text" name="address" placeholder="" id="customer_address" required="required" value={customer.address}
-               class={classes ["form-control", ("is-invalid", isInvalidAddress)]}>
-        {addressFeedback}
+    {customerField customer #firstName "firstName" LFirstName "given-name"}
+    {customerField customer #lastName "lastName" LLastName "family-name"}
+    {customerField customer #email "email" LEmail "email"}
+    {customerField customer #phone "phone" LPhone "tel"}
+    {customerField customer #streetAddress "streetAddress" LStreetAddress "street-address"}
+    {customerField customer #postalCode "postalCode" LPostalCode "postal-code"}
+    {customerField customer #city "city" LCity "address-level2"}
+|]
+
+-- | A text input of the customer form with its label and validation message.
+-- Every field but the last name is required.
+customerField :: forall name. (KnownSymbol name, HasField name Customer Text)
+    => Customer -> Proxy name -> Text -> Localizable -> Text -> Html
+customerField customer fieldProxy fieldName label autocomplete = [hsx|
+    <div class="flex flex-col my-6 space-y-2" id={"form-group-customer_" <> fieldName}>
+        <label class="font-medium text-gray-700 " for={inputId}>{l10nText label}</label>
+        <input type="text" name={fieldName} placeholder="" id={inputId} required={fieldName /= "lastName"}
+               autocomplete={autocomplete} value={getField @name customer}
+               class={classes ["form-control", ("is-invalid", isJust failure)]}>
+        {feedback}
     </div>
 |]
     where
-        isInvalidName = isJust (getValidationFailure #name customer)
-        isInvalidEmail = isJust (getValidationFailure #email customer)
-        isInvalidPhone = isJust (getValidationFailure #phone customer)
-        isInvalidAddress = isJust (getValidationFailure #address customer)
-        nameFeedback = case getValidationFailure #name customer of
-            Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
-            Nothing     -> mempty
-        emailFeedback = case getValidationFailure #email customer of
-            Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
-            Nothing     -> mempty
-        phoneFeedback = case getValidationFailure #phone customer of
-            Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
-            Nothing     -> mempty
-        addressFeedback = case getValidationFailure #address customer of
+        inputId = "customer_" <> fieldName
+        failure = getValidationFailure fieldProxy customer
+        feedback = case failure of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]
             Nothing     -> mempty
 

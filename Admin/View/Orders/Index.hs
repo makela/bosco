@@ -96,7 +96,7 @@ renderOrder :: Bool -> Map (Id Order) Int -> Include "customerId" Order -> Html
 renderOrder isAdmin priceMap order = [hsx|
     <tr>
         <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
-        <td class="normal">{order.customerId.name}</td>
+        <td class="normal">{fullName order.customerId}</td>
         <td>{fmap formatUTCTime order.invoicedAt}</td>
         <td>{fmap formatMoney $ Map.lookup order.id priceMap}</td>
         <td>{showOrMarkPaid isAdmin order}</td>

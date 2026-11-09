@@ -1,5 +1,7 @@
 module Admin.Controller.Customers where
 
+import qualified Data.Text as T
+
 import Admin.Controller.Orders (queryYears)
 import Admin.Controller.Prelude
 import Admin.View.Customers.Edit
@@ -8,7 +10,8 @@ import Admin.View.Customers.Index
 import Admin.View.Customers.New
 import Admin.View.Customers.Show
 
-import Web.Controller.Orders (isEmail', nonEmptyOrWhitespace, setReverseName)
+import Application.Customer (fullName)
+import Web.Controller.Orders (isEmail', nonEmptyOrWhitespace, setReverseName, trimCustomer)
 
 instance Controller CustomersController where
     beforeAction = ensureIsUser
@@ -73,7 +76,7 @@ instance Controller CustomersController where
         customer <- fetch customerId
         orderCount <- query @Order |> filterWhere (#customerId, customerId) |> fetchCount
         when (orderCount > 0) do
-            setErrorMessage ("Customer “" <> customer.name <> "” cannot be deleted because they have orders.")
+            setErrorMessage ("Customer “" <> fullName customer <> "” cannot be deleted because they have orders.")
             earlyReturn $ redirectTo EditCustomerAction { customerId }
         deleteRecord customer
         setSuccessMessage "Customer deleted"
@@ -104,10 +107,13 @@ instance Controller CustomersController where
         let emails = sort . nub $ map (toLower . (.email)) customers
         render EmailView { .. }
 
+-- | Unlike an order, the address may be left empty: many customers from before
+-- the address was split have only a street, or nothing.
 buildCustomer customer = customer
-    |> fill @["name","email","phone","address"]
-    |> validateField #name nonEmptyOrWhitespace
+    |> fill @["firstName","lastName","email","phone","streetAddress","postalCode","city"]
+    |> validateField #firstName nonEmptyOrWhitespace
     |> validateField #email isEmail'
     |> validateField #phone isPhone
-    |> validateField #address nonEmptyOrWhitespace
+    |> validateField #postalCode (\code -> if T.null (T.strip code) then Success else isPostalCode code)
+    |> trimCustomer
     |> setReverseName

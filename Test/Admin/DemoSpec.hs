@@ -80,7 +80,7 @@ tests = do
             it "show only the fake payment details on invoices, whatever is stored" $ withContext do
                 _ <- newRecord @PaymentInstruction |> set #text "IBAN FI12 3456 7890 1234 56" |> createRecord
                 customer <- newRecord @Customer
-                    |> set #name "Demo Customer" |> set #email "demo@example.com" |> set #phone "040 123 4567"
+                    |> set #firstName "Demo Customer" |> set #email "demo@example.com" |> set #phone "040 123 4567"
                     |> createRecord
                 order <- newRecord @Order |> set #customerId customer.id |> createRecord
                 invoice <- inApp (httpGet ("/ShowOrder?orderId=" <> idToParam order.id))

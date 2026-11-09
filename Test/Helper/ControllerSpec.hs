@@ -9,18 +9,14 @@ import Application.Helper.Controller
 
 tests :: Spec
 tests = describe "Application.Helper.Controller" do
-    describe "reverseNameOf" do
-        it "reverses the words and lower-cases them" do
-            reverseNameOf "Maija Virtanen" `shouldBe` "virtanen maija"
+    describe "isPostalCode" do
+        it "accepts five digits, spaces around them too" do
+            isPostalCode "00100" `shouldBe` Success
+            isPostalCode " 33100 " `shouldBe` Success
 
-        it "handles more than two names" do
-            reverseNameOf "Anna Maria Korhonen" `shouldBe` "korhonen maria anna"
-
-        it "collapses extra whitespace" do
-            reverseNameOf "  Maija   Virtanen " `shouldBe` "virtanen maija"
-
-        it "is empty only for a blank name" do
-            reverseNameOf "   " `shouldBe` ""
+        it "rejects anything else" do
+            forM_ ["", "0010", "001000", "00 100", "FI-00100", "00100 Helsinki"] \code ->
+                isPostalCode code `shouldNotBe` Success
 
     describe "matchesSearch" do
         it "matches everything when the query is empty" do

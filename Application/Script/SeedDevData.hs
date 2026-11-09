@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import Data.Time.Calendar (toGregorian)
 import Data.Time.Clock (addUTCTime, nominalDay, secondsToDiffTime)
 
-import Application.Helper.Controller (reverseNameOf)
+import Application.Customer (reverseNameOf)
 import Application.Script.Prelude
 
 run :: Script
@@ -31,7 +31,7 @@ run = do
         ensureWelcomeMessage
         ensurePaymentInstruction
         forM_ (seedOrders now thisYear) createSeedOrder
-        forM_ newsletterSubscribers \name -> createSeedCustomer name (emailFor name) "" ""
+        forM_ newsletterSubscribers \name -> createSeedCustomer name (emailFor name) "" ("", "", "")
         admin <- createLogin "admin@example.com" True
         delivery <- createLogin "jakelija@example.com" False
         pure [admin, delivery]
@@ -44,7 +44,8 @@ run = do
 data SeedOrder = SeedOrder
     { customer :: Text
     , phone :: Text
-    , address :: Text
+    , address :: (Text, Text, Text)
+      -- ^ Street, postal code and city
     , orderedAt :: UTCTime
     , items :: [(Text, Text, Int)]
     , invoicedAfter, paidAfter, deliveredAfter, cancelledAfter :: Maybe Integer
@@ -87,16 +88,16 @@ seedOrders now thisYear =
         , invoicedAfter = invoiced, paidAfter = paid, deliveredAfter = delivered, cancelledAfter = Nothing
         , priceFactor = 1
         }
-    maija = ("Maija Virtanen", "040 123 4567", "Mannerheimintie 12 B 7, 00100 Helsinki")
-    juhani = ("Juhani Korhonen", "050-765 4321", "Hämeenkatu 3 A 1, 33100 Tampere")
-    aino = ("Aino Mäkinen", "+358 44 987 6543", "Puistokatu 8, 20100 Turku")
-    pekka = ("Pekka Laine", "045 222 3344", "Rantatie 21, 90100 Oulu")
-    elina = ("Elina Nieminen", "0401112233", "Kauppakatu 15 C 22, 40100 Jyväskylä")
-    sanna = ("Sanna Heikkinen", "044 555 6677", "Asemakatu 4, 70100 Kuopio")
-    ville = ("Ville Hämäläinen", "+358 40 246 8101", "Satamakatu 9, 15100 Lahti")
-    tuomas = ("Tuomas Lehtonen", "045-998 7766", "Kirkkokatu 30 A 5, 90100 Oulu")
-    kaisa = ("Kaisa-Maria Järvinen", "050 333 4455", "Länsiväylä 101 D 44, 02160 Espoo")
-    olli = ("Olli Koskinen", "+358 40 777 8899", "Torikatu 2, 28100 Pori")
+    maija = ("Maija Virtanen", "040 123 4567", ("Mannerheimintie 12 B 7", "00100", "Helsinki"))
+    juhani = ("Juhani Korhonen", "050-765 4321", ("Hämeenkatu 3 A 1", "33100", "Tampere"))
+    aino = ("Aino Mäkinen", "+358 44 987 6543", ("Puistokatu 8", "20100", "Turku"))
+    pekka = ("Pekka Laine", "045 222 3344", ("Rantatie 21", "90100", "Oulu"))
+    elina = ("Elina Nieminen", "0401112233", ("Kauppakatu 15 C 22", "40100", "Jyväskylä"))
+    sanna = ("Sanna Heikkinen", "044 555 6677", ("Asemakatu 4", "70100", "Kuopio"))
+    ville = ("Ville Hämäläinen", "+358 40 246 8101", ("Satamakatu 9", "15100", "Lahti"))
+    tuomas = ("Tuomas Lehtonen", "045-998 7766", ("Kirkkokatu 30 A 5", "90100", "Oulu"))
+    kaisa = ("Kaisa-Maria Järvinen", "050 333 4455", ("Länsiväylä 101 D 44", "02160", "Espoo"))
+    olli = ("Olli Koskinen", "+358 40 777 8899", ("Torikatu 2", "28100", "Pori"))
     oil3 n = ("Oliiviöljyä", "3 l kanisteri", n)
     oil250 n = ("Oliiviöljyä", "250 ml lasipullo", n)
     almonds n = ("Luomumantelit, kuorellinen", "500g", n)
@@ -150,47 +151,21 @@ createSeedOrder seed = do
             |> createRecord
             |> fmap (const ())
 
-createSeedCustomer :: (?modelContext :: ModelContext) => Text -> Text -> Text -> Text -> IO Customer
-createSeedCustomer name email phone address = newRecord @Customer
-    |> set #name name
-    |> set #reverseName (reverseNameOf name)
+createSeedCustomer :: (?modelContext :: ModelContext) => Text -> Text -> Text -> (Text, Text, Text) -> IO Customer
+createSeedCustomer name email phone (streetAddress, postalCode, city) = newRecord @Customer
+    |> set #firstName firstName
+    |> set #lastName lastName
+    |> set #reverseName (reverseNameOf firstName lastName)
     |> set #email email
     |> set #phone phone
-    |> set #address address
+    |> set #streetAddress streetAddress
+    |> set #postalCode postalCode
+    |> set #city city
     |> createRecord
-
--- | Opens ordering unless some welcome message already exists.
-ensureWelcomeMessage :: (?modelContext :: ModelContext) => IO ()
-ensureWelcomeMessage = do
-    count <- query @WelcomeMessage |> fetchCount
-    when (count == 0) do
-        _ <- newRecord @WelcomeMessage
-            |> set #text "Tervetuloa tilaamaan oliiviöljyä ja muita herkkuja Sisiliasta!"
-            |> set #isOrderingEnabled True
-            |> createRecord
-        pure ()
-
-ensurePaymentInstruction :: (?modelContext :: ModelContext) => IO ()
-ensurePaymentInstruction = do
-    count <- query @PaymentInstruction |> fetchCount
-    when (count == 0) do
-        _ <- newRecord @PaymentInstruction
-            |> set #text "Bosco Falconeria (esimerkkitili)\n\nIBAN FI00 1234 5600 0007 85\n\nBIC ESIMFIHH\n\nMaksun eräpäivä on **15. marraskuuta**."
-            |> createRecord
-        pure ()
-
--- | Creates a login with a random password, or skips an existing one.
-createLogin :: (?modelContext :: ModelContext) => Text -> Bool -> IO (Text, Text)
-createLogin email isAdmin = do
-    existing <- query @User |> filterWhere (#email, email) |> fetchCount
-    if existing > 0
-        then pure (email, "(already existed, password unchanged)")
-        else do
-            password <- generateAuthenticationToken |> fmap (T.take 16)
-            passwordHash <- hashPassword password
-            _ <- newRecord @User
-                |> set #email email
-                |> set #passwordHash passwordHash
-                |> set #isAdmin isAdmin
-                |> createRecord
-            pure (email <> (if isAdmin then " (admin)" else " (orders only)"), password)
+  where
+    -- The seed names have one last name
+    (firstName, lastName) = case T.words name of
+        [] -> ("", "")
+        ws -> (T.unwords (initDef ws), lastDef ws)
+    initDef = reverse . drop 1 . reverse
+    lastDef = fromMaybe "" . last
