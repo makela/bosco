@@ -20,14 +20,16 @@ ALTER TABLE customers
     ALTER COLUMN name SET DEFAULT '';
 
 -- The last word is the last name, the words before it the first name; a
--- one-word name goes to first_name. A name written all in lower or upper
--- case gets capitalised ("anna-liisa mäki" is "Anna-Liisa Mäki").
+-- one-word name goes to first_name. A first or last name written all in lower
+-- or upper case gets capitalised: "anna-liisa mäki" is "Anna-Liisa Mäki",
+-- "Matti VIRTANEN" "Matti Virtanen".
 UPDATE customers
-SET first_name = CASE WHEN n ~ ' ' THEN regexp_replace(n, ' [^ ]+$', '') ELSE n END,
-    last_name = CASE WHEN n ~ ' ' THEN substring(n FROM '[^ ]+$') ELSE '' END
+SET first_name = CASE WHEN f = lower(f) OR f = upper(f) THEN initcap(f) ELSE f END,
+    last_name = CASE WHEN l = lower(l) OR l = upper(l) THEN initcap(l) ELSE l END
 FROM (
     SELECT id,
-        CASE WHEN n = lower(n) OR n = upper(n) THEN initcap(n) ELSE n END AS n
+        CASE WHEN n ~ ' ' THEN regexp_replace(n, ' [^ ]+$', '') ELSE n END AS f,
+        CASE WHEN n ~ ' ' THEN substring(n FROM '[^ ]+$') ELSE '' END AS l
     FROM (SELECT id, regexp_replace(btrim(name), '\s+', ' ', 'g') COLLATE "fi-x-icu" AS n FROM customers) t
 ) s
 WHERE customers.id = s.id;
