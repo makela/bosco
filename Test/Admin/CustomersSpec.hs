@@ -51,6 +51,21 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             customer' <- fetch customer.id
             customer'.reverseName `shouldBe` "laine pekka"
 
+        it "shows a customer's details, the name for the invoice too" $ withContext do
+            admin <- createAdmin
+            customer <- newRecord @Customer
+                |> set #firstName "Maija" |> set #lastName "Virtanen" |> set #billingName "Oliivi Oy"
+                |> set #email "details@example.com" |> set #phone "0401234567"
+                |> set #streetAddress "Kotitie 12 B 4" |> set #postalCode "33100" |> set #city "Tampere"
+                |> createRecord
+            forM_ [ShowCustomerAction customer.id, EditCustomerAction customer.id] \action -> do
+                response <- withUser admin (callAction action)
+                response `responseStatusShouldBe` status200
+                response `responseBodyShouldContain` "Maija Virtanen"
+                response `responseBodyShouldContain` "Oliivi Oy"
+            shown <- withUser admin (callAction (ShowCustomerAction customer.id))
+            shown `responseBodyShouldContain` "<p>33100 Tampere</p>"
+
         it "rejects a customer with a blank first name" $ withContext do
             admin <- createAdmin
             _ <- withUser admin do
