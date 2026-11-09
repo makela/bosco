@@ -26,6 +26,13 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             response `responseBodyShouldContain` "Maija (Mäki) Virtanen"
             response `responseBodyShouldNotContain` "Ville Korhonen"
 
+        it "finds orders by the name for the invoice" $ withContext do
+            admin <- setUp
+            response <- withUser admin $ search "oliivi oy"
+            response `responseStatusShouldBe` status200
+            response `responseBodyShouldContain` "Ville Korhonen"
+            response `responseBodyShouldNotContain` "Maija (Mäki) Virtanen"
+
         it "treats parentheses as plain text instead of crashing" $ withContext do
             admin <- setUp
             response <- withUser admin $ search "maija ("
@@ -92,9 +99,10 @@ setUp :: (?modelContext :: ModelContext) => IO User
 setUp = do
     existing <- query @Order |> fetchCount
     when (existing == 0) do
-        forM_ ["Maija (Mäki) Virtanen", "Ville Korhonen"] \name -> do
+        forM_ [("Maija (Mäki) Virtanen", ""), ("Ville Korhonen", "Oliivi Oy")] \(name, billingName) -> do
             customer <- newRecord @Customer
                 |> set #firstName name
+                |> set #billingName billingName
                 |> set #email "test@example.com"
                 |> set #phone "0401234567"
                 |> set #streetAddress "Testikatu 1"

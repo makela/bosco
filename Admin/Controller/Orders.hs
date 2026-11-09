@@ -41,7 +41,7 @@ instance Controller OrdersController where
             >>= collectionFetchRelated #customerId
         let orders' = xs
                 -- TODO should filter in database
-                |> filter (\x -> matchesSearch q (fullName x.customerId) || matchesSearch q x.customerId.reverseName)
+                |> filter (\x -> any (matchesSearch q) [fullName x.customerId, x.customerId.reverseName, x.customerId.billingName])
                 |> filter (\x -> not excludeInvoiced || isNothing x.invoicedAt)
                 |> filter (\x -> not excludePaid || isNothing x.paidAt)
                 |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)

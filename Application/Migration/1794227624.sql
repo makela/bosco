@@ -17,6 +17,10 @@ ALTER TABLE customers
     ADD COLUMN street_address TEXT DEFAULT '' NOT NULL,
     ADD COLUMN postal_code TEXT DEFAULT '' NOT NULL,
     ADD COLUMN city TEXT DEFAULT '' NOT NULL,
+    -- A company's or someone else's name for the invoice, optional. The few
+    -- customers who wrote one, or a business ID, into their name get it
+    -- moved by hand; scripts/check-customer-split.sql lists them.
+    ADD COLUMN billing_name TEXT DEFAULT '' NOT NULL,
     ALTER COLUMN name SET DEFAULT '';
 
 -- The last word is the last name, the words before it the first name; a

@@ -50,7 +50,7 @@ renderPaymentInstruction order paymentInstruction = case (order.paidAt, order.ca
 renderCustomer :: Customer -> Html
 renderCustomer customer = [hsx|
     <div class="flex flex-wrap">
-      <p>{fullName customer}</p>
+      {renderNameLines customer}
       <p>{customer.email}</p>
       <p>{customer.phone}</p>
       {renderAddressLines customer}

@@ -8,6 +8,10 @@
 -- names or addresses, except cities that at least three customers share. The
 -- last part lists the ids of the customers to check by hand in the admin
 -- (/admin/ShowCustomer?customerId=<id>), customers with orders first.
+--
+-- A company's name or a business ID (y-tunnus) in an "unusual name" or a
+-- "name has digits or punctuation" belongs in "Name on the invoice / Company
+-- name", the customer's own name in first and last name.
 
 \set ON_ERROR_STOP on
 \pset footer off

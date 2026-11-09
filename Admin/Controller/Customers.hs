@@ -110,7 +110,7 @@ instance Controller CustomersController where
 -- | Unlike an order, the address may be left empty: many customers from before
 -- the address was split have only a street, or nothing.
 buildCustomer customer = customer
-    |> fill @["firstName","lastName","email","phone","streetAddress","postalCode","city"]
+    |> fill @["firstName","lastName","billingName","email","phone","streetAddress","postalCode","city"]
     |> validateField #firstName nonEmptyOrWhitespace
     |> validateField #email isEmail'
     |> validateField #phone isPhone

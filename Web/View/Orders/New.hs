@@ -61,6 +61,7 @@ renderCustomerForm :: Customer -> Html
 renderCustomerForm customer = [hsx|
     {customerField customer #firstName "firstName" LFirstName "given-name"}
     {customerField customer #lastName "lastName" LLastName "family-name"}
+    {customerField customer #billingName "billingName" LBillingName "organization"}
     {customerField customer #email "email" LEmail "email"}
     {customerField customer #phone "phone" LPhone "tel"}
     {customerField customer #streetAddress "streetAddress" LStreetAddress "street-address"}
@@ -69,13 +70,13 @@ renderCustomerForm customer = [hsx|
 |]
 
 -- | A text input of the customer form with its label and validation message.
--- Every field but the last name is required.
+-- Every field but the last name and the name for the invoice is required.
 customerField :: forall name. (KnownSymbol name, HasField name Customer Text)
     => Customer -> Proxy name -> Text -> Localizable -> Text -> Html
 customerField customer fieldProxy fieldName label autocomplete = [hsx|
     <div class="flex flex-col my-6 space-y-2" id={"form-group-customer_" <> fieldName}>
         <label class="font-medium text-gray-700 " for={inputId}>{l10nText label}</label>
-        <input type="text" name={fieldName} placeholder="" id={inputId} required={fieldName /= "lastName"}
+        <input type="text" name={fieldName} placeholder="" id={inputId} required={fieldName `notElem` optionalFields}
                autocomplete={autocomplete} value={getField @name customer}
                class={classes ["form-control", ("is-invalid", isJust failure)]}>
         {feedback}
@@ -83,6 +84,7 @@ customerField customer fieldProxy fieldName label autocomplete = [hsx|
 |]
     where
         inputId = "customer_" <> fieldName
+        optionalFields = ["lastName", "billingName"] :: [Text]
         failure = getValidationFailure fieldProxy customer
         feedback = case failure of
             Just result -> [hsx|<div class="invalid-feedback">{result}</div>|]

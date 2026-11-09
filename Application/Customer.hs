@@ -2,6 +2,7 @@
 -- page, the invoice email and the admin.
 module Application.Customer
     ( fullName
+    , nameLines
     , addressLines
     , reverseNameOf
     ) where
@@ -15,6 +16,11 @@ import Generated.Types
 -- a first name.
 fullName :: Customer -> Text
 fullName customer = unwordsNonEmpty [customer.firstName, customer.lastName]
+
+-- | The name for the invoice or the company's name, if given, then the
+-- customer's own name
+nameLines :: Customer -> [Text]
+nameLines customer = filter (not . T.null) [T.strip customer.billingName, fullName customer]
 
 -- | The street on one line, the postal code and city on the next. Customers
 -- from before the address was split may lack either line.

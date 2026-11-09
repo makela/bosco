@@ -37,7 +37,8 @@ CREATE TABLE customers (
     last_name TEXT DEFAULT '' NOT NULL,
     street_address TEXT DEFAULT '' NOT NULL,
     postal_code TEXT DEFAULT '' NOT NULL,
-    city TEXT DEFAULT '' NOT NULL
+    city TEXT DEFAULT '' NOT NULL,
+    billing_name TEXT DEFAULT '' NOT NULL
 );
 CREATE TABLE orders (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,

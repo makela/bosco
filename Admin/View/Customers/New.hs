@@ -19,6 +19,7 @@ renderForm :: Customer -> Html
 renderForm customer = formFor customer [hsx|
     {(textField #firstName) { required = True, autofocus = True }}
     {textField #lastName}
+    {(textField #billingName) { fieldLabel = "Name on the invoice / Company name" }}
     {(textField #email) { required = True }}
     {(textField #phone) { required = True }}
     {textField #streetAddress}

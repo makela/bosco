@@ -1,6 +1,6 @@
 module Web.Mail.Orders.Order where
 import IHP.MailPrelude
-import Application.Customer (addressLines, fullName)
+import Application.Customer (addressLines, fullName, nameLines)
 import Web.View.Orders.Index (renderMarkdown)
 import Web.View.Orders.New (formatMoney)
 import Web.View.Orders.Show (OrderedProductsByProducer)
@@ -26,7 +26,7 @@ instance BuildMail OrderMail where
     html OrderMail { .. } = [hsx|
         <h1>{l10nText LInvoice}</h1>
         <div>
-          <p>{fullName order.customerId}</p>
+          {forEach (nameLines order.customerId) renderLine}
           <p>{order.customerId.email}</p>
           <p>{order.customerId.phone}</p>
           {forEach (addressLines order.customerId) renderLine}

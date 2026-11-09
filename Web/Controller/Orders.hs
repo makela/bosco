@@ -98,7 +98,7 @@ instance Controller OrdersController where
 -- | An order needs the whole address. The last name is optional, for the few
 -- who have only one name.
 buildCustomer customer = customer
-    |> fill @["firstName","lastName","email","phone","streetAddress","postalCode","city"]
+    |> fill @["firstName","lastName","billingName","email","phone","streetAddress","postalCode","city"]
     |> validateField #firstName nonEmptyOrWhitespace
     |> validateField #email isEmail'
     |> validateField #phone isPhone
@@ -124,6 +124,7 @@ trimCustomer :: Customer -> Customer
 trimCustomer customer = customer
     |> modify #firstName T.strip
     |> modify #lastName T.strip
+    |> modify #billingName T.strip
     |> modify #streetAddress T.strip
     |> modify #postalCode T.strip
     |> modify #city T.strip

@@ -29,6 +29,13 @@ tests = describe "Application.Customer" do
         it "is just the first name without a last name" do
             fullName (customer "Cher" "") `shouldBe` "Cher"
 
+    describe "nameLines" do
+        it "is the name for the invoice, then the customer's name" do
+            nameLines ((customer "Maija" "Virtanen") { billingName = "Oliivi Oy" }) `shouldBe` ["Oliivi Oy", "Maija Virtanen"]
+
+        it "is just the customer's name without a name for the invoice" do
+            nameLines ((customer "Maija" "Virtanen") { billingName = "  " }) `shouldBe` ["Maija Virtanen"]
+
     describe "addressLines" do
         it "puts the street on one line and postal code and city on the next" do
             addressLines (address "Kotitie 12 B 4" "33100" "Tampere") `shouldBe` ["Kotitie 12 B 4", "33100 Tampere"]

@@ -118,6 +118,16 @@ tests = aroundAll (withIHPApp WebApplication config) do
             invoice `responseBodyShouldContain` "<p>Anna-Liisa Virtanen</p>"
             invoice `responseBodyShouldContain` "<p>Kotitie 12 B 4</p>"
             invoice `responseBodyShouldContain` "<p>33100 Tampere</p>"
+            invoice `responseBodyShouldNotContain` "<p></p>"
+
+        it "saves the name for the invoice and shows it above the customer's name" $ withContext do
+            (_, oil, _) <- setUp "billing"
+            _ <- submitOrderWith "billing@example.com" [("billingName", " Oliivi Oy, 1234567-8 ")] [(oil, 1)]
+            customer <- query @Customer |> filterWhere (#email, "billing@example.com") |> fetchOne
+            customer.billingName `shouldBe` "Oliivi Oy, 1234567-8"
+            order <- orderOf "billing@example.com"
+            invoice <- callAction ShowOrderAction { orderId = order.id }
+            invoice `responseBodyShouldContain` "<p>Oliivi Oy, 1234567-8</p><p>Maija Virtanen</p>"
 
         it "accepts an order without a last name" $ withContext do
             (_, oil, _) <- setUp "one name"
@@ -201,6 +211,7 @@ submitOrderWith email replaced quantities = callActionWithParams CreateOrderActi
     map (\(k, v) -> (k, fromMaybe v (lookup k replaced)))
         [ ("firstName", "Maija")
         , ("lastName", "Virtanen")
+        , ("billingName", "")
         , ("email", cs email)
         , ("phone", "0401234567")
         , ("streetAddress", "Testikatu 1")

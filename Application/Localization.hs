@@ -42,6 +42,7 @@ data Localizable
   | LOrderForm
   | LFirstName
   | LLastName
+  | LBillingName
   | LEmail
   | LPhone
   | LStreetAddress
@@ -91,6 +92,9 @@ l10nText' LFirstName FR = "Prénom"
 l10nText' LLastName FI = "Sukunimi"
 l10nText' LLastName EN = "Last name"
 l10nText' LLastName FR = "Nom"
+l10nText' LBillingName FI = "Nimi laskulle / Yrityksen nimi"
+l10nText' LBillingName EN = "Name on the invoice / Company name"
+l10nText' LBillingName FR = "Nom sur la facture / Nom de l'entreprise"
 l10nText' LEmail FI = "Sähköposti"
 l10nText' LEmail EN = "Email"
 l10nText' LEmail FR = "E-mail"

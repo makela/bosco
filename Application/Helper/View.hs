@@ -4,12 +4,13 @@ module Application.Helper.View
     , demoHead
     , demoStamp
     , renderAddressLines
+    , renderNameLines
     ) where
 
 import IHP.FrameworkConfig (ConfigProvider)
 import IHP.ViewPrelude
 
-import Application.Customer (addressLines)
+import Application.Customer (addressLines, nameLines)
 import Application.Demo (isDemo)
 import Generated.Types
 
@@ -34,3 +35,8 @@ demoStamp text = when isDemo [hsx|
 -- | The customer's address, a paragraph per line
 renderAddressLines :: Customer -> Html
 renderAddressLines customer = forEach (addressLines customer) \line -> [hsx|<p>{line}</p>|]
+
+-- | The name for the invoice or the company, if any, and the customer's name,
+-- a paragraph each
+renderNameLines :: Customer -> Html
+renderNameLines customer = forEach (nameLines customer) \line -> [hsx|<p>{line}</p>|]
