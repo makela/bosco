@@ -32,7 +32,12 @@ CREATE TABLE customers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     last_modified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     address TEXT DEFAULT '' NOT NULL,
-    reverse_name TEXT DEFAULT '' NOT NULL
+    reverse_name TEXT DEFAULT '' NOT NULL,
+    first_name TEXT DEFAULT '' NOT NULL,
+    last_name TEXT DEFAULT '' NOT NULL,
+    street_address TEXT DEFAULT '' NOT NULL,
+    postal_code TEXT DEFAULT '' NOT NULL,
+    city TEXT DEFAULT '' NOT NULL
 );
 CREATE TABLE orders (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
