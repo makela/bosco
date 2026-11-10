@@ -6,10 +6,8 @@ module Web.Controller.Orders
     , groupProducts
     , isEmail'
     , nonEmptyOrWhitespace
-    , productOrder
     , setReverseName
     , trimCustomer
-    , sortProducers
     ) where
 
 import qualified Data.Map as Map
@@ -19,6 +17,7 @@ import qualified Network.URI.Encode as E
 import Application.Customer (reverseNameOf)
 import Application.Demo (demoPaymentDetails, isDemo)
 import Application.Localization
+import Application.Sorting (productOrder, sortProducers)
 import Web.Controller.Prelude hiding (createOrder)
 import Web.Mail.Orders.Order
 import Web.View.Orders.Index
@@ -173,19 +172,6 @@ groupOrderedProducts orderedProducts = orderedProducts
     |> map (\x -> (x.productId.producerId, [x]))
     |> Map.fromListWith (++)
     |> Map.map (sortOn (\x -> productOrder x.productId))
-
--- | Products with an ordering number come first, lowest first; then by name,
--- and the cheaper (smaller) one first when two share a name.
-productOrder :: (HasField "ordering" product (Maybe Int), HasField "name" product Text, HasField "price" product Int)
-             => product -> (Bool, Maybe Int, Text, Int)
-productOrder x = (isNothing x.ordering, x.ordering, toLower x.name, x.price)
-
--- | Bosco Falconeria first, then the other producers A to Z.
-sortProducers :: [Producer] -> [Producer]
-sortProducers = sortOn (\x -> (not (isBosco x), toLower x.name))
-
-isBosco :: Producer -> Bool
-isBosco x = x.name == "Bosco Falconeria"
 
 countSum xs = xs
     |> map (\x -> x.unitPrice * x.quantity)

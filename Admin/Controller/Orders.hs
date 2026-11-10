@@ -10,9 +10,9 @@ import Application.Settings (EmailsEnabled (..))
 import Admin.View.Orders.Index
 import Admin.View.Orders.OrderedProducts
 import Admin.View.Orders.Show
+import Application.Sorting (sortProducers)
 import Web.Controller.Orders (createOrder, fetchShowOrderContext,
-                              groupProducts,
-                              sortProducers)
+                              groupProducts)
 import Web.View.Orders.New
 
 instance Controller OrdersController where

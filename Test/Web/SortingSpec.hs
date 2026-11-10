@@ -7,7 +7,8 @@ import IHP.Prelude
 import Test.Hspec
 
 import Generated.Types
-import Web.Controller.Orders (groupProducts, sortProducers)
+import Application.Sorting (sortProducers)
+import Web.Controller.Orders (groupProducts)
 
 tests :: Spec
 tests = describe "Web.Controller.Orders sorting" do

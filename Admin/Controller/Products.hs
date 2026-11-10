@@ -2,7 +2,7 @@ module Admin.Controller.Products where
 
 import Admin.Controller.Prelude
 import Application.TextHistory (productTextChanges)
-import Web.Controller.Orders (productOrder, sortProducers)
+import Application.Sorting (productOrder, sortProducers)
 import Admin.View.Products.Edit
 import Admin.View.Products.Index
 import Admin.View.Products.New

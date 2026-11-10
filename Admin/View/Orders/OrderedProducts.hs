@@ -3,6 +3,7 @@ module Admin.View.Orders.OrderedProducts where
 import qualified Data.Map as Map
 
 import Admin.View.Prelude
+import Application.Sorting (productOrder)
 
 data OrderedProductsView = OrderedProductsView
     { producers             :: [Producer]
@@ -42,7 +43,7 @@ renderProducer years orderedProductsByYear producer =
             |> filter (\x -> x.productId.producerId == producer.id)
             |> Map.fromList . map (\x -> (x.productId.id, x))
             |> Map.elems
-            |> sortOn (toLower . (.productId.name))
+            |> sortOn (productOrder . (.productId))
     in if null products then pure () else [hsx|
         <tr><th colspan={length years + 1}>{producer.name}</th></tr>
         {forEach products (renderOrderedProduct years orderedProductsByYear)}
