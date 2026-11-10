@@ -45,6 +45,12 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             menu <- withUser user $ callAction WelcomeAction
             menu `responseBodyShouldNotContain` "Emails for news letter"
 
+        it "doesn't see all ordered products" $ withContext do
+            user <- createDeliverer
+            denied (withUser user $ callAction OrderedProductsAction) `shouldReturn` True
+            menu <- withUser user $ callAction WelcomeAction
+            menu `responseBodyShouldNotContain` "All ordered products"
+
     describe "Admin roles: a promoter" do
         it "sees the email lists and full orders" $ withContext do
             user <- createPromoter
@@ -52,6 +58,8 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             forM_ [EmailsForNewsLetterAction, EmailsForDeliveryInfoAction] \action -> do
                 response <- withUser user (callAction action)
                 response `responseStatusShouldBe` status200
+            orderedProducts <- withUser user $ callAction OrderedProductsAction
+            orderedProducts `responseStatusShouldBe` status200
             list <- withUser user $ callAction OrdersAction
             list `responseStatusShouldBe` status200
             list `responseBodyShouldNotContain` "/admin/NewOrder"
@@ -60,6 +68,7 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             page `responseBodyShouldContain` "Testikatu 1"
             menu <- withUser user $ callAction WelcomeAction
             menu `responseBodyShouldContain` "Emails for news letter"
+            menu `responseBodyShouldContain` "All ordered products"
             menu `responseBodyShouldContain` "Orders"
             menu `responseBodyShouldContain` "Products"
             menu `responseBodyShouldNotContain` "Customers"

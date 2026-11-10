@@ -18,11 +18,11 @@ tests = describe "Application.Permission" do
     it "lets a deliverer see and take orders and mark them delivered, nothing more" do
         allowed (user False True False) `shouldBe` [SeeOrders, CreateOrders, MarkDelivered]
 
-    it "lets a promoter see orders and the email lists, and edit the shop's texts" do
-        allowed (user False False True) `shouldBe` [SeeOrders, SeeEmailLists, EditShopTexts]
+    it "lets a promoter see orders, the email lists and all ordered products, and edit the shop's texts" do
+        allowed (user False False True) `shouldBe` [SeeOrders, SeeEmailLists, SeeOrderedProducts, EditShopTexts]
 
     it "lets a deliverer who is a promoter do what either may" do
-        allowed (user False True True) `shouldBe` [SeeOrders, CreateOrders, MarkDelivered, SeeEmailLists, EditShopTexts]
+        allowed (user False True True) `shouldBe` [SeeOrders, CreateOrders, MarkDelivered, SeeEmailLists, SeeOrderedProducts, EditShopTexts]
 
     it "lets a user without a role do nothing" do
         allowed (user False False False) `shouldBe` []

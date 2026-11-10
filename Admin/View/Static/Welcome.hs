@@ -21,7 +21,7 @@ instance View WelcomeView where
               |]
               -- Alphabetical, as the menu always was
               menu =
-                  [ (ManageShop, "All ordered products", pathTo OrderedProductsAction)
+                  [ (SeeOrderedProducts, "All ordered products", pathTo OrderedProductsAction)
                   , (ManageShop, "Customers", pathTo CustomersAction)
                   , (SeeEmailLists, "Emails for delivery info", pathTo EmailsForDeliveryInfoAction)
                   , (SeeEmailLists, "Emails for news letter", pathTo EmailsForNewsLetterAction)

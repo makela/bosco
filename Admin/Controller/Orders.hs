@@ -148,7 +148,7 @@ instance Controller OrdersController where
         redirectTo ShowOrderAction { orderId }
 
     action OrderedProductsAction = do
-        _ <- requirePermission ManageShop
+        _ <- requirePermission SeeOrderedProducts
         (_, ascendingYears) <- queryYears
         let years = reverse ascendingYears
         orderedProductsByYear <- fmap Map.fromList $ forM years $ \year -> do
