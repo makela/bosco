@@ -139,7 +139,7 @@ tests = aroundAll (withIHPApp AdminApplication config) do
                 , (user.id, "package", "3 l kanisteri", "3 l can")
                 ]
             page <- withUser user $ callAction ShowProductAction { productId = product.id }
-            page `responseBodyShouldContain` "admin@example.com: description"
+            page `responseBodyShouldContain` "admin@example.com · description</summary>"
             page `responseBodyShouldContain` "Was: Sisiliasta"
             page `responseBodyShouldContain` "Now: From Sicily"
 
