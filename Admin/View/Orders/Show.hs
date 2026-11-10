@@ -1,7 +1,6 @@
 module Admin.View.Orders.Show where
 import IHP.Job.Types (JobStatus (..))
 
-import Admin.View.Orders.Index (formatUTCTime)
 import Admin.View.Prelude
 import Application.Permission (Permission (..), can)
 import Web.View.Orders.New (formatMoney)
@@ -36,7 +35,7 @@ instance View ShowView where
             breadcrumb = renderBreadcrumb
                 [ breadcrumbLink "Home" WelcomeAction
                 , breadcrumbLink "Orders" OrdersAction
-                , breadcrumbText [hsx|{formatUTCTime order.orderedAt}|]
+                , breadcrumbText (dateTime order.orderedAt)
                 ]
             markPaid = case (can user ManageOrders, order.paidAt) of
                 (True, Nothing) -> [hsx|
@@ -70,7 +69,7 @@ instance View ShowView where
                 |]
                 (_, _) -> pure ()
             cancelledOrControls = case order.cancelledAt of
-                Just x -> [hsx|<p>Cancelled {formatUTCTime x}</p>|]
+                Just x -> [hsx|<p>Cancelled {dateTime x}</p>|]
                 Nothing -> [hsx|
                     <div class="order-steps">
                         {sendInvoice}
@@ -98,15 +97,13 @@ renderEmailHistory emailsEnabled jobs = [hsx|
         |]
 
 renderEmailJob :: EmailOrderJob -> Html
-renderEmailJob job = [hsx|<li>{describe job.status}</li>|]
+renderEmailJob job = [hsx|<li>{label} {dateTime at}{detail}</li>|]
     where
-        time :: UTCTime -> Text
-        time = cs . formatUTCTime
-        describe :: JobStatus -> Text
-        describe = \case
-            JobStatusSucceeded -> "Emailed " <> time job.updatedAt
-            JobStatusFailed -> "Failed " <> time job.updatedAt <> ": " <> fromMaybe "" job.lastError
-            JobStatusTimedOut -> "Timed out " <> time job.updatedAt
-            JobStatusRetry -> "Failed " <> time job.updatedAt <> ", trying again: " <> fromMaybe "" job.lastError
-            JobStatusRunning -> "Sending, queued " <> time job.createdAt
-            JobStatusNotStarted -> "Queued " <> time job.createdAt
+        lastError = fromMaybe "" job.lastError
+        (label, at, detail) :: (Text, UTCTime, Text) = case job.status of
+            JobStatusSucceeded -> ("Emailed", job.updatedAt, "")
+            JobStatusFailed -> ("Failed", job.updatedAt, ": " <> lastError)
+            JobStatusTimedOut -> ("Timed out", job.updatedAt, "")
+            JobStatusRetry -> ("Failed", job.updatedAt, ", trying again: " <> lastError)
+            JobStatusRunning -> ("Sending, queued", job.createdAt, "")
+            JobStatusNotStarted -> ("Queued", job.createdAt, "")

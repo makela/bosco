@@ -106,7 +106,8 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             page <- withUser admin $ callAction ShowOrderAction { orderId = order.id }
             page `responseStatusShouldBe` status200
             page `responseBodyShouldContain` "Send invoice"
-            page `responseBodyShouldContain` "Emailed "
+            -- In the browser's time zone, through IHP's helpers.js
+            page `responseBodyShouldContain` "Emailed <time class=\"date-time\" datetime="
             page `responseBodyShouldContain` ": SMTP said no"
 
     describe "Admin OrdersController prices" do

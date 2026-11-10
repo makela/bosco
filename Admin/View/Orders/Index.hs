@@ -3,7 +3,6 @@ module Admin.View.Orders.Index where
 import qualified Data.Map as Map
 
 import Admin.View.Prelude
-import Data.Time.Format (formatTime)
 import IHP.Controller.Param
 import Web.View.Orders.New (formatMoney)
 
@@ -95,19 +94,19 @@ instance View IndexView where
 renderOrder :: Bool -> Map (Id Order) Int -> Include "customerId" Order -> Html
 renderOrder canManageOrders priceMap order = [hsx|
     <tr>
-        <td><a href={ShowOrderAction order.id}>{formatUTCTime order.orderedAt}</a></td>
+        <td><a href={ShowOrderAction order.id}>{dateTime order.orderedAt}</a></td>
         <td class="normal">{fullName order.customerId}</td>
-        <td>{fmap formatUTCTime order.invoicedAt}</td>
+        <td>{maybe mempty dateTime order.invoicedAt}</td>
         <td>{fmap formatMoney $ Map.lookup order.id priceMap}</td>
         <td>{showOrMarkPaid canManageOrders order}</td>
-        <td>{fmap formatUTCTime order.deliveredAt}</td>
+        <td>{maybe mempty dateTime order.deliveredAt}</td>
     </tr>
 |]
 
 showOrMarkPaid :: Bool -> Include "customerId" Order -> Html
 showOrMarkPaid canManageOrders order =
     case order.paidAt of
-      Just paidAt -> [hsx|{formatUTCTime paidAt}|]
+      Just paidAt -> dateTime paidAt
       Nothing | not canManageOrders -> mempty
       Nothing     -> [hsx|
                     <form method="POST" action={UpdateMarkPaidOrderAction order.id}>
@@ -152,6 +151,3 @@ renderOrderDir dir = [hsx|
         </select>
     </label>
 |]
-
-formatUTCTime :: UTCTime -> String
-formatUTCTime = formatTime defaultTimeLocale "%Y-%m-%d %H:%M UTC"
