@@ -36,12 +36,12 @@ run = do
 
 -- | "deliverer, promoter" is ["deliverer", "promoter"]. At least one role,
 -- and only known ones: a user without a role could log in but do nothing.
-parseRoles :: Text -> Either String [Text]
+parseRoles :: Text -> Either Text [Text]
 parseRoles text = case filter (not . T.null) (map (T.toLower . T.strip) (T.splitOn "," text)) of
     [] -> Left "ROLES should name at least one of admin, deliverer, promoter"
     roles -> case filter (`notElem` knownRoles) roles of
         [] -> Right (nub roles)
-        unknown -> Left ("Unknown roles " <> cs (intercalate ", " unknown) <> ", known: " <> cs (intercalate ", " knownRoles))
+        unknown -> Left ("Unknown roles " <> intercalate ", " unknown <> ", known: " <> intercalate ", " knownRoles)
   where knownRoles = ["admin", "deliverer", "promoter"]
 
 -- | A setting that must be given. Checked here, before any query: IHP's env
