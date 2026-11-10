@@ -1,7 +1,8 @@
 module Test.Admin.OrdersSpec where
 
 import qualified Control.Exception as Exception
-import Network.HTTP.Types (status200)
+import Network.HTTP.Types (hLocation, hReferer, status200)
+import Network.Wai (requestHeaders, responseHeaders)
 
 import IHP.ControllerPrelude
 import IHP.Job.Types (JobStatus (..))
@@ -109,6 +110,17 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             -- In the browser's time zone, through IHP's helpers.js
             page `responseBodyShouldContain` "Emailed <time class=\"date-time\" datetime="
             page `responseBodyShouldContain` ": SMTP said no"
+
+    describe "Admin OrdersController marking paid" do
+        it "goes back to the list as it was, filters and sorting included" $ withContext do
+            admin <- createAdmin
+            order <- createEmailOrder "paid@example.com"
+            let list = "http://localhost:8000/admin/Orders?year=2026&ordering=price&orderDir=descending&excludePaid=on"
+            response <- let ?request = ?request { requestHeaders = (hReferer, list) : requestHeaders ?request }
+                in withUser admin $ callAction UpdateMarkPaidOrderAction { orderId = order.id }
+            lookup hLocation (responseHeaders response) `shouldBe` Just list
+            order' <- fetch order.id
+            isJust order'.paidAt `shouldBe` True
 
     describe "Admin OrdersController prices" do
         it "lists an order at the price it was placed at" $ withContext do

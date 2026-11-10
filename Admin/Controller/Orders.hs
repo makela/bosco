@@ -103,7 +103,9 @@ instance Controller OrdersController where
             |> setJust #paidAt now
             |> updateRecord
         setSuccessMessage "Order paid"
-        redirectTo OrdersAction
+        -- Back to the list as it was, with its year, filters and sorting, or
+        -- to the order's page when marked there
+        redirectBackWithFallback (pathTo OrdersAction)
 
     action DeleteCancelOrderAction { orderId } = do
         _ <- requirePermission ManageOrders
