@@ -19,7 +19,8 @@ DEVENV_ROOT = --override-input devenv-root "file+file://$$PWD/.devenv/root"
 TEST_CHECKS = tests integration-tests nixos-module deploy-migrations
 
 # Runs Test/Main.hs and Test/Integration.hs (with its own PostgreSQL) plus the
-# rest of the flake checks. New files under Test/ must be `git add`ed first.
+# rest of the flake checks, one of which compiles every Application/Script.
+# New files under Test/ must be `git add`ed first.
 # Nix reuses test results when nothing changed, so the summary comes from
 # the log of the last real run. `nix log` on a check shows the full output.
 .PHONY: check

@@ -4,7 +4,6 @@ import IHP.Prelude
 import Data.Either (isLeft)
 import Test.Hspec
 
--- Importing the scripts also keeps them compiling: nothing else builds them
 import Application.Script.CreateUser (parseRoles)
 import Application.Script.SeedDevData (emailFor)
 

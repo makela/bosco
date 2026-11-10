@@ -57,6 +57,11 @@
                     inherit (inputs) self;
                 };
 
+                # Every Application/Script/*.hs compiles: nothing else builds
+                # them, and a broken one shows only when someone runs it
+                checks.scripts = pkgs.linkFarm "bosco-scripts"
+                    (pkgs.lib.filterAttrs (name: _: pkgs.lib.hasPrefix "script-" name) self'.packages);
+
                 checks.deploy-migrations = import ./nix/tests/migrations.nix {
                     inherit pkgs;
                     inherit (self'.packages) migrate;
