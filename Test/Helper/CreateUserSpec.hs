@@ -4,8 +4,9 @@ import IHP.Prelude
 import Data.Either (isLeft)
 import Test.Hspec
 
--- Importing the script also keeps it compiling: nothing else builds it
+-- Importing the scripts also keeps them compiling: nothing else builds them
 import Application.Script.CreateUser (parseRoles)
+import Application.Script.SeedDevData (emailFor)
 
 tests :: Spec
 tests = describe "Application.Script.CreateUser.parseRoles" do
@@ -20,3 +21,6 @@ tests = describe "Application.Script.CreateUser.parseRoles" do
 
     it "refuses an unknown role" do
         parseRoles "admin,translator" `shouldBe` Left "Unknown roles translator, known: admin, deliverer, promoter"
+
+    it "makes the dev seed's emails without accents" do
+        emailFor "Kaisa-Maria Järvinen" `shouldBe` "kaisamaria.jarvinen@example.com"

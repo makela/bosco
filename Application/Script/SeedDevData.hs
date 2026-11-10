@@ -1,8 +1,8 @@
 #!/usr/bin/env run-script
 -- | Fills the dev database with data to browse: orders from this season and
 -- the two before it in every state, a returning customer, newsletter-only
--- subscribers, a payment instruction and two logins (admin and a delivery
--- person who only sees orders). The passwords are printed at the end.
+-- subscribers, a payment instruction and a login for each role: admin,
+-- delivery person and promoter. The passwords are printed at the end.
 --
 -- Run with: make seed-dev
 --
@@ -32,9 +32,11 @@ run = do
         ensurePaymentInstruction
         forM_ (seedOrders now thisYear) createSeedOrder
         forM_ newsletterSubscribers \name -> createSeedCustomer name (emailFor name) "" ("", "", "")
-        admin <- createLogin "admin@example.com" True
-        delivery <- createLogin "jakelija@example.com" False
-        pure [admin, delivery]
+        mapM (uncurry createLogin)
+            [ ("admin@example.com", Admin)
+            , ("jakelija@example.com", Deliverer)
+            , ("promoottori@example.com", Promoter)
+            ]
 
     putStrLn "Seeded the dev database. Logins at /admin/NewSession:"
     forM_ passwords \(email, password) -> putStrLn ("  " <> email <> "  " <> password)
@@ -169,3 +171,44 @@ createSeedCustomer name email phone (streetAddress, postalCode, city) = newRecor
         ws -> (T.unwords (initDef ws), lastDef ws)
     initDef = reverse . drop 1 . reverse
     lastDef = fromMaybe "" . last
+
+-- | Opens ordering unless some welcome message already exists.
+ensureWelcomeMessage :: (?modelContext :: ModelContext) => IO ()
+ensureWelcomeMessage = do
+    count <- query @WelcomeMessage |> fetchCount
+    when (count == 0) do
+        _ <- newRecord @WelcomeMessage
+            |> set #text "Tervetuloa tilaamaan oliiviöljyä ja muita herkkuja Sisiliasta!"
+            |> set #isOrderingEnabled True
+            |> createRecord
+        pure ()
+
+ensurePaymentInstruction :: (?modelContext :: ModelContext) => IO ()
+ensurePaymentInstruction = do
+    count <- query @PaymentInstruction |> fetchCount
+    when (count == 0) do
+        _ <- newRecord @PaymentInstruction
+            |> set #text "Bosco Falconeria (esimerkkitili)\n\nIBAN FI00 1234 5600 0007 85\n\nBIC ESIMFIHH\n\nMaksun eräpäivä on **15. marraskuuta**."
+            |> createRecord
+        pure ()
+
+data Role = Admin | Deliverer | Promoter
+    deriving (Eq, Show)
+
+-- | Creates a login with a random password, or skips an existing one.
+createLogin :: (?modelContext :: ModelContext) => Text -> Role -> IO (Text, Text)
+createLogin email role = do
+    existing <- query @User |> filterWhere (#email, email) |> fetchCount
+    if existing > 0
+        then pure (email, "(already existed, password unchanged)")
+        else do
+            password <- generateAuthenticationToken |> fmap (T.take 16)
+            passwordHash <- hashPassword password
+            _ <- newRecord @User
+                |> set #email email
+                |> set #passwordHash passwordHash
+                |> set #isAdmin (role == Admin)
+                |> set #isDeliverer (role == Deliverer)
+                |> set #isPromoter (role == Promoter)
+                |> createRecord
+            pure (email <> " (" <> toLower (tshow role) <> ")", password)
