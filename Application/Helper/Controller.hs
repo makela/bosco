@@ -4,6 +4,8 @@ import Data.Char (isDigit)
 import qualified Data.Text as T
 
 import IHP.ControllerPrelude
+import Network.Wai (rawPathInfo)
+import System.Log.FastLogger (toLogStr)
 
 import Application.Localization
 
@@ -46,3 +48,21 @@ isPostalCode text
     | T.length stripped == 5 && T.all isDigit stripped = Success
     | otherwise = Failure (l10nText LInvalidPostalCode)
     where stripped = T.strip text
+
+-- | Answers a public form with @answer@, as if it was sent, when a bot sent
+-- it, and runs @accept@ otherwise. A bot fills in every field, also the one
+-- that people don't see, see 'honeypotField' in "Application.Helper.View".
+-- Nothing is saved or emailed for it, and it is not told why, so that it
+-- does not simply try again otherwise.
+unlessSpam :: (?context :: ControllerContext, ?request :: Request) => IO a -> IO a -> IO a
+unlessSpam answer accept
+    | T.null (T.strip (paramOrDefault @Text "" honeypotName)) = accept
+    | otherwise = do
+        -- Like IHP itself logs, as IHP.Log doesn't fit IHP 1.6's FastLogger
+        ?context.frameworkConfig.logger
+            (toLogStr ("Ignored a form filled in by a bot: " <> cs (rawPathInfo ?request) :: Text))
+        answer
+
+-- | The name of the field for bots only, also in 'honeypotField'.
+honeypotName :: ByteString
+honeypotName = "contact_me_by_fax_only"

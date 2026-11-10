@@ -227,3 +227,9 @@ a.btn-small.danger, button.btn-small.danger, input[type=submit].btn-small.danger
 .front-actions a.link {
   @apply ml-0;
 }
+
+/* The field for bots only in public forms, see honeypotField. Off the page
+   rather than display: none, which some bots look for. */
+.honeypot {
+  @apply absolute -left-[10000px] w-px h-px overflow-hidden;
+}

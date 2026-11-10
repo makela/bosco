@@ -18,6 +18,7 @@ instance View NewEmailView where
                            class={classes ["form-control", ("is-invalid", isInvalidEmail)]}>
                     {emailFeedback}
                 </div>
+                {honeypotField}
                 <input type="submit" value={l10nText LSubscribe} />
             </form>
         |]

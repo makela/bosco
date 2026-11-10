@@ -59,7 +59,9 @@ instance Controller OrdersController where
                 | otherwise = stored
         render ShowView { .. }
 
-    action CreateOrderAction = do
+    -- A bot's order can't be shown like a person's, which has an invoice,
+    -- so it is thanked on the front page.
+    action CreateOrderAction = unlessSpam (orderSent OrdersAction) do
         message <- fetchLastWelcomeMessage
         -- Ordering can close while the customer is still filling in the form
         unless (maybe False (.isOrderingEnabled) message) do
@@ -74,15 +76,14 @@ instance Controller OrdersController where
         let queueEmail order = do
                 _ <- newRecord @EmailOrderJob |> set #orderId order.id |> createRecord
                 pure ()
-        createOrder actionUrl producers products unorderable queueEmail \order -> do
-            setSuccessMessage (l10nText LOrderSent)
-            redirectTo ShowOrderAction { orderId = order.id }
+        createOrder actionUrl producers products unorderable queueEmail \order ->
+            orderSent ShowOrderAction { orderId = order.id }
 
     action NewEmailAction = do
         let customer = newRecord @Customer
         render NewEmailView { .. }
 
-    action CreateEmailAction = do
+    action CreateEmailAction = unlessSpam detailsSaved do
         let customer = newRecord @Customer
         customer
             |> buildEmail
@@ -91,8 +92,18 @@ instance Controller OrdersController where
                     render NewEmailView { .. }
                 Right customer -> do
                     _ <- customer |> createRecord
-                    setSuccessMessage (l10nText LDetailsSaved)
-                    redirectTo OrdersAction
+                    detailsSaved
+
+-- | The answers to the public forms, also to a bot's, see 'unlessSpam'.
+orderSent :: (?context :: ControllerContext, ?request :: Request, ?respond :: Respond) => OrdersController -> IO ResponseReceived
+orderSent page = do
+    setSuccessMessage (l10nText LOrderSent)
+    redirectTo page
+
+detailsSaved :: (?context :: ControllerContext, ?request :: Request, ?respond :: Respond) => IO ResponseReceived
+detailsSaved = do
+    setSuccessMessage (l10nText LDetailsSaved)
+    redirectTo OrdersAction
 
 -- | An order needs the whole address. The last name is optional, for the few
 -- who have only one name.

@@ -64,6 +64,7 @@ data Localizable
   | LInvoicePaid
   | LOrderSent
   | LDetailsSaved
+  | LLeaveEmpty
   | LFieldRequired
   | LInvalidEmail
   | LInvalidPhone
@@ -158,6 +159,9 @@ l10nText' LOrderSent FR = "Commande envoyée"
 l10nText' LDetailsSaved FI = "Tiedot tallennettu"
 l10nText' LDetailsSaved EN = "Details saved"
 l10nText' LDetailsSaved FR = "Informations enregistrées"
+l10nText' LLeaveEmpty FI = "Jätä tämä tyhjäksi"
+l10nText' LLeaveEmpty EN = "Leave this empty"
+l10nText' LLeaveEmpty FR = "Laissez ce champ vide"
 l10nText' LFieldRequired FI = "Tämä kenttä vaaditaan"
 l10nText' LFieldRequired EN = "This field is required"
 l10nText' LFieldRequired FR = "Ce champ est obligatoire"

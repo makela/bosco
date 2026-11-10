@@ -3,7 +3,8 @@ module Test.Web.CreateOrderSpec where
 import qualified Control.Exception as Exception
 import qualified Data.Text as T
 import Network.HTTP.Types (status200)
-import Network.Wai (Response)
+import qualified Data.ByteString as ByteString
+import Network.Wai (Response, responseHeaders)
 
 import IHP.ControllerPrelude
 import IHP.Hspec (responseBodyShouldContain, responseBodyShouldNotContain,
@@ -142,6 +143,38 @@ tests = aroundAll (withIHPApp WebApplication config) do
                 response `responseStatusShouldBe` status200
                 customerCount email `shouldReturn` 0
 
+    describe "Web forms filled in by a bot" do
+        it "has the field for bots in the order and newsletter forms" $ withContext do
+            _ <- setUp "bot form"
+            orderForm <- callAction NewOrderAction
+            orderForm `responseBodyShouldContain` "name=\"contact_me_by_fax_only\""
+            emailForm <- callAction NewEmailAction
+            emailForm `responseBodyShouldContain` "name=\"contact_me_by_fax_only\""
+
+        it "is thanked for an order, but nothing is saved or emailed" $ withContext do
+            (_, oil, _) <- setUp "bot order"
+            jobsBefore <- query @EmailOrderJob |> fetchCount
+            response <- submitOrderWithBot "botti@example.com" [(oil, 2)]
+            response `shouldRedirectToPath` pathTo OrdersAction
+            customerCount "botti@example.com" `shouldReturn` 0
+            jobsAfter <- query @EmailOrderJob |> fetchCount
+            jobsAfter `shouldBe` jobsBefore
+
+        it "is thanked for a newsletter signup, but nothing is saved" $ withContext do
+            response <- callActionWithParams CreateEmailAction
+                [ ("firstName", "Botti"), ("lastName", ""), ("email", "uutisbotti@example.com")
+                , ("contact_me_by_fax_only", "http://spam.example.com")
+                ]
+            response `shouldRedirectToPath` pathTo OrdersAction
+            customerCount "uutisbotti@example.com" `shouldReturn` 0
+
+        it "saves a newsletter signup with the field left empty, as a browser sends it" $ withContext do
+            _ <- callActionWithParams CreateEmailAction
+                [ ("firstName", "Uutis"), ("lastName", "Tilaaja"), ("email", "uutiset@example.com")
+                , ("contact_me_by_fax_only", "")
+                ]
+            customerCount "uutiset@example.com" `shouldReturn` 1
+
     describe "Web producer order" do
         it "lists producers the same way on the order form and the invoice" $ withContext do
             _ <- setUp "producer order"
@@ -220,6 +253,15 @@ submitOrderWith email replaced quantities = callActionWithParams CreateOrderActi
         ]
     <> map (\(product, n) -> (idToParam product.id, cs (tshow n))) quantities
 
+-- | An order like 'submitOrder', with the field for bots filled in
+submitOrderWithBot :: (ContextParameters WebApplication) => Text -> [(Product, Int)] -> IO Response
+submitOrderWithBot email quantities = callActionWithParams CreateOrderAction $
+    [ ("firstName", "Botti"), ("lastName", ""), ("billingName", ""), ("email", cs email)
+    , ("phone", "0401234567"), ("streetAddress", "Testikatu 1"), ("postalCode", "00100")
+    , ("city", "Helsinki"), ("contact_me_by_fax_only", "http://spam.example.com")
+    ]
+    <> map (\(product, n) -> (idToParam product.id, cs (tshow n))) quantities
+
 customerCount :: (?modelContext :: ModelContext) => Text -> IO Int
 customerCount email = query @Customer |> filterWhere (#email, email) |> fetchCount
 
@@ -235,3 +277,8 @@ orderedQuantities email = do
     orders <- query @Order |> filterWhereIn (#customerId, map (.id) customers) |> fetch
     ordered <- query @OrderedProduct |> filterWhereIn (#orderId, map (.id) orders) |> fetch
     pure $ map (\x -> (x.productId, x.quantity)) ordered
+
+-- | The redirect goes to this path, whatever host the test app has.
+shouldRedirectToPath :: HasCallStack => Response -> Text -> IO ()
+shouldRedirectToPath response path =
+    lookup "Location" (responseHeaders response) `shouldSatisfy` maybe False (cs path `ByteString.isSuffixOf`)

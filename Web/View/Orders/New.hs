@@ -35,6 +35,7 @@ instance View NewView where
                 {forEach producers (renderProducer orders productsByProducers)}
             </div>
             {renderCustomerForm customer}
+            {honeypotField}
             <input type="submit" value={l10nText LSubmit} />
         </form>
     |]
