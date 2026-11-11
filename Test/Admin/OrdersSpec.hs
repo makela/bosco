@@ -166,8 +166,8 @@ tests = aroundAll (withIHPApp AdminApplication config) do
                 |> createRecord
             response <- withUser admin $ search "hinta asiakas"
             response `responseBodyShouldContain` "Hinta Asiakas"
-            response `responseBodyShouldContain` "20 €"
-            response `responseBodyShouldNotContain` "30 €"
+            response `responseBodyShouldContain` "20\160€"
+            response `responseBodyShouldNotContain` "30\160€"
   where
     search q = callActionWithParams OrdersAction [("q", q)]
 

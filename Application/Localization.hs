@@ -200,3 +200,19 @@ l10nText' LPageNotFoundTitle FR = "Page introuvable"
 l10nText' LPageNotFound FI = "Sivua ei löytynyt tai se ei ole juuri nyt käytettävissä."
 l10nText' LPageNotFound EN = "The page was not found, or it is not available right now."
 l10nText' LPageNotFound FR = "Cette page est introuvable ou n'est pas disponible pour le moment."
+
+-- | An amount in cents in the locale's way: "10,10 €" in Finnish and
+-- French, "€10.10" in English. Whole euros leave out the cents ("51 €",
+-- "€51"), and the space before "€" doesn't break, so the sign stays with
+-- its number.
+formatMoney' :: Integral a => Locale -> a -> Text
+formatMoney' locale amount = sign <> case locale of
+    EN -> "€" <> number "."
+    _ -> number "," <> "\160€"
+  where
+    cents = abs (toInteger amount)
+    sign = if amount < 0 then "-" else ""
+    (euros, rest) = cents `divMod` 100
+    number separator
+        | rest == 0 = tshow euros
+        | otherwise = tshow euros <> separator <> (if rest < 10 then "0" else "") <> tshow rest

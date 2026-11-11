@@ -93,7 +93,7 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             other <- newRecord @Producer |> set #name "Toinen tila" |> set #subject "" |> set #description "" |> createRecord
             form <- withUser user $ callAction EditProductAction { productId = product.id }
             form `responseStatusShouldBe` status200
-            form `responseBodyShouldContain` "Price: 10 €"
+            form `responseBodyShouldContain` "Price: 10\160€"
             form `responseBodyShouldNotContain` "name=\"price\""
             form `responseBodyShouldNotContain` "Delete"
             -- A crafted request with the other fields too changes only the texts

@@ -1,11 +1,9 @@
 module Web.View.Orders.New where
-import Numeric
 import GHC.Records (HasField (getField))
 import GHC.TypeLits (KnownSymbol)
 import Web.View.Prelude
 
 import qualified Data.Map as Map
-import qualified Data.Text as T
 
 import Application.Localization
 import Web.View.Orders.Index (renderMarkdown)
@@ -124,11 +122,6 @@ renderProduct orders product = [hsx|
         price = formatMoney product.price
         count = maybe "" show $ Map.lookup product.id orders
 
-formatMoney :: (Integral a, Num a) => a -> Text
-formatMoney amount =
-    fromIntegral amount
-        |> (/100)
-        |> \x -> showFFloat (Just 2) x " €"
-        |> T.pack
-        |> T.replace "." ","
-        |> T.replace ",00" ""
+-- | An amount in cents in this instance's language, see 'formatMoney''
+formatMoney :: Integral a => a -> Text
+formatMoney = formatMoney' defaultLocale

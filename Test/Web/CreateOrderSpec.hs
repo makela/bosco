@@ -205,9 +205,9 @@ tests = aroundAll (withIHPApp WebApplication config) do
             order <- orderOf "price@example.com"
             response <- callAction ShowOrderAction { orderId = order.id }
             response `responseStatusShouldBe` status200
-            response `responseBodyShouldContain` "20 €"
-            response `responseBodyShouldNotContain` "15 €"
-            response `responseBodyShouldNotContain` "30 €"
+            response `responseBodyShouldContain` "20\160€"
+            response `responseBodyShouldNotContain` "15\160€"
+            response `responseBodyShouldNotContain` "30\160€"
             ordered <- query @OrderedProduct |> filterWhere (#orderId, order.id) |> fetchOne
             ordered.unitPrice `shouldBe` 1000
 

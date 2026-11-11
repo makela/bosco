@@ -35,3 +35,24 @@ tests = describe "Application.Localization" do
     it "uses Finnish by default" do
         l10nText LInvoice `shouldBe` "Lasku"
         localeCode defaultLocale `shouldBe` "fi"
+
+    describe "formatMoney'" do
+        it "writes Finnish and French amounts with a comma and the euro after" do
+            forM_ [FI, FR] \locale -> do
+                formatMoney' locale (1010 :: Int) `shouldBe` "10,10\160€"
+                formatMoney' locale (5 :: Int) `shouldBe` "0,05\160€"
+                formatMoney' locale (100050 :: Int) `shouldBe` "1000,50\160€"
+
+        it "writes English amounts with a point and the euro before" do
+            formatMoney' EN (1010 :: Int) `shouldBe` "€10.10"
+            formatMoney' EN (5 :: Int) `shouldBe` "€0.05"
+            formatMoney' EN (100050 :: Int) `shouldBe` "€1000.50"
+
+        it "leaves out the cents of whole euros" do
+            formatMoney' FI (5100 :: Int) `shouldBe` "51\160€"
+            formatMoney' FI (10000 :: Int) `shouldBe` "100\160€"
+            formatMoney' EN (5100 :: Int) `shouldBe` "€51"
+
+        it "shows a negative amount with a minus" do
+            formatMoney' FI (-1010 :: Int) `shouldBe` "-10,10\160€"
+            formatMoney' EN (-1010 :: Int) `shouldBe` "-€10.10"
