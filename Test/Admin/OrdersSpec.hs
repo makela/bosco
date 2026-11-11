@@ -36,6 +36,24 @@ tests = aroundAll (withIHPApp AdminApplication config) do
             response `responseBodyShouldContain` "Ville Korhonen"
             response `responseBodyShouldNotContain` "Maija (Mäki) Virtanen"
 
+        it "leaves out the paid orders when asked to" $ withContext do
+            admin <- setUp
+            customer <- newRecord @Customer
+                |> set #firstName "Paula Maksanut"
+                |> set #email "paula@example.com"
+                |> set #phone "0401234567"
+                |> set #streetAddress "Testikatu 2"
+                |> createRecord
+            now <- getCurrentTime
+            _ <- newRecord @Order |> set #customerId customer.id |> setJust #paidAt now |> createRecord
+            everything <- withUser admin $ callActionWithParams OrdersAction []
+            everything `responseBodyShouldContain` "Paula Maksanut"
+            unpaid <- withUser admin $ callActionWithParams OrdersAction [("excludePaid", "on")]
+            unpaid `responseBodyShouldNotContain` "Paula Maksanut"
+            unpaid `responseBodyShouldContain` "Ville Korhonen"
+            notInvoiced <- withUser admin $ callActionWithParams OrdersAction [("excludeInvoiced", "on")]
+            notInvoiced `responseBodyShouldContain` "Paula Maksanut"
+
         it "treats parentheses as plain text instead of crashing" $ withContext do
             admin <- setUp
             response <- withUser admin $ search "maija ("

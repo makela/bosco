@@ -32,21 +32,23 @@ instance Controller OrdersController where
             excludeDelivered = paramOrDefault @Bool False "excludeDelivered"
             dateAfter = ">= '" <> tshow year <> "-01-01 00:00:00'"
             dateBefore = "< '" <> tshow (year + 1) <> "-01-01 00:00:00'"
-        -- TODO exclude handled orders, separate Action/View?
+            -- The handled orders the admin chose to leave out
+            unhandled exclude field = if exclude then filterWhereSql (field, "IS NULL") else \x -> x
         xs <- query @Order
             |> filterWhereSql (#cancelledAt, "IS NULL")
             |> filterWhereSql (#orderedAt, dateAfter)
             |> filterWhereSql (#orderedAt, dateBefore)
+            |> unhandled excludeInvoiced #invoicedAt
+            |> unhandled excludePaid #paidAt
+            |> unhandled excludeDelivered #deliveredAt
             |> fetch
-            -- TODO should sort in database
-            -- >>= pure . map (modify #customerId (orderBy #name))
             >>= collectionFetchRelated #customerId
+        -- The search and the sorting are here rather than in SQL: a year's
+        -- orders are a few hundred at most, the full name is put together
+        -- here, and the price is a sum of the order's lines. PostgreSQL's
+        -- lower() also leaves ä and ö alone in a database without a locale.
         let orders' = xs
-                -- TODO should filter in database
                 |> filter (\x -> any (matchesSearch q) [fullName x.customerId, x.customerId.reverseName, x.customerId.billingName])
-                |> filter (\x -> not excludeInvoiced || isNothing x.invoicedAt)
-                |> filter (\x -> not excludePaid || isNothing x.paidAt)
-                |> filter (\x -> not excludeDelivered || isNothing x.deliveredAt)
         -- All order lines in one query, summed per order
         orderLines <- query @OrderedProduct
             |> filterWhereIn (#orderId, map (.id) orders')
