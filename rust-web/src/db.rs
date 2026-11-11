@@ -650,37 +650,20 @@ pub struct Published {
     pub is_ordering_enabled: Option<bool>,
 }
 
-pub async fn count_published(db: &PgPool, kind: TextKind) -> sqlx::Result<i64> {
-    let sql = match kind {
-        TextKind::Welcome => "SELECT COUNT(*) FROM welcome_messages",
-        TextKind::Payment => "SELECT COUNT(*) FROM payment_instructions",
-    };
-    sqlx::query_scalar(sql).fetch_one(db).await
-}
-
-/// A page of them: welcome messages newest first, payment instructions
+/// All of them: welcome messages newest first, payment instructions
 /// oldest first (IHP listed these in no particular order)
-pub async fn published_page(
-    db: &PgPool,
-    kind: TextKind,
-    limit: i64,
-    offset: i64,
-) -> sqlx::Result<Vec<Published>> {
+pub async fn all_published(db: &PgPool, kind: TextKind) -> sqlx::Result<Vec<Published>> {
     let sql = match kind {
         TextKind::Welcome => {
             "SELECT id, text, published_at, is_ordering_enabled FROM welcome_messages
-             ORDER BY published_at DESC LIMIT $1 OFFSET $2"
+             ORDER BY published_at DESC"
         }
         TextKind::Payment => {
             "SELECT id, text, published_at, NULL::bool AS is_ordering_enabled
-             FROM payment_instructions ORDER BY published_at, id LIMIT $1 OFFSET $2"
+             FROM payment_instructions ORDER BY published_at, id"
         }
     };
-    sqlx::query_as(sql)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(db)
-        .await
+    sqlx::query_as(sql).fetch_all(db).await
 }
 
 pub async fn published(db: &PgPool, kind: TextKind, id: Uuid) -> sqlx::Result<Option<Published>> {

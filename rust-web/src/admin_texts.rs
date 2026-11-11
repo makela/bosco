@@ -3,7 +3,8 @@
 //! the welcome message on the front page, which also opens and closes
 //! ordering, and the payment instructions on invoices. Each has a list, a
 //! page, and IHP's generated forms to write a new one, edit one and delete
-//! one. Admins only.
+//! one. Admins only. The lists are on one page: IHP's split them into
+//! pages of 50, which these never reach.
 //!
 //! On a demo, everyone is an admin, so a visitor can't put their own words
 //! or bank account in front of others: only ordering can be opened and
@@ -22,8 +23,8 @@ use uuid::Uuid;
 use crate::admin::{self, Crumb};
 use crate::admin_orders::time_ago;
 use crate::db::{self, Published, TextKind};
-use crate::pagination::{self, Pagination};
 use crate::permission::Permission;
+use crate::query;
 use crate::session::{FLASH_ERROR, FLASH_SUCCESS, Session};
 use crate::views::markdown;
 use crate::{AppState, Result};
@@ -98,7 +99,7 @@ fn refuse(state: &AppState, mut session: Session, kind: TextKind) -> Response {
 
 /// The id in the address, as IHP's router reads it; None is a 400
 fn id_of(kind: TextKind, uri: &Uri) -> Option<Uuid> {
-    let items = pagination::query_items(uri.query());
+    let items = query::items(uri.query());
     let (_, value) = items.iter().find(|(key, _)| key == names(kind).id_param)?;
     Uuid::parse_str(value.as_deref()?).ok()
 }
@@ -130,13 +131,7 @@ pub async fn index(
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
-    let items = pagination::query_items(uri.query());
-    let total = db::count_published(&state.db, kind).await?;
-    let Ok(pagination) = Pagination::from_query(&items, total) else {
-        return Ok(bad_request());
-    };
-    let rows =
-        db::published_page(&state.db, kind, pagination.page_size, pagination.offset()).await?;
+    let rows = db::all_published(&state.db, kind).await?;
     let n = names(kind);
     let mut crumbs = vec![
         Crumb::link("Home", admin::WELCOME),
@@ -167,7 +162,6 @@ pub async fn index(
                     }
                 }
             }
-            (pagination::render(&pagination, uri.path(), &items))
         }
     };
     Ok(admin::page(&state, session, &content))
@@ -350,7 +344,7 @@ fn edit_page(state: &AppState, kind: TextKind, text: &Published) -> Markup {
 /// checkbox comes before its hidden "off"), the form's before the
 /// address's; a field that isn't sent stays as it was
 fn fill(kind: TextKind, demo: bool, text: &mut Published, form: &[(String, String)], uri: &Uri) {
-    let query: Vec<(String, String)> = pagination::query_items(uri.query())
+    let query: Vec<(String, String)> = query::items(uri.query())
         .into_iter()
         .filter_map(|(key, value)| Some((key, value?)))
         .collect();

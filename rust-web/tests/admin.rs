@@ -1292,9 +1292,10 @@ async fn welcome_messages_are_written_changed_and_deleted(db: PgPool) -> TestRes
     Ok(())
 }
 
-/// More than a page: IHP's pagination under the list
+/// The lists are on one page, however long, newest first; IHP's paged
+/// them by 50
 #[sqlx::test(migrations = false)]
-async fn long_lists_are_paged(db: PgPool) -> TestResult {
+async fn long_lists_are_on_one_page(db: PgPool) -> TestResult {
     admin(&db).await?;
     sqlx::query(
         "INSERT INTO welcome_messages (text, published_at)
@@ -1305,32 +1306,18 @@ async fn long_lists_are_paged(db: PgPool) -> TestResult {
     .await?;
     let app = site(db.clone(), false);
     let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
-    let first = text(send(&app, Method::GET, "/admin/WelcomeMessages", &boss, &[]).await?).await?;
-    assert_eq!(first.matches("ShowWelcomeMessage").count(), 50);
-    assert!(first.contains(r#"<a href="/admin/WelcomeMessages?page=2" class="relative inline-flex items-center px-4 py-2 border text-sm font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50">2</a>"#));
-    // Newest first: the oldest on the second page
-    let second = text(
-        send(
-            &app,
-            Method::GET,
-            "/admin/WelcomeMessages?page=2",
-            &boss,
-            &[],
-        )
-        .await?,
-    )
-    .await?;
-    assert_eq!(second.matches("ShowWelcomeMessage").count(), 5);
-    assert!(second.contains(r#"datetime="2025-01-02T00:00:00Z""#));
-    let response = send(
-        &app,
-        Method::GET,
+    for uri in [
+        "/admin/WelcomeMessages",
+        "/admin/WelcomeMessages?page=2",
         "/admin/WelcomeMessages?page=x",
-        &boss,
-        &[],
-    )
-    .await?;
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    ] {
+        let list = text(send(&app, Method::GET, uri, &boss, &[]).await?).await?;
+        assert_eq!(list.matches("ShowWelcomeMessage").count(), 55, "{uri}");
+        assert!(!list.contains("maxItemsSelect"));
+        let newest = list.find(r#"datetime="2025-02-25T00:00:00Z""#).unwrap();
+        let oldest = list.find(r#"datetime="2025-01-02T00:00:00Z""#).unwrap();
+        assert!(newest < oldest);
+    }
     Ok(())
 }
 

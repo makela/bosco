@@ -40,7 +40,7 @@ emails keep working, and the markup and classes are the same, so
 - `src/admin_texts.rs`: the welcome messages and payment instructions, from
   `Admin/Controller/WelcomeMessages.hs` and `PaymentInstructions.hs`, with
   IHP's generated forms
-- `src/pagination.rs`: IHP's pagination of the admin's lists
+- `src/query.rs`: reading an address's query string as IHP does
 - `src/permission.rs`: what each role may do, from
   `Application/Permission.hs`
 - `src/session.rs`, `src/skein_mac.rs`: IHP's session cookie
@@ -112,8 +112,9 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   with 400; IHP's was a 500.
 - **Payment instructions** are listed oldest first; IHP listed them in
   whatever order the database gave, which is the same until one is edited.
-- **A page number that isn't a number** (`?page=`, `?maxItems=`) is
-  answered with 400; IHP's was a 500.
+- **The admin's lists are on one page**: IHP's were in pages of 50 (with
+  `?page=` and `?maxItems=`), which only the customers ever reached, and
+  those are easier to find from one page, A to Z.
 - **Access denied** (a login whose roles don't allow the page) is a page in
   the admin's layout; IHP showed its own branded page. Both are 403.
 - **After "Mark as paid"** the admin goes back to the page they were on
