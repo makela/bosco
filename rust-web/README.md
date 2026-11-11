@@ -4,7 +4,8 @@ The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 [maud](https://maud.lambda.xyz/), [SQLx](https://github.com/launchbadge/sqlx)):
 the welcome message, the order form, an order's invoice and the newsletter
 form, in Finnish, English or French, demo mode included; the admin's login,
-logout, welcome page (its menu) and order list; and the email worker, IHP's job runner with
+logout, welcome page (its menu) and orders (the list, an order's page and
+its buttons); and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
 so both can run at once: the rest of the admin stays in IHP, and either
 app's worker emails the invoices of either app's orders, as each order saves
@@ -32,8 +33,8 @@ emails keep working, and the markup and classes are the same, so
   `Admin/Controller/Sessions.hs` and IHP's sessions controller, its layout,
   the login check every admin page makes (`require_user`), and the welcome
   page, from `Admin/Controller/Static.hs`
-- `src/admin_orders.rs`: the admin's order list, from `OrdersAction` in
-  `Admin/Controller/Orders.hs` and `Admin/View/Orders/Index.hs`
+- `src/admin_orders.rs`: the admin's orders, from `Admin/Controller/Orders.hs`
+  and `Admin/View/Orders`: the list, an order's page, and its buttons
 - `src/permission.rs`: what each role may do, from
   `Application/Permission.hs`
 - `src/session.rs`, `src/skein_mac.rs`: IHP's session cookie
@@ -104,6 +105,9 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   with 400; IHP's was a 500.
 - **Access denied** (a login whose roles don't allow the page) is a page in
   the admin's layout; IHP showed its own branded page. Both are 403.
+- **After "Mark as paid"** the admin goes back to the page they were on
+  (the `Referer`) by its path only, so always on this site; IHP took the
+  whole address.
 - **A login's wrong passwords** are counted in the database (`+ 1`), so two
   at once both count; IHP counted from what it had read.
 
@@ -113,5 +117,6 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the admin's pages beyond its login, welcome page and order
-list.
+Not done yet: the rest of the admin: a new order from the admin, all
+ordered products, customers, producers, products, welcome messages, payment
+instructions, email lists and changing one's password.

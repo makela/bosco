@@ -7,7 +7,7 @@ use maud::{DOCTYPE, Markup, PreEscaped, html};
 use pulldown_cmark::{Event, Parser};
 use uuid::Uuid;
 
-use crate::db::{Invoice, NewCustomer, Producer, Product, WelcomeMessage};
+use crate::db::{Customer, Invoice, NewCustomer, Producer, Product, WelcomeMessage};
 use crate::l10n::{Locale, Text};
 use crate::{Flash, Site};
 
@@ -286,40 +286,54 @@ pub fn subscribe_form(site: &Site, form: &CustomerForm) -> Markup {
     }
 }
 
-pub fn invoice(site: &Site, invoice: &Invoice, payment_instruction: Option<&str>) -> Markup {
-    let t = |text: Text| text.text(site.locale);
-    let order = &invoice.order;
-    let customer = &order.customer;
+/// The customer's names, email, phone and address, a paragraph each
+/// (`renderCustomer`)
+pub fn customer_block(customer: &Customer) -> Markup {
     html! {
-        h1 { (t(Text::Invoice)) }
         div class="flex flex-wrap" {
             @for line in customer.name_lines() { p { (line) } }
             p { (customer.email) }
             p { (customer.phone) }
             @for line in customer.address_lines() { p { (line) } }
         }
+    }
+}
+
+/// The order's lines under their producers, and the total, as table rows
+/// (`renderProducer`, `renderTotalSum`)
+pub fn invoice_rows(site: &Site, invoice: &Invoice) -> Markup {
+    let t = |text: Text| text.text(site.locale);
+    html! {
+        @for (producer, lines) in &invoice.producers {
+            tr { td colspan="4" class="font-bold" { (producer.name) } }
+            @for line in lines {
+                tr {
+                    td.normal { (line.product.name) " (" (line.product.package) ")" }
+                    td { (line.quantity) }
+                    td { "*" }
+                    td { (money(site.locale, i64::from(line.unit_price))) }
+                    td { "=" }
+                    td.last { (money(site.locale, i64::from(line.unit_price) * i64::from(line.quantity))) }
+                }
+            }
+        }
+        tr.font-bold {
+            td { (t(Text::Total)) }
+            td {} td {} td {} td {}
+            td.last { (money(site.locale, invoice.total)) }
+        }
+    }
+}
+
+pub fn invoice(site: &Site, invoice: &Invoice, payment_instruction: Option<&str>) -> Markup {
+    let t = |text: Text| text.text(site.locale);
+    let order = &invoice.order;
+    html! {
+        h1 { (t(Text::Invoice)) }
+        (customer_block(&order.customer))
         div.table-responsive {
             table.whitespace-nowrap {
-                tbody {
-                    @for (producer, lines) in &invoice.producers {
-                        tr { td colspan="4" class="font-bold" { (producer.name) } }
-                        @for line in lines {
-                            tr {
-                                td.normal { (line.product.name) " (" (line.product.package) ")" }
-                                td { (line.quantity) }
-                                td { "*" }
-                                td { (money(site.locale, i64::from(line.unit_price))) }
-                                td { "=" }
-                                td.last { (money(site.locale, i64::from(line.unit_price) * i64::from(line.quantity))) }
-                            }
-                        }
-                    }
-                    tr.font-bold {
-                        td { (t(Text::Total)) }
-                        td {} td {} td {} td {}
-                        td.last { (money(site.locale, invoice.total)) }
-                    }
-                }
+                tbody { (invoice_rows(site, invoice)) }
             }
         }
         @match (order.paid_at, order.cancelled_at) {

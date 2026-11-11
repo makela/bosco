@@ -58,6 +58,7 @@ fn site(db: PgPool, demo: bool) -> Router {
         static_dir: PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../static")),
         session_key: key(),
         secure_cookies: false,
+        emails_enabled: true,
     }))
 }
 
@@ -765,6 +766,283 @@ async fn the_orders_are_for_those_who_may_see_them(db: PgPool) -> TestResult {
     assert_eq!(
         session.get_text(REDIRECT_AFTER_LOGIN).as_deref(),
         Some("/admin/Orders?q=x")
+    );
+    Ok(())
+}
+
+/// The forms and links of an order page's next steps
+fn steps(page: &str) -> Vec<&str> {
+    [
+        "Send invoice",
+        "Mark as invoiced",
+        "Mark as paid",
+        "Mark as delivered",
+        "Cancel order",
+    ]
+    .into_iter()
+    .filter(|step| {
+        page.contains(&format!("value=\"{step}\"")) || page.contains(&format!(">{step}</a>"))
+    })
+    .collect()
+}
+
+#[sqlx::test(migrations = false)]
+async fn an_orders_page_has_the_steps_the_roles_allow(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let order = listed_order(&db, "Cecilia", "2026-01-15 12:00:00+00", 300, "").await?;
+    let app = site(db.clone(), false);
+    let uri = format!("/admin/ShowOrder?orderId={order}");
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    let page = |session: Session| {
+        let (app, uri) = (app.clone(), uri.clone());
+        async move { text(send(&app, Method::GET, &uri, &session, &[]).await?).await }
+    };
+
+    let shown = page(boss.clone()).await?;
+    assert!(
+        shown.contains("<p>Cecilia Aalto</p><p>x@example.com</p>"),
+        "{shown}"
+    );
+    assert!(shown.contains(r#"<td class="normal">Oil (1 l)</td><td>2</td>"#));
+    assert!(shown.contains(r#"<a class="hover:text-gray-700" href="/admin/Orders">Orders</a>"#));
+    assert!(shown.contains(r#"<p id="email-history">The invoice hasn't been emailed.</p>"#));
+    assert_eq!(
+        steps(&shown),
+        [
+            "Send invoice",
+            "Mark as invoiced",
+            "Mark as paid",
+            "Mark as delivered",
+            "Cancel order"
+        ]
+    );
+    assert_eq!(steps(&page(driver.clone()).await?), ["Mark as delivered"]);
+
+    // Paid: no more paying or cancelling; the emails as they went
+    sqlx::query("UPDATE orders SET paid_at = NOW()")
+        .execute(&db)
+        .await?;
+    sqlx::query(
+        "INSERT INTO email_order_jobs (order_id, status, last_error)
+         VALUES ($1, 'job_status_succeeded', NULL), ($1, 'job_status_retry', 'SMTP <down>')",
+    )
+    .bind(order)
+    .execute(&db)
+    .await?;
+    let shown = page(boss.clone()).await?;
+    assert_eq!(
+        steps(&shown),
+        ["Send invoice", "Mark as invoiced", "Mark as delivered"]
+    );
+    assert!(shown.contains("<h2>Invoice emails</h2><ul><li>Emailed <time"));
+    assert!(shown.contains("</time>, trying again: SMTP &lt;down&gt;</li>"));
+    assert!(!shown.contains("Emails are off"));
+
+    sqlx::query("UPDATE orders SET cancelled_at = NOW()")
+        .execute(&db)
+        .await?;
+    let shown = page(boss).await?;
+    assert_eq!(steps(&shown), Vec::<&str>::new());
+    assert!(shown.contains("<p>Cancelled <time"));
+    Ok(())
+}
+
+/// Each button: the row, the message, and where it goes
+#[sqlx::test(migrations = false)]
+async fn the_buttons_mark_the_order(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let order = listed_order(&db, "Cecilia", "2026-01-15 12:00:00+00", 300, "").await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let show = format!("/admin/ShowOrder?orderId={order}");
+    let done = |column: &'static str| {
+        let db = db.clone();
+        async move {
+            let sql = match column {
+                "invoiced" => "SELECT invoiced_at IS NOT NULL FROM orders",
+                "paid" => "SELECT paid_at IS NOT NULL FROM orders",
+                "delivered" => "SELECT delivered_at IS NOT NULL FROM orders",
+                _ => "SELECT cancelled_at IS NOT NULL FROM orders",
+            };
+            sqlx::query_scalar::<_, bool>(sql).fetch_one(&db).await
+        }
+    };
+    let press = |method: Method, action: &str, form: &'static [(&'static str, &'static str)]| {
+        let (app, boss) = (app.clone(), boss.clone());
+        let uri = format!("/admin/{action}?orderId={order}");
+        async move { send(&app, method, &uri, &boss, form).await }
+    };
+
+    let response = press(Method::POST, "UpdateInvoiceOrder", &[]).await?;
+    assert_eq!(
+        (response.status(), location(&response)),
+        (StatusCode::FOUND, show.as_str())
+    );
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_SUCCESS)
+            .as_deref(),
+        Some("Order invoiced")
+    );
+    assert!(done("invoiced").await?);
+
+    let response = press(Method::POST, "UpdateMarkPaidOrder", &[]).await?;
+    assert_eq!(location(&response), "/admin/Orders");
+    assert!(done("paid").await?);
+
+    let response = press(Method::POST, "UpdateDeliverOrder", &[]).await?;
+    assert_eq!(location(&response), show);
+    assert!(done("delivered").await?);
+
+    let response = press(Method::POST, "UpdateSendInvoiceOrder", &[]).await?;
+    assert_eq!(location(&response), show);
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_SUCCESS)
+            .as_deref(),
+        Some("Invoice queued for sending to x@example.com")
+    );
+    let jobs: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM email_order_jobs WHERE status = 'job_status_not_started'",
+    )
+    .fetch_one(&db)
+    .await?;
+    assert_eq!(jobs, 1);
+
+    // Cancelling is a DELETE, from the page's js-delete link
+    let response = press(Method::POST, "DeleteCancelOrder", &[]).await?;
+    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert!(!done("cancelled").await?);
+    let response = press(Method::POST, "DeleteCancelOrder", &[("_method", "DELETE")]).await?;
+    assert_eq!(location(&response), "/admin/Orders");
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_SUCCESS)
+            .as_deref(),
+        Some("Order cancelled")
+    );
+    assert!(done("cancelled").await?);
+
+    // A cancelled order's invoice isn't sent
+    let response = press(Method::POST, "UpdateSendInvoiceOrder", &[]).await?;
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_ERROR)
+            .as_deref(),
+        Some("A cancelled order's invoice can't be sent")
+    );
+    let jobs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_order_jobs")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(jobs, 1);
+    Ok(())
+}
+
+/// Marking paid from the list goes back to the list as it was
+#[sqlx::test(migrations = false)]
+async fn marking_paid_goes_back_to_the_page_it_was_on(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let order = listed_order(&db, "Cecilia", "2026-01-15 12:00:00+00", 300, "").await?;
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let request = Request::post(format!("/admin/UpdateMarkPaidOrder?orderId={order}"))
+        .header(
+            header::COOKIE,
+            format!("{}={}", session::COOKIE, boss.encrypt(&key())),
+        )
+        .header(
+            header::REFERER,
+            "https://tilaus.example.fi/admin/Orders?year=2026&q=cec",
+        )
+        .body(Body::empty())?;
+    let response = site(db, false).oneshot(request).await?;
+    assert_eq!(location(&response), "/admin/Orders?year=2026&q=cec");
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_order_pages_check_who_and_what(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let order = listed_order(&db, "Cecilia", "2026-01-15 12:00:00+00", 300, "").await?;
+    let app = site(db.clone(), false);
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let unknown = Uuid::from_u128(9);
+    for (session, method, uri, status) in [
+        (
+            &boss,
+            Method::GET,
+            "/admin/ShowOrder".to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            &boss,
+            Method::GET,
+            "/admin/ShowOrder?orderId=xyz".to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            &boss,
+            Method::GET,
+            format!("/admin/ShowOrder?orderId={unknown}"),
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            &boss,
+            Method::POST,
+            format!("/admin/UpdateMarkPaidOrder?orderId={unknown}"),
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            &boss,
+            Method::GET,
+            format!("/admin/UpdateMarkPaidOrder?orderId={order}"),
+            StatusCode::METHOD_NOT_ALLOWED,
+        ),
+        (
+            &driver,
+            Method::POST,
+            format!("/admin/UpdateMarkPaidOrder?orderId={order}"),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            &driver,
+            Method::POST,
+            format!("/admin/UpdateInvoiceOrder?orderId={order}"),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            &driver,
+            Method::POST,
+            format!("/admin/UpdateSendInvoiceOrder?orderId={order}"),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            &driver,
+            Method::DELETE,
+            format!("/admin/DeleteCancelOrder?orderId={order}"),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            &driver,
+            Method::POST,
+            format!("/admin/UpdateDeliverOrder?orderId={order}"),
+            StatusCode::FOUND,
+        ),
+    ] {
+        let response = send(&app, method, &uri, session, &[]).await?;
+        assert_eq!(response.status(), status, "{uri}");
+    }
+    let row: (bool, bool, bool, bool, i64) = sqlx::query_as(
+        "SELECT invoiced_at IS NULL, paid_at IS NULL, cancelled_at IS NULL, delivered_at IS NOT NULL,
+                (SELECT COUNT(*) FROM email_order_jobs) FROM orders",
+    )
+    .fetch_one(&db)
+    .await?;
+    assert_eq!(
+        row,
+        (true, true, true, true, 0),
+        "only the delivery was marked"
     );
     Ok(())
 }

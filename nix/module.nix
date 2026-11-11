@@ -46,7 +46,7 @@
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
 # rustWeb.enable, bosco-<name>-rust-web runs the public pages and the admin's
-# login, welcome page and order list in Rust next to them, with the same session key, and nginx sends
+# login, welcome page and orders in Rust next to them, with the same session key, and nginx sends
 # those pages to it (rustWeb.nginxLocations). With
 # rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
 # of IHP's.
@@ -241,8 +241,9 @@ let
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
             newsletter form, and of the admin, which shares IHP's session, the
-            login, logout, welcome page and order list. The rest of the admin
-            stays in IHP. nginx sends these pages
+            login, logout, welcome page, and the orders and their buttons
+            (except a new order from the admin). The rest of the admin stays in
+            IHP. nginx sends these pages
             to it with nginxLocations
           '';
 
@@ -301,7 +302,7 @@ let
   listenAddress = instance: listenAddressOf instance.host instance.port;
 
   # The Rust site's pages: the IHP app's public addresses (Web/) and the
-  # admin's login, welcome page and order list, see the routes in
+  # admin's login, welcome page and orders, see the routes in
   # rust-web/src/lib.rs
   rustWebPaths = [
     "/"
@@ -314,6 +315,12 @@ let
     "/admin/"
     "/admin/Welcome"
     "/admin/Orders"
+    "/admin/ShowOrder"
+    "/admin/UpdateMarkPaidOrder"
+    "/admin/UpdateInvoiceOrder"
+    "/admin/UpdateDeliverOrder"
+    "/admin/UpdateSendInvoiceOrder"
+    "/admin/DeleteCancelOrder"
     "/admin/NewSession"
     "/admin/CreateSession"
     "/admin/DeleteSession"
@@ -529,6 +536,8 @@ let
             ADDR = listenAddressOf instance.host instance.rustWeb.port;
             APP_LOCALE = instance.locale;
             APP_DEMO = if instance.demo then "1" else "0";
+            # The admin's order pages say when emails are off
+            SEND_EMAILS = if instance.sendEmails then "1" else "0";
             STATIC_DIR = "${static}";
             STYLESHEET = "/prod.css?v=${assetVersion}";
             # The admin's stylesheet and scripts, /static/app.css?v=…

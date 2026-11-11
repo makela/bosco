@@ -1,22 +1,30 @@
-//! The admin's order list, `/admin/Orders`: the IHP app's `OrdersAction`
-//! (`Admin/Controller/Orders.hs`, `Admin/View/Orders/Index.hs`). A year's
-//! orders that weren't cancelled, searched by the customer's name, sorted,
-//! and less those already invoiced, paid or delivered if asked. The order
-//! pages and the buttons' actions are still the IHP app's.
+//! The admin's orders, the IHP app's `Admin/Controller/Orders.hs`:
+//! - the list, `/admin/Orders` (`Admin/View/Orders/Index.hs`): a year's
+//!   orders that weren't cancelled, searched by the customer's name,
+//!   sorted, and less those already invoiced, paid or delivered if asked
+//! - an order's page, `/admin/ShowOrder` (`Admin/View/Orders/Show.hs`): its
+//!   invoice, the buttons for its next steps that the user's roles allow,
+//!   and when its invoice was emailed
+//! - the buttons' actions: mark it invoiced, paid or delivered, cancel it,
+//!   and email the invoice again
+//!
+//! A new order from the admin is still the IHP app's.
 
 use std::sync::Arc;
 
-use axum::extract::{Query, State};
+use axum::extract::rejection::FormRejection;
+use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use maud::{Markup, html};
 
 use crate::admin::{self, Crumb};
-use crate::db::{self, ListedOrder, Unhandled};
+use crate::db::{self, EmailJob, ListedOrder, Step, Unhandled};
 use crate::permission::Permission;
-use crate::views::money;
-use crate::{AppState, Result};
+use crate::session::{FLASH_ERROR, FLASH_SUCCESS};
+use crate::views::{customer_block, invoice_rows, money};
+use crate::{AppState, Params, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OrderBy {
@@ -253,6 +261,263 @@ pub async fn orders(
     Ok(admin::page(&state, session, &content))
 }
 
+/// The order an address is about, `?orderId=…`, as IHP's router reads it:
+/// None (a 400) when it's missing or not an id
+fn order_id(params: &[(String, String)]) -> Option<uuid::Uuid> {
+    let (_, id) = params.iter().find(|(key, _)| key == "orderId")?;
+    uuid::Uuid::parse_str(id).ok()
+}
+
+fn bad_request() -> Response {
+    StatusCode::BAD_REQUEST.into_response()
+}
+
+/// `renderEmailHistory`: when the invoice was emailed, and how it went
+fn email_history(emails_enabled: bool, jobs: &[EmailJob]) -> Markup {
+    if jobs.is_empty() {
+        return html! { p #email-history { "The invoice hasn't been emailed." } };
+    }
+    html! {
+        div #email-history {
+            h2 { "Invoice emails" }
+            @if !emails_enabled {
+                p { "Emails are off for this instance, so none of these was actually sent." }
+            }
+            ul {
+                @for job in jobs {
+                    @let error = job.last_error.as_deref().unwrap_or_default();
+                    @let (label, at, detail) = match job.status.as_str() {
+                        "job_status_succeeded" => ("Emailed", job.updated_at, String::new()),
+                        "job_status_failed" => ("Failed", job.updated_at, format!(": {error}")),
+                        "job_status_timed_out" => ("Timed out", job.updated_at, String::new()),
+                        "job_status_retry" => ("Failed", job.updated_at, format!(", trying again: {error}")),
+                        "job_status_running" => ("Sending, queued", job.created_at, String::new()),
+                        _ => ("Queued", job.created_at, String::new()),
+                    };
+                    li { (label) " " (date_time(at)) (detail) }
+                }
+            }
+        }
+    }
+}
+
+struct OrderView<'a> {
+    id: uuid::Uuid,
+    invoice: &'a db::Invoice,
+    jobs: &'a [EmailJob],
+    roles: db::Roles,
+}
+
+fn order_page(state: &AppState, view: &OrderView) -> Markup {
+    let order = &view.invoice.order;
+    let id = view.id;
+    let manage = view.roles.can(Permission::ManageOrders);
+    let button = |action: &str, label: &str| {
+        html! {
+            form method="POST" action={ "/admin/" (action) "?orderId=" (id) } {
+                input type="submit" class="btn-small" value=(label);
+            }
+        }
+    };
+    html! {
+        (admin::breadcrumb(&[
+            Crumb::link("Home", admin::WELCOME),
+            Crumb::link("Orders", "/admin/Orders"),
+            Crumb::text(date_time(order.ordered_at)),
+        ]))
+        (customer_block(&order.customer))
+        table {
+            tbody { (invoice_rows(&state.site, view.invoice)) }
+        }
+        @if let Some(at) = order.cancelled_at {
+            p { "Cancelled " (date_time(at)) }
+        } @else {
+            div.order-steps {
+                @if manage { (button("UpdateSendInvoiceOrder", "Send invoice")) }
+                @if manage && order.invoiced_at.is_none() { (button("UpdateInvoiceOrder", "Mark as invoiced")) }
+                @if manage && order.paid_at.is_none() { (button("UpdateMarkPaidOrder", "Mark as paid")) }
+                @if view.roles.can(Permission::MarkDelivered) && order.delivered_at.is_none() {
+                    (button("UpdateDeliverOrder", "Mark as delivered"))
+                }
+                @if manage && order.paid_at.is_none() {
+                    a href={ "/admin/DeleteCancelOrder?orderId=" (id) } class="js-delete btn-small danger" { "Cancel order" }
+                }
+            }
+        }
+        (email_history(state.emails_enabled, view.jobs))
+    }
+}
+
+pub async fn show_order(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    let Some(id) = order_id(&params) else {
+        return Ok(bad_request());
+    };
+    let (user, session) =
+        match admin::require_permission(&state, &headers, &uri, Permission::SeeOrders).await? {
+            Ok(found) => found,
+            Err(response) => return Ok(response),
+        };
+    let Some(invoice) = db::invoice(&state.db, id).await? else {
+        return Ok(crate::not_found(State(state), headers).await);
+    };
+    let jobs = db::email_jobs(&state.db, id).await?;
+    let content = order_page(
+        &state,
+        &OrderView {
+            id,
+            invoice: &invoice,
+            jobs: &jobs,
+            roles: user.roles,
+        },
+    );
+    Ok(admin::page(&state, session, &content))
+}
+
+fn show_path(id: uuid::Uuid) -> String {
+    format!("/admin/ShowOrder?orderId={id}")
+}
+
+/// The path and query of the page the button was on, for going back to
+/// it: the list as it was, with its year, filters and sorting. Only the
+/// path, so it stays on this site.
+fn referer_path(headers: &HeaderMap) -> Option<String> {
+    let referer = headers.get(axum::http::header::REFERER)?.to_str().ok()?;
+    let uri: Uri = referer.parse().ok()?;
+    let path = uri.path_and_query()?.as_str();
+    path.starts_with('/').then(|| path.to_string())
+}
+
+/// One of the buttons: the user may do it, the order is marked, and the
+/// next page says so
+async fn step(
+    state: Arc<AppState>,
+    headers: HeaderMap,
+    uri: Uri,
+    params: &[(String, String)],
+    step: Step,
+) -> Result<Response> {
+    let Some(id) = order_id(params) else {
+        return Ok(bad_request());
+    };
+    let permission = match step {
+        Step::Delivered => Permission::MarkDelivered,
+        _ => Permission::ManageOrders,
+    };
+    let (user, mut session) =
+        match admin::require_permission(&state, &headers, &uri, permission).await? {
+            Ok(found) => found,
+            Err(response) => return Ok(response),
+        };
+    if !db::mark(&state.db, id, step).await? {
+        return Ok(crate::not_found(State(state), headers).await);
+    }
+    tracing::info!(user = %user.id, order = %id, ?step, "marked the order");
+    let (message, to) = match step {
+        Step::Invoiced => ("Order invoiced", show_path(id)),
+        // Back to the list as it was, or to the order's page
+        Step::Paid => (
+            "Order paid",
+            referer_path(&headers).unwrap_or_else(|| "/admin/Orders".to_string()),
+        ),
+        Step::Delivered => ("Order delivered", show_path(id)),
+        Step::Cancelled => ("Order cancelled", "/admin/Orders".to_string()),
+    };
+    session.set_text(FLASH_SUCCESS, message);
+    Ok(admin::with_session(&state, &session, admin::found(&to)))
+}
+
+pub async fn mark_paid(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    step(state, headers, uri, &params, Step::Paid).await
+}
+
+pub async fn mark_invoiced(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    step(state, headers, uri, &params, Step::Invoiced).await
+}
+
+pub async fn mark_delivered(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    step(state, headers, uri, &params, Step::Delivered).await
+}
+
+/// Cancelling is a DELETE, which the order page's link sends as a POST
+/// with `_method=DELETE`, as IHP's `js-delete` links do
+pub async fn cancel(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    step(state, headers, uri, &params, Step::Cancelled).await
+}
+
+pub async fn cancel_by_post(
+    state: State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    query: Query<Vec<(String, String)>>,
+    form: std::result::Result<Form<Params>, FormRejection>,
+) -> Result<Response> {
+    if !admin::is_delete(form) {
+        return Ok(StatusCode::METHOD_NOT_ALLOWED.into_response());
+    }
+    cancel(state, headers, uri, query).await
+}
+
+/// Emails the invoice to the customer again, e.g. after their email
+/// address was corrected: a job for the worker, as on ordering
+pub async fn send_invoice(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    let Some(id) = order_id(&params) else {
+        return Ok(bad_request());
+    };
+    let (user, mut session) =
+        match admin::require_permission(&state, &headers, &uri, Permission::ManageOrders).await? {
+            Ok(found) => found,
+            Err(response) => return Ok(response),
+        };
+    let Some((email, cancelled)) = db::order_email(&state.db, id).await? else {
+        return Ok(crate::not_found(State(state), headers).await);
+    };
+    if cancelled {
+        session.set_text(FLASH_ERROR, "A cancelled order's invoice can't be sent");
+    } else {
+        db::queue_invoice_email(&state.db, id).await?;
+        tracing::info!(user = %user.id, order = %id, "queued the invoice to be emailed again");
+        session.set_text(
+            FLASH_SUCCESS,
+            &format!("Invoice queued for sending to {email}"),
+        );
+    }
+    Ok(admin::with_session(
+        &state,
+        &session,
+        admin::found(&show_path(id)),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,6 +627,36 @@ mod tests {
         assert_eq!(names(&arrange(all(), &filter("q=aalto eeva"))), ["Eeva"]);
         assert_eq!(names(&arrange(all(), &filter("q=eeva aalto"))), ["Eeva"]);
         assert_eq!(names(&arrange(all(), &filter("q=oliivi"))), ["Bertta"]);
+    }
+
+    #[test]
+    fn reads_the_order_id_and_the_page_to_go_back_to() {
+        let id = "d6af84db-3cf4-4445-8003-061c3bd99dc3";
+        assert_eq!(
+            order_id(&params(&format!("orderId={id}"))),
+            Some(id.parse().unwrap())
+        );
+        assert_eq!(order_id(&params("orderId=xyz")), None);
+        assert_eq!(order_id(&params("")), None);
+        let referer = |value: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert(axum::http::header::REFERER, value.parse().unwrap());
+            referer_path(&headers)
+        };
+        assert_eq!(
+            referer("https://tilaus.example.fi/admin/Orders?year=2025&q=aalto").as_deref(),
+            Some("/admin/Orders?year=2025&q=aalto")
+        );
+        // Another site's address goes to that path here
+        assert_eq!(
+            referer("https://evil.example/admin/Orders").as_deref(),
+            Some("/admin/Orders")
+        );
+        assert_eq!(
+            referer("/admin/ShowOrder?orderId=1").as_deref(),
+            Some("/admin/ShowOrder?orderId=1")
+        );
+        assert_eq!(referer("nonsense"), None);
     }
 
     #[test]

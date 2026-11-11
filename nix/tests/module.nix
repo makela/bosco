@@ -350,6 +350,7 @@ let
             ADDR
             APP_LOCALE
             APP_DEMO
+            SEND_EMAILS
             STATIC_DIR
             IHP_SESSION_SECRET_FILE
             IHP_BASEURL
@@ -369,6 +370,7 @@ let
         ADDR = "127.0.0.1:3403";
         APP_LOCALE = "en";
         APP_DEMO = "1";
+        SEND_EMAILS = "0";
         STATIC_DIR = "${self.packages.${system}.static}";
         IHP_SESSION_SECRET_FILE = "/var/lib/bosco-demo/session.aes";
         IHP_BASEURL = "https://demo.example.com";
@@ -389,6 +391,12 @@ let
           "= /admin/".proxyPass = "http://127.0.0.1:3403";
           "= /admin/Welcome".proxyPass = "http://127.0.0.1:3403";
           "= /admin/Orders".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/ShowOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/UpdateMarkPaidOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/UpdateInvoiceOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/UpdateDeliverOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/UpdateSendInvoiceOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/DeleteCancelOrder".proxyPass = "http://127.0.0.1:3403";
           "= /admin/NewSession".proxyPass = "http://127.0.0.1:3403";
           "= /admin/CreateSession".proxyPass = "http://127.0.0.1:3403";
           "= /admin/DeleteSession".proxyPass = "http://127.0.0.1:3403";

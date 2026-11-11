@@ -149,7 +149,10 @@ mod tests {
         };
         Invoice {
             order: Order {
+                ordered_at: chrono::DateTime::UNIX_EPOCH,
+                invoiced_at: None,
                 paid_at: None,
+                delivered_at: None,
                 cancelled_at: None,
                 customer: Customer {
                     email: "anna@example.com".into(),

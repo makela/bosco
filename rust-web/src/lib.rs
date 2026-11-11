@@ -62,6 +62,9 @@ pub struct AppState {
     /// Whether the session cookie is only sent over HTTPS, as IHP does when
     /// its base URL is https
     pub secure_cookies: bool,
+    /// Whether the instance sends emails (`SEND_EMAILS`), which the admin's
+    /// order pages tell
+    pub emails_enabled: bool,
 }
 
 /// The notice the next page shows once, like IHP's flash messages. Kept in
@@ -416,6 +419,30 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/Orders",
             get(admin_orders::orders).post(admin_orders::orders),
+        )
+        .route(
+            "/admin/ShowOrder",
+            get(admin_orders::show_order).post(admin_orders::show_order),
+        )
+        .route(
+            "/admin/UpdateMarkPaidOrder",
+            post(admin_orders::mark_paid).patch(admin_orders::mark_paid),
+        )
+        .route(
+            "/admin/UpdateInvoiceOrder",
+            post(admin_orders::mark_invoiced).patch(admin_orders::mark_invoiced),
+        )
+        .route(
+            "/admin/UpdateDeliverOrder",
+            post(admin_orders::mark_delivered).patch(admin_orders::mark_delivered),
+        )
+        .route(
+            "/admin/UpdateSendInvoiceOrder",
+            post(admin_orders::send_invoice).patch(admin_orders::send_invoice),
+        )
+        .route(
+            "/admin/DeleteCancelOrder",
+            delete(admin_orders::cancel).post(admin_orders::cancel_by_post),
         )
         .route("/admin/CreateSession", post(admin::create_session))
         .route(

@@ -5,6 +5,8 @@
 //! - `ADDR`: where to listen, `127.0.0.1:8003` by default
 //! - `APP_LOCALE`: fi, en or fr, as for the IHP app
 //! - `APP_DEMO`: 1 for a public demo
+//! - `SEND_EMAILS`: 0 when the instance sends no emails, as the admin's
+//!   order pages then say
 //! - `STATIC_DIR`: the IHP app's `static/`, `../static` by default
 //! - `STYLESHEET`: the stylesheet's URL, `/app.css` (the IHP app's dev
 //!   build, see `devenv up`) by default
@@ -65,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         static_dir: setting("STATIC_DIR", "../static").into(),
         session_key,
         secure_cookies: setting("IHP_BASEURL", "").starts_with("https://"),
+        emails_enabled: flag("SEND_EMAILS", true)?,
     });
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;

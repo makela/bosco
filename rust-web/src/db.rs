@@ -45,7 +45,10 @@ pub struct Customer {
 
 #[derive(Debug, FromRow)]
 pub struct Order {
+    pub ordered_at: DateTime<Utc>,
+    pub invoiced_at: Option<DateTime<Utc>>,
     pub paid_at: Option<DateTime<Utc>>,
+    pub delivered_at: Option<DateTime<Utc>>,
     pub cancelled_at: Option<DateTime<Utc>>,
     #[sqlx(flatten)]
     pub customer: Customer,
@@ -241,7 +244,8 @@ pub struct Invoice {
 
 pub async fn invoice(db: &PgPool, order_id: Uuid) -> sqlx::Result<Option<Invoice>> {
     let Some(order): Option<Order> = sqlx::query_as(
-        "SELECT paid_at, cancelled_at, email, phone, first_name, last_name,
+        "SELECT ordered_at, invoiced_at, paid_at, delivered_at, cancelled_at,
+                email, phone, first_name, last_name,
                 street_address, postal_code, city, billing_name
          FROM orders JOIN customers ON customers.id = orders.customer_id
          WHERE orders.id = $1",
@@ -493,4 +497,68 @@ pub async fn order_years(db: &PgPool) -> sqlx::Result<std::ops::RangeInclusive<i
     .await?;
     let now = chrono::Datelike::year(&Utc::now());
     Ok(first.unwrap_or(now)..=last.unwrap_or(now))
+}
+
+/// A time the order's invoice was emailed, or is to be
+#[derive(Debug, FromRow)]
+pub struct EmailJob {
+    /// IHP's job status, e.g. `job_status_succeeded`
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_error: Option<String>,
+}
+
+/// Every time the order's invoice was emailed, or is to be, oldest first
+pub async fn email_jobs(db: &PgPool, order_id: Uuid) -> sqlx::Result<Vec<EmailJob>> {
+    sqlx::query_as(
+        "SELECT status::text, created_at, updated_at, last_error FROM email_order_jobs
+         WHERE order_id = $1 ORDER BY created_at",
+    )
+    .bind(order_id)
+    .fetch_all(db)
+    .await
+}
+
+/// A step of an order's handling, its time column
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Step {
+    Invoiced,
+    Paid,
+    Delivered,
+    Cancelled,
+}
+
+/// Marks the order's step done now, as the admin's buttons do. False if
+/// there's no such order.
+pub async fn mark(db: &PgPool, order_id: Uuid, step: Step) -> sqlx::Result<bool> {
+    let sql = match step {
+        Step::Invoiced => "UPDATE orders SET invoiced_at = NOW() WHERE id = $1",
+        Step::Paid => "UPDATE orders SET paid_at = NOW() WHERE id = $1",
+        Step::Delivered => "UPDATE orders SET delivered_at = NOW() WHERE id = $1",
+        Step::Cancelled => "UPDATE orders SET cancelled_at = NOW() WHERE id = $1",
+    };
+    let done = sqlx::query(sql).bind(order_id).execute(db).await?;
+    Ok(done.rows_affected() == 1)
+}
+
+/// The order's customer's email and whether it was cancelled, if there's
+/// such an order
+pub async fn order_email(db: &PgPool, order_id: Uuid) -> sqlx::Result<Option<(String, bool)>> {
+    sqlx::query_as(
+        "SELECT email, cancelled_at IS NOT NULL FROM orders
+         JOIN customers ON customers.id = orders.customer_id WHERE orders.id = $1",
+    )
+    .bind(order_id)
+    .fetch_optional(db)
+    .await
+}
+
+/// Emails the invoice again: a job for the worker, as on ordering
+pub async fn queue_invoice_email(db: &PgPool, order_id: Uuid) -> sqlx::Result<()> {
+    sqlx::query("INSERT INTO email_order_jobs (order_id) VALUES ($1)")
+        .bind(order_id)
+        .execute(db)
+        .await
+        .map(drop)
 }

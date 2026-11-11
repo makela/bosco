@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use axum::extract::rejection::FormRejection;
 use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
@@ -86,7 +87,7 @@ pub(crate) fn with_session(
 }
 
 /// IHP's `redirectTo`, a 302
-fn found(to: &str) -> impl IntoResponse + use<> {
+pub(crate) fn found(to: &str) -> impl IntoResponse + use<> {
     (StatusCode::FOUND, [(header::LOCATION, to.to_string())])
 }
 
@@ -237,12 +238,19 @@ pub async fn delete_session(State(state): State<Arc<AppState>>, headers: HeaderM
     with_session(&state, &session, see_other(NEW_SESSION))
 }
 
+/// A POST that IHP takes as a DELETE: one with `_method=DELETE` in its
+/// form. Without a form, or another method, it's a POST, which a DELETE
+/// action refuses with 405.
+pub fn is_delete(form: std::result::Result<Form<Params>, FormRejection>) -> bool {
+    form.is_ok_and(|Form(params)| params.get("_method").map(String::as_str) == Some("DELETE"))
+}
+
 pub async fn delete_session_by_post(
     state: State<Arc<AppState>>,
     headers: HeaderMap,
-    Form(params): Form<Params>,
+    form: std::result::Result<Form<Params>, FormRejection>,
 ) -> Response {
-    if params.get("_method").map(String::as_str) == Some("DELETE") {
+    if is_delete(form) {
         delete_session(state, headers).await
     } else {
         StatusCode::METHOD_NOT_ALLOWED.into_response()
@@ -390,20 +398,23 @@ pub async fn require_permission(
 
 /// A step of a page's breadcrumb, a link or the page itself
 pub struct Crumb<'a> {
-    label: &'a str,
+    label: Markup,
     url: Option<&'a str>,
 }
 
 impl<'a> Crumb<'a> {
-    pub fn link(label: &'a str, url: &'a str) -> Self {
+    pub fn link(label: &str, url: &'a str) -> Self {
         Self {
-            label,
+            label: html! { (label) },
             url: Some(url),
         }
     }
 
-    pub fn text(label: &'a str) -> Self {
-        Self { label, url: None }
+    pub fn text(label: impl maud::Render) -> Self {
+        Self {
+            label: html! { (label) },
+            url: None,
+        }
     }
 }
 
