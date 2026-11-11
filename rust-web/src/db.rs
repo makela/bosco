@@ -401,3 +401,30 @@ pub async fn ensure_demo_user(
     .fetch_one(db)
     .await
 }
+
+/// A logged-in user, for the admin's pages
+#[derive(Debug, Clone)]
+pub struct AdminUser {
+    pub id: Uuid,
+    pub email: String,
+    pub roles: Roles,
+}
+
+/// The logged-in user, if their login still exists
+pub async fn admin_user(db: &PgPool, id: Uuid) -> sqlx::Result<Option<AdminUser>> {
+    let row: Option<(String, bool, bool, bool)> = sqlx::query_as(
+        "SELECT email, is_admin, is_deliverer, is_promoter FROM users WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(|(email, admin, deliverer, promoter)| AdminUser {
+        id,
+        email,
+        roles: Roles {
+            admin,
+            deliverer,
+            promoter,
+        },
+    }))
+}

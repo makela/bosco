@@ -155,9 +155,15 @@ impl Session {
     }
 
     /// The logged-in user's id
+    /// The logged-in user's id: its 36 characters, or, as IHP also takes
+    /// it, those set as a Text (with their length before them)
     pub fn user_id(&self) -> Option<uuid::Uuid> {
         let value = self.get(LOGIN)?;
-        uuid::Uuid::try_parse_ascii(value).ok()
+        let ascii = match value.len() {
+            44 => &value[8..],
+            _ => value,
+        };
+        uuid::Uuid::try_parse_ascii(ascii).ok()
     }
 
     pub fn login(&mut self, user_id: uuid::Uuid) {
@@ -321,6 +327,15 @@ mod tests {
         assert_eq!(read.get(LOGIN), Some(&b""[..]));
         assert_eq!(read.get_text(FLASH_ERROR), None);
         assert_eq!(read.get_text(FLASH_SUCCESS).as_deref(), Some("Päivitetty"));
+    }
+
+    #[test]
+    fn takes_a_login_set_as_a_text_too() {
+        let mut session = Session::default();
+        session.set_text(LOGIN, USER);
+        assert_eq!(session.user_id(), Some(USER.parse().unwrap()));
+        session.insert(LOGIN, b"not a uuid".to_vec());
+        assert_eq!(session.user_id(), None);
     }
 
     #[test]

@@ -1,8 +1,9 @@
 //! The admin's login and logout, the IHP app's `Admin/Controller/Sessions.hs`
-//! with IHP's `IHP.AuthSupport.Controller.Sessions`. The rest of the admin
-//! is still the IHP app's: they share IHP's session cookie (`session.rs`),
-//! so a login here lets one into the IHP app's admin pages, and their flash
-//! messages show here.
+//! with IHP's `IHP.AuthSupport.Controller.Sessions`, and its welcome page,
+//! `Admin/Controller/Static.hs`. The rest of the admin is still the IHP
+//! app's: they share IHP's session cookie (`session.rs`), so a login here
+//! lets one into the IHP app's admin pages, and their flash messages show
+//! here.
 //!
 //! As in IHP, a login is locked for an hour after 10 wrong passwords in a
 //! row, and the login page is shown even to someone logged in.
@@ -10,17 +11,18 @@
 use std::sync::Arc;
 
 use axum::extract::{Form, Query, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
 use maud::{DOCTYPE, Markup, html};
 
-use crate::db::{self, Roles};
+use crate::db::{self, AdminUser, Roles};
+use crate::permission::Permission;
 use crate::session::{FLASH_ERROR, FLASH_SUCCESS, REDIRECT_AFTER_LOGIN, Session};
 use crate::{AppState, Params, Result, password};
 
 pub const NEW_SESSION: &str = "/admin/NewSession";
 /// The admin's start page, where a demo login goes
-const WELCOME: &str = "/admin/Welcome";
+pub const WELCOME: &str = "/admin/Welcome";
 /// IHP's `afterLoginRedirectPath`: where a login goes when it wasn't sent
 /// to the login page from an admin page
 const AFTER_LOGIN: &str = "/";
@@ -266,4 +268,90 @@ pub async fn demo_login(
     session.login(user);
     tracing::info!(user = %user, role = login.role, "logged in to the demo");
     Ok(with_session(&state, &session, found(WELCOME)))
+}
+
+/// The logged-in user, with their session; or, for someone not logged in,
+/// the login page, which will come back here, as IHP's `ensureIsUser`
+pub async fn require_user(
+    state: &AppState,
+    headers: &HeaderMap,
+    uri: &Uri,
+) -> Result<std::result::Result<(AdminUser, Session), Response>> {
+    let mut session = Session::from_headers(&state.session_key, headers);
+    if let Some(id) = session.user_id()
+        && let Some(user) = db::admin_user(&state.db, id).await?
+    {
+        return Ok(Ok((user, session)));
+    }
+    session.set_text(FLASH_SUCCESS, "Please log in to access this page");
+    let here = uri.path_and_query().map_or(uri.path(), |p| p.as_str());
+    session.set_text(REDIRECT_AFTER_LOGIN, here);
+    Ok(Err(with_session(state, &session, found(NEW_SESSION))))
+}
+
+/// The menu: what each link needs, its text and address, A to Z
+const MENU: &[(Permission, &str, &str)] = &[
+    (
+        Permission::SeeOrderedProducts,
+        "All ordered products",
+        "/admin/OrderedProducts",
+    ),
+    (Permission::ManageShop, "Customers", "/admin/Customers"),
+    (
+        Permission::SeeEmailLists,
+        "Emails for delivery info",
+        "/admin/EmailsForDeliveryInfo",
+    ),
+    (
+        Permission::SeeEmailLists,
+        "Emails for news letter",
+        "/admin/EmailsForNewsLetter",
+    ),
+    (Permission::SeeOrders, "Orders", "/admin/Orders"),
+    (
+        Permission::ManageShop,
+        "Payment Instructions",
+        "/admin/PaymentInstructions",
+    ),
+    (Permission::EditShopTexts, "Producers", "/admin/Producers"),
+    (Permission::EditShopTexts, "Products", "/admin/Products"),
+    (
+        Permission::ManageShop,
+        "Welcome Messages",
+        "/admin/WelcomeMessages",
+    ),
+];
+
+/// `Admin/View/Static/Welcome.hs`: the links the user's roles allow
+fn welcome_page(user: &AdminUser) -> Markup {
+    // A demo's logins have no password to change
+    let demo_user = DEMO_LOGINS.iter().any(|login| login.email == user.email);
+    html! {
+        a class="js-delete js-delete-no-confirm back-button float-right p-2" href="/admin/DeleteSession" { "Logout" }
+        @if !demo_user {
+            a class="float-right p-2" href="/admin/NewPassword" { "Change password" }
+        }
+        ol.my-4 {
+            @for (permission, label, url) in MENU {
+                @if user.roles.can(*permission) {
+                    li { a href=(url) { (label) } }
+                }
+            }
+            @if !user.roles.any() {
+                li { "Your login has no role yet: ask an admin for one." }
+            }
+        }
+    }
+}
+
+pub async fn welcome(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Result<Response> {
+    let (user, session) = match require_user(&state, &headers, &uri).await? {
+        Ok(found) => found,
+        Err(to_login) => return Ok(to_login),
+    };
+    Ok(page(&state, session, &welcome_page(&user)))
 }

@@ -462,3 +462,147 @@ async fn only_a_demo_has_demo_logins(db: PgPool) -> TestResult {
     assert_eq!(users, 1);
     Ok(())
 }
+
+/// A login with these roles, as the session has it after logging in
+async fn user_with(
+    db: &PgPool,
+    email: &str,
+    roles: (bool, bool, bool),
+) -> Result<Session, Box<dyn std::error::Error>> {
+    let id: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, password_hash, is_admin, is_deliverer, is_promoter)
+         VALUES ($1, 'x', $2, $3, $4) RETURNING id",
+    )
+    .bind(email)
+    .bind(roles.0)
+    .bind(roles.1)
+    .bind(roles.2)
+    .fetch_one(db)
+    .await?;
+    let mut session = Session::default();
+    session.login(id);
+    Ok(session)
+}
+
+/// The menu's links on the welcome page
+fn links(page: &str) -> Vec<&str> {
+    page.split("<li><a href=\"")
+        .skip(1)
+        .filter_map(|rest| rest.split('"').next())
+        .collect()
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_welcome_page_shows_what_the_roles_allow(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let all = [
+        "/admin/OrderedProducts",
+        "/admin/Customers",
+        "/admin/EmailsForDeliveryInfo",
+        "/admin/EmailsForNewsLetter",
+        "/admin/Orders",
+        "/admin/PaymentInstructions",
+        "/admin/Producers",
+        "/admin/Products",
+        "/admin/WelcomeMessages",
+    ];
+    for (email, roles, expected) in [
+        ("boss@example.com", (true, false, false), &all[..]),
+        (
+            "driver@example.com",
+            (false, true, false),
+            &["/admin/Orders"][..],
+        ),
+        (
+            "promo@example.com",
+            (false, false, true),
+            &[
+                "/admin/OrderedProducts",
+                "/admin/EmailsForDeliveryInfo",
+                "/admin/EmailsForNewsLetter",
+                "/admin/Orders",
+                "/admin/Producers",
+                "/admin/Products",
+            ][..],
+        ),
+        ("nobody@example.com", (false, false, false), &[][..]),
+    ] {
+        let session = user_with(&db, email, roles).await?;
+        for uri in ["/admin/", "/admin/Welcome"] {
+            let response = send(&app, Method::GET, uri, &session, &[]).await?;
+            assert_eq!(response.status(), StatusCode::OK);
+            let page = text(response).await?;
+            assert_eq!(links(&page), expected, "{email} {uri}");
+            assert!(page.contains(
+                r#"<a class="js-delete js-delete-no-confirm back-button float-right p-2" href="/admin/DeleteSession">Logout</a>"#
+            ));
+            assert!(page.contains(r#"href="/admin/NewPassword">Change password</a>"#));
+            assert_eq!(
+                page.contains("<li>Your login has no role yet: ask an admin for one.</li>"),
+                expected.is_empty(),
+                "{email}"
+            );
+        }
+    }
+    Ok(())
+}
+
+/// A demo's logins have no password to change
+#[sqlx::test(migrations = false)]
+async fn a_demo_login_has_no_password_to_change(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), true);
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/DemoLogin?role=admin",
+        &Session::default(),
+        &[],
+    )
+    .await?;
+    let session = session_after(&response, &Session::default());
+    let page = text(send(&app, Method::GET, "/admin/Welcome", &session, &[]).await?).await?;
+    assert!(page.contains(">Logout</a>"));
+    assert!(!page.contains("Change password"), "{page}");
+    assert!(page.contains(r#"<div class="demo-ribbon""#));
+    Ok(())
+}
+
+/// As IHP's `ensureIsUser`: to the login page, with a message, and back
+/// here after logging in
+#[sqlx::test(migrations = false)]
+async fn the_welcome_page_needs_a_login(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let response = send(
+        &app,
+        Method::GET,
+        "/admin/Welcome?x=1",
+        &Session::default(),
+        &[],
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::FOUND);
+    assert_eq!(location(&response), "/admin/NewSession");
+    let session = session_after(&response, &Session::default());
+    assert_eq!(
+        session.get_text(FLASH_SUCCESS).as_deref(),
+        Some("Please log in to access this page")
+    );
+    let response = login(&app, &session, "admin@example.com", "salasana").await?;
+    assert_eq!(location(&response), "/admin/Welcome?x=1");
+
+    // A login that was deleted since is no login
+    let mut gone = Session::default();
+    gone.login(Uuid::from_u128(7));
+    let response = send(&app, Method::GET, "/admin/", &gone, &[]).await?;
+    assert_eq!(response.status(), StatusCode::FOUND);
+    assert_eq!(location(&response), "/admin/NewSession");
+    let after = session_after(&response, &gone);
+    assert_eq!(
+        after.get_text(REDIRECT_AFTER_LOGIN).as_deref(),
+        Some("/admin/")
+    );
+    Ok(())
+}

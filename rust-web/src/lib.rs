@@ -10,6 +10,7 @@ pub mod db;
 pub mod l10n;
 pub mod mail;
 pub mod password;
+pub mod permission;
 pub mod session;
 pub mod settings;
 pub mod skein_mac;
@@ -409,6 +410,8 @@ pub fn app(state: Arc<AppState>) -> Router {
             admin::NEW_SESSION,
             get(admin::new_session).post(admin::new_session),
         )
+        .route("/admin/", get(admin::welcome).post(admin::welcome))
+        .route(admin::WELCOME, get(admin::welcome).post(admin::welcome))
         .route("/admin/CreateSession", post(admin::create_session))
         .route(
             "/admin/DeleteSession",

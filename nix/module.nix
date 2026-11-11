@@ -46,7 +46,7 @@
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
 # rustWeb.enable, bosco-<name>-rust-web runs the public pages and the admin's
-# login in Rust next to them, with the same session key, and nginx sends
+# login and welcome page in Rust next to them, with the same session key, and nginx sends
 # those pages to it (rustWeb.nginxLocations). With
 # rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
 # of IHP's.
@@ -240,8 +240,8 @@ let
           enable = lib.mkEnableOption ''
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
-            newsletter form, and the admin's login and logout, which share IHP's
-            session. The rest of the admin stays in IHP. nginx sends these pages
+            newsletter form, and the admin's login, logout and welcome page,
+            which share IHP's session. The rest of the admin stays in IHP. nginx sends these pages
             to it with nginxLocations
           '';
 
@@ -300,7 +300,7 @@ let
   listenAddress = instance: listenAddressOf instance.host instance.port;
 
   # The Rust site's pages: the IHP app's public addresses (Web/) and the
-  # admin's login, see the routes in rust-web/src/lib.rs
+  # admin's login and welcome page, see the routes in rust-web/src/lib.rs
   rustWebPaths = [
     "/"
     "/Orders"
@@ -309,6 +309,8 @@ let
     "/ShowOrder"
     "/NewEmail"
     "/CreateEmail"
+    "/admin/"
+    "/admin/Welcome"
     "/admin/NewSession"
     "/admin/CreateSession"
     "/admin/DeleteSession"

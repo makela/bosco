@@ -3,8 +3,8 @@
 The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 [maud](https://maud.lambda.xyz/), [SQLx](https://github.com/launchbadge/sqlx)):
 the welcome message, the order form, an order's invoice and the newsletter
-form, in Finnish, English or French, demo mode included; the admin's login
-and logout; and the email worker, IHP's job runner with
+form, in Finnish, English or French, demo mode included; the admin's login,
+logout and welcome page (its menu); and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
 so both can run at once: the rest of the admin stays in IHP, and either
 app's worker emails the invoices of either app's orders, as each order saves
@@ -29,7 +29,11 @@ emails keep working, and the markup and classes are the same, so
   job table as IHP's job runner does
 - `src/mail.rs`: the order email, from `Web/Mail/Orders/Order.hs`
 - `src/admin.rs`: the admin's login and logout, from
-  `Admin/Controller/Sessions.hs` and IHP's sessions controller
+  `Admin/Controller/Sessions.hs` and IHP's sessions controller, its layout,
+  the login check every admin page makes (`require_user`), and the welcome
+  page, from `Admin/Controller/Static.hs`
+- `src/permission.rs`: what each role may do, from
+  `Application/Permission.hs`
 - `src/session.rs`, `src/skein_mac.rs`: IHP's session cookie
   (clientsession's AES-256-CTR and Skein-MAC-512-256)
 - `src/password.rs`: IHP's password hashes (pwstore-fast's)
@@ -100,4 +104,4 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the admin beyond its login.
+Not done yet: the admin's pages beyond its login and welcome page.
