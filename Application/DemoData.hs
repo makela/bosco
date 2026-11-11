@@ -36,6 +36,14 @@ import Application.Customer (reverseNameOf)
 import Application.Localization
 import Generated.Types
 
+-- | The olive oils, four times as popular as the other products. By id, as
+-- the catalogs in other languages (Fixtures.en.sql) have the same ids.
+oliveOils :: [Id Product]
+oliveOils = map textToId
+    [ "61db0ec5-698a-4b48-b19b-995d41472bb1" :: Text -- 250 ml
+    , "0fa0cd0f-921a-429e-a184-3a9a547f0990" -- 3 l
+    ]
+
 -- | How many ordering seasons the demo has: this one and the three before
 seasons :: Int
 seasons = 4
@@ -49,7 +57,7 @@ resetDemoData fixtures seed now = withTransaction do
     forM_ (fixtureInserts fixtures) \statement -> unsafeSqlExecDiscardResult (fromString (cs statement)) ()
     _ <- newRecord @PaymentInstruction |> set #text demoPaymentDetails |> createRecord
     products <- query @Product |> filterWhere (#enabled, True) |> fetch
-    let catalog = map (\p -> CatalogItem { productId = p.id, name = p.name, price = p.price }) products
+    let catalog = map (\p -> CatalogItem { productId = p.id, price = p.price }) products
         orders = demoOrders seed now catalog
     forM_ orders createDemoOrder
     forM_ newsletterSubscribers (createDemoCustomer . subscriberOnly)
@@ -127,7 +135,6 @@ seedFor now = fromIntegral (toModifiedJulianDay (utctDay now))
 
 data CatalogItem = CatalogItem
     { productId :: Id Product
-    , name :: Text
     , price :: Int
       -- ^ This season's price, in cents
     }
@@ -203,7 +210,7 @@ demoOrders seed now catalog = fst $ runGen generate seed
 
     genLines age = do
         count <- genWeighted [(5, 1), (4, 2), (2, 3), (1, 4)]
-        items <- genDistinct count [(if "Oliiviöljy" `T.isPrefixOf` item.name then 4 else 1, item) | item <- catalog]
+        items <- genDistinct count [(if item.productId `elem` oliveOils then 4 else 1, item) | item <- catalog]
         forM items \item -> do
             quantity <- genWeighted [(6, 1), (3, 2), (1, 3)]
             let unitPrice = fromMaybe item.price (Map.lookup item.productId prices >>= \ps -> ps `atMay` age)

@@ -286,6 +286,13 @@ let
       state = "/var/lib/bosco-${name}";
       migrate = "bosco-${name}-migrate.service";
       databaseUrl = "postgresql:///${instance.database}?host=/run/postgresql";
+      # The catalog in the instance's language, Fixtures.<locale>.sql, or
+      # the Finnish one, Fixtures.sql, when there's none
+      fixtures =
+        let
+          localized = "${instance.flake}/Application/Fixtures.${instance.locale}.sql";
+        in
+        if builtins.pathExists localized then localized else "${instance.flake}/Application/Fixtures.sql";
 
       after = [
         "network.target"
@@ -343,7 +350,7 @@ let
         // lib.optionalAttrs instance.bootstrapSchema {
           IHP_SCHEMA = "${instance.flake.inputs.ihp}/ihp-schema-compiler/data/IHPSchema.sql";
           APP_SCHEMA = "${instance.flake}/Application/Schema.sql";
-          APP_FIXTURES = "${instance.flake}/Application/Fixtures.sql";
+          APP_FIXTURES = fixtures;
         };
         serviceConfig = serviceConfig // {
           Type = "oneshot";
@@ -418,7 +425,7 @@ let
           migrate
         ];
         environment = environment // {
-          APP_FIXTURES = "${instance.flake}/Application/Fixtures.sql";
+          APP_FIXTURES = fixtures;
         };
         serviceConfig = serviceConfig // {
           Type = "oneshot";

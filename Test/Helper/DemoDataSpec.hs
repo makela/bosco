@@ -14,8 +14,8 @@ import Generated.Types
 tests :: Spec
 tests = describe "Application.DemoData" do
     let now = UTCTime (fromGregorian 2026 11 8) 43200
-        oil = CatalogItem { productId = textToId ("61db0ec5-698a-4b48-b19b-995d41472bb1" :: Text), name = "Oliiviöljyä", price = 5100 }
-        chocolate = CatalogItem { productId = textToId ("c5292736-21d4-4846-a192-2447ef3fdf9f" :: Text), name = "Chilisuklaa", price = 410 }
+        oil = CatalogItem { productId = textToId ("61db0ec5-698a-4b48-b19b-995d41472bb1" :: Text), price = 5100 }
+        chocolate = CatalogItem { productId = textToId ("c5292736-21d4-4846-a192-2447ef3fdf9f" :: Text), price = 410 }
         catalog = [oil, chocolate]
         orders = demoOrders 42 now catalog
         yearOf order = let (year, _, _) = toGregorian (utctDay order.orderedAt) in year
@@ -79,6 +79,14 @@ tests = describe "Application.DemoData" do
             recent `shouldSatisfy` (not . null)
             all (\o -> isNothing o.deliveredAt) recent `shouldBe` True
             any (\o -> isNothing o.paidAt && isNothing o.cancelledAt) recent `shouldBe` True
+
+        it "has olive oil ordered more than the other products" do
+            let others = [CatalogItem { productId = textToId ("00000000-0000-0000-0000-00000000000" <> tshow i), price = 410 } | i <- [1 .. 6 :: Int]]
+                many = demoOrders 42 now (oil : others)
+                linesOf :: CatalogItem -> Int
+                linesOf item = length [() | order <- many, line <- order.orderLines, line.productId == item.productId]
+            -- Without the weight it would be about as many as each other product
+            (2 * linesOf oil) `shouldSatisfy` (> 3 * maximum (map linesOf others))
 
         it "charges each season's price" do
             let prices = seasonPrices 42 catalog

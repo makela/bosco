@@ -174,12 +174,15 @@ own admin login, made with `CreateUser`, works as usual.
 
 Every night at 03:00 (`demoReset.time`), `bosco-<name>-reset-demo` resets
 the demo's data in one transaction (`Application/DemoData.hs`). It reloads
-the catalog from `Fixtures.sql`, adds fake payment details and makes up four
-seasons of orders, with more each year, returning customers and prices a
-few percent lower each year back. Logins are kept. The newest orders are
-still waiting to be invoiced, paid or delivered. The orders differ every
-day. The script refuses to run unless `APP_DEMO` is on. A new demo has no
-orders until the first reset, so run it once after the first deploy:
+the catalog in the instance's language, `Fixtures.<locale>.sql` (so far
+`Fixtures.en.sql`), or else the Finnish `Fixtures.sql`. The catalogs have
+the same ids and prices, so a change to one belongs in the others too. It
+adds fake payment details and makes up four seasons of orders, with more
+each year, returning customers and prices a few percent lower each year
+back. Logins are kept. The newest orders are still waiting to be invoiced,
+paid or delivered. The orders differ every day. The script refuses to run
+unless `APP_DEMO` is on. A new demo has no orders until the first reset,
+so run it once after the first deploy:
 
 ```sh
 systemctl start bosco-demo-reset-demo

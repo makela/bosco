@@ -406,6 +406,43 @@ let
       };
     };
 
+    # Fixtures.en.sql for an English demo; French has no catalog of its own
+    # yet, so it gets the Finnish one
+    testADemoHasTheCatalogInItsLanguage = {
+      expr =
+        let
+          demo =
+            locale:
+            evaluate {
+              demo = {
+                baseUrl = "https://demo.example.com";
+                inherit locale;
+                demo = true;
+                sendEmails = false;
+                bootstrapSchema = true;
+              };
+            };
+          fixtures = locale: {
+            reset = (demo locale).systemd.services.bosco-demo-reset-demo.environment.APP_FIXTURES;
+            bootstrap = (demo locale).systemd.services.bosco-demo-migrate.environment.APP_FIXTURES;
+          };
+        in
+        {
+          en = fixtures "en";
+          fr = fixtures "fr";
+        };
+      expected = {
+        en = {
+          reset = "${self}/Application/Fixtures.en.sql";
+          bootstrap = "${self}/Application/Fixtures.en.sql";
+        };
+        fr = {
+          reset = "${self}/Application/Fixtures.sql";
+          bootstrap = "${self}/Application/Fixtures.sql";
+        };
+      };
+    };
+
     # Config.hs refuses to start a demo without SEND_EMAILS=0, so every
     # program of a demo needs both settings, not only the worker
     testEveryDemoProgramKnowsItIsADemoWithoutEmails = {
