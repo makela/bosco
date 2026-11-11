@@ -533,8 +533,9 @@ let
       };
     };
 
-    # A demo with the Rust site resets its data with the Rust program
-    testTheRustSiteResetsTheDemo = {
+    # A demo with the Rust site migrates and resets its data with the Rust
+    # programs
+    testTheRustSiteMigratesAndResetsTheDemo = {
       expr =
         let
           config = evaluate {
@@ -547,13 +548,18 @@ let
             };
           };
           reset = config.systemd.services.bosco-demo-reset-demo;
+          migrate = config.systemd.services.bosco-demo-migrate;
         in
         {
+          migrates = lib.hasSuffix "/bin/bosco-migrate" migrate.serviceConfig.ExecStart;
+          migratesWithTheUser = migrate.environment.DATABASE_URL == reset.environment.DATABASE_URL;
           program = lib.hasSuffix "/bin/bosco-reset-demo" reset.serviceConfig.ExecStart;
           inherit (reset.environment) APP_DEMO DATABASE_URL;
           fixtures = lib.hasSuffix "Fixtures.sql" reset.environment.APP_FIXTURES;
         };
       expected = {
+        migrates = true;
+        migratesWithTheUser = true;
         program = true;
         APP_DEMO = "1";
         DATABASE_URL = "postgresql:///bosco_demo?host=/run/postgresql&user=bosco_demo";

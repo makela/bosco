@@ -227,8 +227,10 @@ writes IHP's session cookie with the instance's session key and checks and
 makes IHP's password hashes, so a login in either app is a login in the
 other, and logins, lockouts and changed passwords carry over both ways.
 nginx sends these pages to it and the rest to the IHP app with
-`rustWeb.nginxLocations`, as for the demo above. Without it, an instance runs
-them in IHP as before. See `rust-web/README.md` for the few differences.
+`rustWeb.nginxLocations`, as for the demo above. The instance's migrations
+then run with the Rust site's `bosco-migrate`, and a demo's nightly reset
+with its `bosco-reset-demo`. Without it, an instance runs all of these in
+IHP as before. See `rust-web/README.md` for the few differences.
 
 Try it on the demo first. `journalctl -u bosco-demo-rust-web` shows its
 requests. To go back, set `rustWeb.enable = false` and point nginx's

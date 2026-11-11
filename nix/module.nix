@@ -93,7 +93,7 @@ let
           type = lib.types.package;
           default = config.flake.packages.${system}.migrate;
           defaultText = lib.literalExpression "flake.packages.\${system}.migrate";
-          description = "IHP's migrate program.";
+          description = "IHP's migrate program, without rustWeb.enable.";
         };
 
         baseUrl = lib.mkOption {
@@ -465,7 +465,8 @@ let
         inherit after;
         requires = [ "postgresql.service" ];
         environment = {
-          DATABASE_URL = databaseUrl;
+          # SQLx, of bosco-migrate, needs the user; psql takes it either way
+          DATABASE_URL = if instance.rustWeb.enable then rustDatabaseUrl else databaseUrl;
           IHP_MIGRATION_DIR = "${instance.flake}/Application/Migration/";
           MINIMUM_REVISION = toString instance.minimumRevision;
         }
@@ -479,7 +480,12 @@ let
           # Stays active, so a new version's migrations run on the next switch
           RemainAfterExit = true;
           ExecStartPre = [ keygen ] ++ lib.optional instance.bootstrapSchema (lib.getExe bootstrap);
-          ExecStart = "${instance.migratePackage}/bin/migrate";
+          # With the Rust site, its bosco-migrate, which does the same
+          ExecStart =
+            if instance.rustWeb.enable then
+              "${instance.rustWeb.package}/bin/bosco-migrate"
+            else
+              "${instance.migratePackage}/bin/migrate";
         };
       };
 

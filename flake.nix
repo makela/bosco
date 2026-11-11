@@ -27,6 +27,20 @@
 
             perSystem = { pkgs, self', ... }: let
                 craneLib = inputs.crane.mkLib pkgs;
+                migrationTest = migrate: import ./nix/tests/migrations.nix {
+                    inherit pkgs migrate;
+                    bootstrapSchema = pkgs.callPackage ./nix/bootstrap-schema.nix { };
+                    # What it reads, so that other changes don't rerun it
+                    src = pkgs.lib.fileset.toSource {
+                        root = ./.;
+                        fileset = pkgs.lib.fileset.unions [
+                            ./Application/Schema.sql
+                            ./Application/Fixtures.sql
+                            ./Application/Migration
+                        ];
+                    };
+                    ihpSchema = "${ihp}/ihp-schema-compiler/data/IHPSchema.sql";
+                };
             in {
                 ihp = {
                     appName = "bosco";
@@ -83,21 +97,12 @@
                 checks.scripts = pkgs.linkFarm "bosco-scripts"
                     (pkgs.lib.filterAttrs (name: _: pkgs.lib.hasPrefix "script-" name) self'.packages);
 
-                checks.deploy-migrations = import ./nix/tests/migrations.nix {
-                    inherit pkgs;
-                    inherit (self'.packages) migrate;
-                    bootstrapSchema = pkgs.callPackage ./nix/bootstrap-schema.nix { };
-                    # What it reads, so that other changes don't rerun it
-                    src = pkgs.lib.fileset.toSource {
-                        root = ./.;
-                        fileset = pkgs.lib.fileset.unions [
-                            ./Application/Schema.sql
-                            ./Application/Fixtures.sql
-                            ./Application/Migration
-                        ];
-                    };
-                    ihpSchema = "${ihp}/ihp-schema-compiler/data/IHPSchema.sql";
-                };
+                # The deployment's database steps, with IHP's migrate and with
+                # the Rust site's bosco-migrate, which should do the same
+                checks.deploy-migrations = migrationTest self'.packages.migrate;
+                checks.deploy-migrations-rust = migrationTest (pkgs.writeShellScriptBin "migrate" ''
+                    exec ${self'.packages.rust-web}/bin/bosco-migrate "$@"
+                '');
 
                 devenv.shells.default = {
                     processes = {
