@@ -44,7 +44,9 @@
 # - bosco-<name> is the web server, on the socket bosco-<name>.socket
 # - bosco-<name>-worker runs the jobs that send the order emails
 #
-# Their state, the session key, is in /var/lib/bosco-<name>.
+# Their state, the session key, is in /var/lib/bosco-<name>. With
+# rustWeb.enable, bosco-<name>-rust-web runs the public pages in Rust next to
+# them, and nginx sends those pages to it (rustWeb.nginxLocations).
 {
   config,
   lib,
@@ -231,6 +233,49 @@ let
           };
         };
 
+        rustWeb = {
+          enable = lib.mkEnableOption ''
+            the public site in Rust (rust-web/) next to the IHP app, on the same
+            database: the welcome message, the order form, the invoices and the
+            newsletter form. The admin and the email worker stay in IHP. nginx
+            sends the public pages to it with nginxLocations
+          '';
+
+          port = lib.mkOption {
+            type = lib.types.port;
+            default = config.port + 100;
+            defaultText = lib.literalExpression "port + 100";
+            description = "Port the Rust site listens on, at host (instance ${name}).";
+          };
+
+          package = lib.mkOption {
+            type = lib.types.package;
+            default = config.flake.packages.${system}.rust-web;
+            defaultText = lib.literalExpression "flake.packages.\${system}.rust-web";
+            description = "The Rust site (nix/rust-web.nix).";
+          };
+
+          nginxLocations = lib.mkOption {
+            type = lib.types.attrsOf (lib.types.attrsOf lib.types.str);
+            readOnly = true;
+            default =
+              let
+                proxy = address: { proxyPass = "http://${address}"; };
+                rust = proxy (listenAddressOf config.host config.rustWeb.port);
+              in
+              # The public pages exactly, whatever their query; the rest, the
+              # admin and the static files included, to IHP
+              lib.genAttrs (map (path: "= ${path}") rustWebPaths) (_: rust)
+              // { "/" = proxy (listenAddressOf config.host config.port); };
+            defaultText = lib.literalExpression ''{ "= /NewOrder".proxyPass = "http://127.0.0.1:3400"; …; "/".proxyPass = "http://127.0.0.1:3300"; }'';
+            description = ''
+              The instance's nginx locations with the Rust site: its public pages to
+              it, everything else to the IHP app. For an nginx virtual host:
+              locations = config.services.bosco.instances.<name>.rustWeb.nginxLocations;
+            '';
+          };
+        };
+
         rtsFlags = lib.mkOption {
           type = lib.types.str;
           default = "-A96m -n4m -N";
@@ -239,12 +284,21 @@ let
       };
     };
 
-  listenAddress =
-    instance:
-    if lib.hasInfix ":" instance.host then
-      "[${instance.host}]:${toString instance.port}"
-    else
-      "${instance.host}:${toString instance.port}";
+  listenAddressOf =
+    host: port: if lib.hasInfix ":" host then "[${host}]:${toString port}" else "${host}:${toString port}";
+  listenAddress = instance: listenAddressOf instance.host instance.port;
+
+  # The Rust site's pages: the IHP app's public addresses (Web/), see the
+  # routes in rust-web/src/lib.rs
+  rustWebPaths = [
+    "/"
+    "/Orders"
+    "/NewOrder"
+    "/CreateOrder"
+    "/ShowOrder"
+    "/NewEmail"
+    "/CreateEmail"
+  ];
 
   # The services only read from the Nix store, write to their state directory,
   # and talk to PostgreSQL, the reverse proxy and, from the worker, SMTP.
@@ -415,6 +469,40 @@ let
           };
       };
     }
+    // lib.optionalAttrs instance.rustWeb.enable {
+      "bosco-${name}-rust-web" =
+        let
+          # The IHP app's static files: the logo, and prod.css with the same
+          # version in its address as the IHP app gives it, so a new one
+          # isn't taken from the browser's cache
+          static = instance.flake.packages.${system}.static;
+        in
+        {
+          description = "Bosco Falconeria public site in Rust (${name})";
+          wantedBy = [ "multi-user.target" ];
+          after = after ++ [ migrate ];
+          requires = [
+            "postgresql.service"
+            migrate
+          ];
+          environment = {
+            # The user too: without one, SQLx doesn't take the service's
+            DATABASE_URL = "${databaseUrl}&user=${instance.database}";
+            ADDR = listenAddressOf instance.host instance.rustWeb.port;
+            APP_LOCALE = instance.locale;
+            APP_DEMO = if instance.demo then "1" else "0";
+            STATIC_DIR = "${static}";
+            STYLESHEET = "/prod.css?v=${lib.substring 0 32 (baseNameOf "${static}")}";
+            RUST_LOG = "info";
+          };
+          serviceConfig = serviceConfig // {
+            ExecStart = lib.getExe instance.rustWeb.package;
+            Restart = "always";
+            # Unlike the GHC runtime, it needs no executable memory
+            MemoryDenyWriteExecute = true;
+          };
+        };
+    }
     // lib.optionalAttrs instance.demo {
       # Started by its timer, see demoTimers
       "bosco-${name}-reset-demo" = {
@@ -448,7 +536,13 @@ let
 
   # Values two instances must not share
   duplicates = values: lib.length values != lib.length (lib.unique values);
-  addresses = lib.mapAttrsToList (_: listenAddress) instances;
+  addresses = lib.concatLists (
+    lib.mapAttrsToList (
+      _: instance:
+      [ (listenAddress instance) ]
+      ++ lib.optional instance.rustWeb.enable (listenAddressOf instance.host instance.rustWeb.port)
+    ) instances
+  );
   databases = lib.mapAttrsToList (_: instance: instance.database) instances;
 in
 {
@@ -462,7 +556,7 @@ in
     assertions = [
       {
         assertion = !duplicates addresses;
-        message = "services.bosco.instances: each instance needs its own port (${lib.concatStringsSep ", " addresses}).";
+        message = "services.bosco.instances: each instance, and its Rust site, needs its own port (${lib.concatStringsSep ", " addresses}).";
       }
       {
         assertion = !duplicates databases;

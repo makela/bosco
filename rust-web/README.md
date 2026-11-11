@@ -52,5 +52,9 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   is shown as text in both.
 - **Pages not found** have the site's layout.
 
-Not done yet: a NixOS module to run it in place of the IHP app's public
-pages, and the admin.
+On a server, the NixOS module runs it next to the IHP app with
+`rustWeb.enable`, see "The public site in Rust" in the project's README. Its
+package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
+check) runs these tests too.
+
+Not done yet: the admin.

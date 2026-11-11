@@ -325,6 +325,78 @@ let
       expected = true;
     };
 
+    # A demo with the public pages in Rust: its own service next to IHP's,
+    # on the same database as the same user, and nginx locations for both
+    testTheRustSiteRunsBesideTheIhpApp = {
+      expr =
+        let
+          demo = evaluate {
+            demo = {
+              baseUrl = "https://demo.example.com";
+              port = 3303;
+              locale = "en";
+              demo = true;
+              sendEmails = false;
+              rustWeb.enable = true;
+            };
+          };
+          rust = demo.systemd.services.bosco-demo-rust-web;
+          static = "${self.packages.${system}.static}";
+        in
+        {
+          program = lib.hasSuffix "/bin/bosco-web" rust.serviceConfig.ExecStart;
+          inherit (rust.environment) DATABASE_URL ADDR APP_LOCALE APP_DEMO STATIC_DIR;
+          stylesheet = rust.environment.STYLESHEET == "/prod.css?v=${lib.substring 0 32 (baseNameOf static)}";
+          user = rust.serviceConfig.User;
+          afterMigrations = lib.elem "bosco-demo-migrate.service" rust.after;
+          ihpStillRuns = demo.systemd.services ? bosco-demo && demo.systemd.services ? bosco-demo-worker;
+          locations = demo.services.bosco.instances.demo.rustWeb.nginxLocations;
+        };
+      expected = {
+        program = true;
+        DATABASE_URL = "postgresql:///bosco_demo?host=/run/postgresql&user=bosco_demo";
+        ADDR = "127.0.0.1:3403";
+        APP_LOCALE = "en";
+        APP_DEMO = "1";
+        STATIC_DIR = "${self.packages.${system}.static}";
+        stylesheet = true;
+        user = "bosco_demo";
+        afterMigrations = true;
+        ihpStillRuns = true;
+        locations = {
+          "= /".proxyPass = "http://127.0.0.1:3403";
+          "= /Orders".proxyPass = "http://127.0.0.1:3403";
+          "= /NewOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /CreateOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /ShowOrder".proxyPass = "http://127.0.0.1:3403";
+          "= /NewEmail".proxyPass = "http://127.0.0.1:3403";
+          "= /CreateEmail".proxyPass = "http://127.0.0.1:3403";
+          "/".proxyPass = "http://127.0.0.1:3303";
+        };
+      };
+    };
+
+    testOnlyAnInstanceThatAsksRunsTheRustSite = {
+      expr = lib.attrNames (lib.filterAttrs (name: _: lib.hasSuffix "-rust-web" name) services);
+      expected = [ ];
+    };
+
+    testTheRustSiteNeedsAPortOfItsOwn = {
+      expr = anyMessage "own port" (
+        failedAssertions (evaluate (quiet {
+          fi = {
+            baseUrl = "https://tilaus.example.fi";
+            rustWeb.enable = true;
+          };
+          fr = {
+            baseUrl = "https://commande.example.fr";
+            port = 3400; # the Rust site's of fi
+          };
+        }))
+      );
+      expected = true;
+    };
+
     testTwoInstancesCannotShareADatabase = {
       expr = anyMessage "own database" (
         failedAssertions (evaluate (quiet {

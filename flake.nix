@@ -51,6 +51,11 @@
                     ];
                 };
 
+                # The public site in Rust, see rust-web/ and the rustWeb option
+                # of nix/module.nix; the check runs its tests too
+                packages.rust-web = pkgs.callPackage ./nix/rust-web.nix { };
+                checks.rust-web-tests = pkgs.callPackage ./nix/rust-web.nix { runTests = true; };
+
                 checks.nixos-module = import ./nix/tests/module.nix {
                     inherit pkgs;
                     inherit (inputs.nixpkgs.lib) nixosSystem;

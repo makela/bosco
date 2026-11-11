@@ -16,10 +16,11 @@ static/app.css:
 
 # devenv needs to know the project directory; `nix develop` defaults it to /dev/null
 DEVENV_ROOT = --override-input devenv-root "file+file://$$PWD/.devenv/root"
-TEST_CHECKS = tests integration-tests nixos-module deploy-migrations
+TEST_CHECKS = tests integration-tests nixos-module deploy-migrations rust-web-tests
 
-# Runs Test/Main.hs and Test/Integration.hs (with its own PostgreSQL) plus the
-# rest of the flake checks, one of which compiles every Application/Script.
+# Runs Test/Main.hs and Test/Integration.hs (with its own PostgreSQL), the Rust
+# site's tests (rust-web/) plus the rest of the flake checks, one of which
+# compiles every Application/Script.
 # New files under Test/ must be `git add`ed first.
 # Nix reuses test results when nothing changed, so the summary comes from
 # the log of the last real run. `nix log` on a check shows the full output.
@@ -32,7 +33,7 @@ check:
 	for c in $(TEST_CHECKS); do \
 		result=$$(nix log $(DEVENV_ROOT) ".#checks.$$system.$$c" 2>/dev/null \
 			| sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' \
-			| grep -E 'examples, |tests passed' | tr '\n' ' '); \
+			| grep -E 'examples, |tests passed|test result: ok\. [1-9]' | tr '\n' ' '); \
 		echo "  $$c: $${result:-no result}"; \
 	done; \
 	exit $$status

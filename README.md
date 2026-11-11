@@ -60,6 +60,7 @@ committed and staged files are used.
 The addresses below are examples; use the real ones.
 
 ```nix
+{ config, ... }:
 {
   imports = [ /srv/bosco/nix/module.nix ];
 
@@ -95,6 +96,16 @@ The addresses below are examples; use the real ones.
       bootstrapSchema = true;
       sendEmails = false;
     };
+    # A public demo in English, its public pages in Rust (see below)
+    demo = {
+      baseUrl = "https://demo.tilaus.example.fi";
+      port = 3303;
+      locale = "en";
+      bootstrapSchema = true;
+      demo = true;
+      sendEmails = false;
+      rustWeb.enable = true; # on port 3403
+    };
   };
 
   services.nginx = {
@@ -117,6 +128,13 @@ The addresses below are examples; use the real ones.
       basicAuthFile = "/var/lib/secrets/bosco/staging.htpasswd";
       locations."/".proxyPass = "http://127.0.0.1:3302";
       extraConfig = "add_header X-Robots-Tag noindex;";
+    };
+    # The public pages to the Rust site, the rest (the admin, the static
+    # files) to the IHP app
+    virtualHosts."demo.tilaus.example.fi" = {
+      enableACME = true;
+      forceSSL = true;
+      locations = config.services.bosco.instances.demo.rustWeb.nginxLocations;
     };
   };
   security.acme.acceptTerms = true;
@@ -187,6 +205,23 @@ so run it once after the first deploy:
 ```sh
 systemctl start bosco-demo-reset-demo
 ```
+
+### The public site in Rust
+
+With `rustWeb.enable = true`, an instance runs the public pages, the welcome
+message, the order form, the invoices and the newsletter form, from
+`rust-web/` in Rust, as `bosco-<name>-rust-web` on port `rustWeb.port`
+(`port` + 100 by default). It uses the instance's database as the IHP app
+does, as the same user; the IHP app's services keep running, and its admin
+and email worker work as before, also for orders made in Rust. nginx sends
+the public pages to it and the rest to the IHP app with
+`rustWeb.nginxLocations`, as for the demo above. Without it, an instance runs
+the public pages in IHP as before. See `rust-web/README.md` for the few
+differences.
+
+Try it on the demo first. `journalctl -u bosco-demo-rust-web` shows its
+requests. To go back, set `rustWeb.enable = false` and point nginx's
+`locations."/"` at the IHP app again.
 
 ### Users and roles
 
