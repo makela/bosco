@@ -14,12 +14,16 @@ import IHP.View.CSSFramework
 
 import Admin.Controller.Prelude
 import Application.Localization (defaultLocale)
+import Application.NotFound (localizedNotFound)
 import Application.Settings
 
 config :: ConfigBuilder
 config = do
     option $ AuthMiddleware (authMiddleware @User)
     option tailwind
+    -- Pages not found in the site's language
+    environment <- envOrDefault "IHP_ENV" Development -- as IHP reads it
+    option (CustomMiddleware (localizedNotFound environment))
 
     -- The instance's settings, see nix/module.nix. Without any, the site
     -- is in Finnish and sends emails with the local sendmail.

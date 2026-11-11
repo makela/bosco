@@ -13,6 +13,7 @@ import qualified Test.Admin.ProductsSpec
 import qualified Test.Admin.RolesSpec
 import qualified Test.Web.CreateOrderSpec
 import qualified Test.Web.EmailJobSpec
+import qualified Test.Web.NotFoundSpec
 import qualified Test.Web.OrdersSpec
 
 main :: IO ()
@@ -20,6 +21,7 @@ main = hspec do
     Test.Web.OrdersSpec.tests
     Test.Web.CreateOrderSpec.tests
     Test.Web.EmailJobSpec.tests
+    Test.Web.NotFoundSpec.tests
     Test.Admin.CustomersSpec.tests
     Test.Admin.OrdersSpec.tests
     Test.Admin.DeleteSpec.tests

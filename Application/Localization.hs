@@ -75,6 +75,8 @@ data Localizable
   | LDemoBanner
   | LDemoDoNotPay
   | LDemoNoEmail
+  | LPageNotFoundTitle
+  | LPageNotFound
   deriving (Eq, Show, Enum, Bounded)
 
 l10nText :: Localizable -> Text
@@ -192,3 +194,9 @@ l10nText' LDemoDoNotPay FR = "Facture de démonstration – ne pas payer."
 l10nText' LDemoNoEmail FI = "Esittelyversio ei lähetä laskua sähköpostiin."
 l10nText' LDemoNoEmail EN = "The demo does not send the invoice to your email."
 l10nText' LDemoNoEmail FR = "La démo n'envoie pas la facture par e-mail."
+l10nText' LPageNotFoundTitle FI = "Sivua ei löytynyt"
+l10nText' LPageNotFoundTitle EN = "Page not found"
+l10nText' LPageNotFoundTitle FR = "Page introuvable"
+l10nText' LPageNotFound FI = "Sivua ei löytynyt tai se ei ole juuri nyt käytettävissä."
+l10nText' LPageNotFound EN = "The page was not found, or it is not available right now."
+l10nText' LPageNotFound FR = "Cette page est introuvable ou n'est pas disponible pour le moment."
