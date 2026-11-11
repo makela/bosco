@@ -45,8 +45,8 @@
 # - bosco-<name>-worker runs the jobs that send the order emails
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
-# rustWeb.enable, bosco-<name>-rust-web runs the whole site in Rust next to
-# them, with the same session key, and nginx sends everything to it
+# rustWeb.enable, bosco-<name>-rust-web runs the whole site in Rust instead of
+# bosco-<name>, with the same session key, and nginx sends everything to it
 # (rustWeb.nginxLocations). With
 # rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
 # of IHP's.
@@ -241,7 +241,8 @@ let
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
             newsletter form, the whole admin, which shares IHP's session, and
-            the static files. nginx sends everything to it with nginxLocations
+            the static files, in place of the IHP app's web server, which then
+            doesn't run. nginx sends everything to it with nginxLocations
           '';
 
           port = lib.mkOption {
@@ -414,28 +415,6 @@ let
         };
       };
 
-      "bosco-${name}" = {
-        description = "Bosco Falconeria site (${name})";
-        wantedBy = [ "multi-user.target" ];
-        after = after ++ [ migrate ];
-        requires = [
-          "postgresql.service"
-          migrate
-          "bosco-${name}.socket"
-        ];
-        environment = environment // {
-          IHP_SYSTEMD = "1";
-        };
-        serviceConfig = serviceConfig // {
-          Type = "notify";
-          ExecStart = "${instance.package}/bin/RunProdServer";
-          Restart = "always";
-          KillSignal = "SIGINT";
-          WatchdogSec = "60";
-          Sockets = "bosco-${name}.socket";
-        };
-      };
-
       "bosco-${name}-worker" = {
         description = "Bosco Falconeria email worker${lib.optionalString instance.rustWorker.enable " in Rust"} (${name})";
         wantedBy = [ "multi-user.target" ];
@@ -482,6 +461,30 @@ let
           // lib.optionalAttrs smtpPassword {
             LoadCredential = "smtp-password:${instance.smtp.passwordFile}";
           };
+      };
+    }
+    # The IHP app's web server, unless the Rust site serves the whole site
+    // lib.optionalAttrs (!instance.rustWeb.enable) {
+      "bosco-${name}" = {
+        description = "Bosco Falconeria site (${name})";
+        wantedBy = [ "multi-user.target" ];
+        after = after ++ [ migrate ];
+        requires = [
+          "postgresql.service"
+          migrate
+          "bosco-${name}.socket"
+        ];
+        environment = environment // {
+          IHP_SYSTEMD = "1";
+        };
+        serviceConfig = serviceConfig // {
+          Type = "notify";
+          ExecStart = "${instance.package}/bin/RunProdServer";
+          Restart = "always";
+          KillSignal = "SIGINT";
+          WatchdogSec = "60";
+          Sockets = "bosco-${name}.socket";
+        };
       };
     }
     // lib.optionalAttrs instance.rustWeb.enable {
@@ -576,8 +579,10 @@ let
   addresses = lib.concatLists (
     lib.mapAttrsToList (
       _: instance:
-      [ (listenAddress instance) ]
-      ++ lib.optional instance.rustWeb.enable (listenAddressOf instance.host instance.rustWeb.port)
+      if instance.rustWeb.enable then
+        [ (listenAddressOf instance.host instance.rustWeb.port) ]
+      else
+        [ (listenAddress instance) ]
     ) instances
   );
   databases = lib.mapAttrsToList (_: instance: instance.database) instances;
@@ -651,7 +656,7 @@ in
           Accept = false;
         };
       }
-    ) instances;
+    ) (lib.filterAttrs (_: instance: !instance.rustWeb.enable) instances);
 
     systemd.services = lib.mkMerge (lib.mapAttrsToList services instances);
     systemd.timers = lib.mapAttrs' demoTimers (lib.filterAttrs (_: instance: instance.demo) instances);

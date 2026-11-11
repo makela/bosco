@@ -218,9 +218,10 @@ systemctl start bosco-demo-reset-demo
 With `rustWeb.enable = true`, an instance runs the public pages, the welcome
 message, the order form, the invoices and the newsletter form, from
 `rust-web/` in Rust, as `bosco-<name>-rust-web` on port `rustWeb.port`
-(`port` + 100 by default). It uses the instance's database as the IHP app
-does, as the same user; the IHP app's services keep running, and its email
-worker works as before, also for orders made in Rust. It also runs the whole
+(`port` + 100 by default), in place of the IHP app's web server
+`bosco-<name>`, which then doesn't run. It uses the instance's database as
+the IHP app did, as the same user, and the IHP app's email worker works as
+before, also for orders made in Rust. It also runs the whole
 admin (`/admin/…`), the demo's one-click logins included. It reads and
 writes IHP's session cookie with the instance's session key and checks and
 makes IHP's password hashes, so a login in either app is a login in the
@@ -233,7 +234,8 @@ IHP as before. See `rust-web/README.md` for the few differences.
 
 Try it on the demo first. `journalctl -u bosco-demo-rust-web` shows its
 requests. To go back, set `rustWeb.enable = false` and point nginx's
-`locations."/"` at the IHP app again.
+`locations."/"` at the IHP app's port again: the IHP app starts, on the
+same data.
 
 With `rustWorker.enable = true`, the instance's email worker,
 `bosco-<name>-worker`, runs `bosco-worker` from `rust-web/` instead of IHP's
@@ -242,7 +244,8 @@ the same jobs, with a readable plain-text version and the `Date` and
 `Message-ID` headers IHP's left out. Jobs carry over either way, so
 switching back and forth loses none. `journalctl -u bosco-<name>-worker`
 logs each email sent or failed. It works without `rustWeb.enable`, and
-the other way round.
+the other way round. With both, nothing of the IHP app runs on the
+instance: its site, worker, migrations and demo reset are all Rust's.
 
 ### Users and roles
 

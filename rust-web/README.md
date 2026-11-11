@@ -173,5 +173,7 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-With `rustWeb.enable` and `rustWorker.enable`, the IHP app's services still
-run but get no work: the next step is turning them off.
+With `rustWeb.enable` and `rustWorker.enable`, nothing of the IHP app runs
+on an instance. Its code is still the source of the static files
+(`prod.css`, `prod.js`), of IHP's base schema (`IHPSchema.sql`) and of the
+dev environment; removing it is a later step.

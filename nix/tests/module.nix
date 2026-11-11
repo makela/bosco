@@ -325,9 +325,44 @@ let
       expected = true;
     };
 
-    # A demo with the public pages in Rust: its own service next to IHP's,
-    # on the same database as the same user, and nginx locations for both
-    testTheRustSiteRunsBesideTheIhpApp = {
+    # With both the Rust site and the Rust worker, nothing of the IHP app runs:
+    # every service's program is a Rust one
+    testWithBothNoIhpProgramRuns = {
+      expr =
+        let
+          config = evaluate {
+            demo = {
+              baseUrl = "https://demo.example.com";
+              port = 3303;
+              demo = true;
+              sendEmails = false;
+              rustWeb.enable = true;
+              rustWorker.enable = true;
+            };
+          };
+          ours = lib.filterAttrs (name: _: lib.hasPrefix "bosco-demo" name) config.systemd.services;
+        in
+        {
+          programs = lib.sort (a: b: a < b) (
+            lib.mapAttrsToList (_: service: baseNameOf service.serviceConfig.ExecStart) ours
+          );
+          sockets = lib.attrNames (lib.filterAttrs (name: _: lib.hasPrefix "bosco-" name) config.systemd.sockets);
+        };
+      expected = {
+        programs = [
+          "bosco-migrate"
+          "bosco-reset-demo"
+          "bosco-web"
+          "bosco-worker"
+        ];
+        sockets = [ ];
+      };
+    };
+
+    # The Rust site in place of the IHP app's web server, on the same
+    # database as the same user; the IHP app's worker stays until
+    # rustWorker.enable
+    testTheRustSiteReplacesTheIhpWebServer = {
       expr =
         let
           demo = evaluate {
@@ -357,11 +392,12 @@ let
             ;
           stylesheet = rust.environment.STYLESHEET == "/prod.css?v=${lib.substring 0 32 (baseNameOf static)}";
           assetVersion = rust.environment.ASSET_VERSION == lib.substring 0 32 (baseNameOf static);
-          # The same key as the IHP app's
-          sessionKey = rust.environment.IHP_SESSION_SECRET_FILE == demo.systemd.services.bosco-demo.environment.IHP_SESSION_SECRET_FILE;
+          # The same key as the IHP app's (its worker's here)
+          sessionKey = rust.environment.IHP_SESSION_SECRET_FILE == demo.systemd.services.bosco-demo-worker.environment.IHP_SESSION_SECRET_FILE;
           user = rust.serviceConfig.User;
           afterMigrations = lib.elem "bosco-demo-migrate.service" rust.after;
-          ihpStillRuns = demo.systemd.services ? bosco-demo && demo.systemd.services ? bosco-demo-worker;
+          ihpWebServer = demo.systemd.services ? bosco-demo || demo.systemd.sockets ? bosco-demo;
+          ihpWorker = demo.systemd.services ? bosco-demo-worker;
           locations = demo.services.bosco.instances.demo.rustWeb.nginxLocations;
         };
       expected = {
@@ -379,7 +415,8 @@ let
         sessionKey = true;
         user = "bosco_demo";
         afterMigrations = true;
-        ihpStillRuns = true;
+        ihpWebServer = false;
+        ihpWorker = true;
         locations = {
           "/".proxyPass = "http://127.0.0.1:3403";
         };
