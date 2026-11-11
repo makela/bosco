@@ -20,6 +20,12 @@ The dev site is in Finnish. To try another language, set `APP_LOCALE=fr` (or
 `en`) in `.env` and restart `devenv up`. Texts are in
 `Application/Localization.hs`; a test fails if a language misses one.
 
+`.env` is read by `.envrc`, so it only takes effect once direnv is allowed
+to run it: `direnv allow` in the project directory (again whenever
+`.envrc` changes; `direnv status` says "Found RC allowed 0" when it is).
+Without direnv, set the variables for one run instead, e.g.
+`APP_LOCALE=en devenv up`.
+
 ### Tests
 
 - `Test/Main.hs`: unit tests, no database needed.
