@@ -428,3 +428,69 @@ pub async fn admin_user(db: &PgPool, id: Uuid) -> sqlx::Result<Option<AdminUser>
         },
     }))
 }
+
+/// An order in the admin's list, with its customer's names and its price
+#[derive(Debug, Clone, FromRow)]
+pub struct ListedOrder {
+    pub id: Uuid,
+    pub ordered_at: DateTime<Utc>,
+    pub invoiced_at: Option<DateTime<Utc>>,
+    pub paid_at: Option<DateTime<Utc>>,
+    pub delivered_at: Option<DateTime<Utc>>,
+    pub first_name: String,
+    pub last_name: String,
+    pub reverse_name: String,
+    pub billing_name: String,
+    /// The sum of its lines, in cents
+    pub price: i64,
+}
+
+/// Which orders the admin's list leaves out, besides the cancelled ones
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Unhandled {
+    pub invoiced: bool,
+    pub paid: bool,
+    pub delivered: bool,
+}
+
+/// The year's orders that weren't cancelled (the year in UTC), less those
+/// handled in the ways `exclude` says, in no particular order
+pub async fn orders_of_year(
+    db: &PgPool,
+    year: i32,
+    exclude: Unhandled,
+) -> sqlx::Result<Vec<ListedOrder>> {
+    sqlx::query_as(
+        "SELECT orders.id, ordered_at, invoiced_at, paid_at, delivered_at,
+                first_name, last_name, reverse_name, billing_name,
+                COALESCE((SELECT SUM(unit_price::int8 * quantity) FROM ordered_products
+                          WHERE order_id = orders.id), 0)::int8 AS price
+         FROM orders JOIN customers ON customers.id = orders.customer_id
+         WHERE cancelled_at IS NULL
+           AND ordered_at >= make_timestamptz($1, 1, 1, 0, 0, 0, 'UTC')
+           AND ordered_at < make_timestamptz($1 + 1, 1, 1, 0, 0, 0, 'UTC')
+           AND (NOT $2 OR invoiced_at IS NULL)
+           AND (NOT $3 OR paid_at IS NULL)
+           AND (NOT $4 OR delivered_at IS NULL)",
+    )
+    .bind(year)
+    .bind(exclude.invoiced)
+    .bind(exclude.paid)
+    .bind(exclude.delivered)
+    .fetch_all(db)
+    .await
+}
+
+/// The years from the first order's to the last one's (in UTC), cancelled
+/// ones included; this year's alone when there are none
+pub async fn order_years(db: &PgPool) -> sqlx::Result<std::ops::RangeInclusive<i32>> {
+    let (first, last): (Option<i32>, Option<i32>) = sqlx::query_as(
+        "SELECT EXTRACT(YEAR FROM MIN(ordered_at) AT TIME ZONE 'UTC')::int4,
+                EXTRACT(YEAR FROM MAX(ordered_at) AT TIME ZONE 'UTC')::int4
+         FROM orders",
+    )
+    .fetch_one(db)
+    .await?;
+    let now = chrono::Datelike::year(&Utc::now());
+    Ok(first.unwrap_or(now)..=last.unwrap_or(now))
+}

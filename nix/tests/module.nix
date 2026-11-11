@@ -388,6 +388,7 @@ let
           "= /CreateEmail".proxyPass = "http://127.0.0.1:3403";
           "= /admin/".proxyPass = "http://127.0.0.1:3403";
           "= /admin/Welcome".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/Orders".proxyPass = "http://127.0.0.1:3403";
           "= /admin/NewSession".proxyPass = "http://127.0.0.1:3403";
           "= /admin/CreateSession".proxyPass = "http://127.0.0.1:3403";
           "= /admin/DeleteSession".proxyPass = "http://127.0.0.1:3403";

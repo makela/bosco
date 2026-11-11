@@ -606,3 +606,165 @@ async fn the_welcome_page_needs_a_login(db: PgPool) -> TestResult {
     );
     Ok(())
 }
+
+/// An order of the customer at that time, with a line of the given price,
+/// handled as given
+async fn listed_order(
+    db: &PgPool,
+    first_name: &str,
+    ordered_at: &str,
+    price: i32,
+    handled: &str,
+) -> sqlx::Result<Uuid> {
+    let customer: Uuid = sqlx::query_scalar(
+        "INSERT INTO customers (first_name, last_name, email, phone, street_address,
+                                postal_code, city, reverse_name)
+         VALUES ($1, 'Aalto', 'x@example.com', '040', 'Katu 1', '00100', 'Helsinki',
+                 'aalto ' || lower($1))
+         RETURNING id",
+    )
+    .bind(first_name)
+    .fetch_one(db)
+    .await?;
+    let order: Uuid = sqlx::query_scalar(
+        "INSERT INTO orders (customer_id, ordered_at) VALUES ($1, $2::timestamptz) RETURNING id",
+    )
+    .bind(customer)
+    .bind(ordered_at)
+    .fetch_one(db)
+    .await?;
+    let handle = match handled {
+        "paid_at" => "UPDATE orders SET paid_at = NOW() WHERE id = $1",
+        "invoiced_at" => "UPDATE orders SET invoiced_at = NOW() WHERE id = $1",
+        "cancelled_at" => "UPDATE orders SET cancelled_at = NOW() WHERE id = $1",
+        _ => "SELECT $1::uuid",
+    };
+    sqlx::query(handle).bind(order).execute(db).await?;
+    let producer: Uuid = sqlx::query_scalar(
+        "INSERT INTO producers (name, subject, description) VALUES ('P', '', '') RETURNING id",
+    )
+    .fetch_one(db)
+    .await?;
+    let product: Uuid = sqlx::query_scalar(
+        "INSERT INTO products (producer_id, name, description, package, price)
+         VALUES ($1, 'Oil', '', '1 l', $2) RETURNING id",
+    )
+    .bind(producer)
+    .bind(price)
+    .fetch_one(db)
+    .await?;
+    sqlx::query(
+        "INSERT INTO ordered_products (order_id, product_id, quantity, unit_price)
+         VALUES ($1, $2, 2, $3)",
+    )
+    .bind(order)
+    .bind(product)
+    .bind(price)
+    .execute(db)
+    .await?;
+    Ok(order)
+}
+
+/// The list's customers, in its order
+fn customers(page: &str) -> Vec<String> {
+    page.split("</a></td><td>")
+        .skip(1)
+        .filter_map(|rest| rest.split("</td>").next())
+        .map(str::to_string)
+        .collect()
+}
+
+#[sqlx::test(migrations = false)]
+async fn lists_a_years_orders(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let session = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    listed_order(&db, "Old", "2025-06-01 12:00:00+00", 1000, "").await?;
+    let cecilia = listed_order(&db, "Cecilia", "2026-01-15 12:00:00+00", 300, "").await?;
+    listed_order(&db, "Bertta", "2026-02-01 12:00:00+00", 500, "paid_at").await?;
+    listed_order(&db, "Aino", "2026-03-01 12:00:00+00", 100, "invoiced_at").await?;
+    listed_order(&db, "Gone", "2026-04-01 12:00:00+00", 100, "cancelled_at").await?;
+    let app = site(db.clone(), false);
+    let page = |uri: &'static str| {
+        let app = app.clone();
+        let session = session.clone();
+        async move { text(send(&app, Method::GET, uri, &session, &[]).await?).await }
+    };
+
+    // The last year with orders, by name; cancelled ones left out
+    let list = page("/admin/Orders").await?;
+    assert_eq!(
+        customers(&list),
+        ["Aino Aalto", "Bertta Aalto", "Cecilia Aalto"]
+    );
+    assert!(list.contains("<p>3 orders</p>"));
+    assert!(list.contains("<option>2025</option><option selected=\"selected\">2026</option>"));
+    // Prices, and the button for the unpaid ones
+    assert!(list.contains("<td>10\u{a0}€</td>"), "{list}");
+    assert!(list.contains(&format!(
+        r#"<form method="POST" action="/admin/UpdateMarkPaidOrder?orderId={cecilia}">"#
+    )));
+    assert_eq!(list.matches("Mark as paid").count(), 2);
+    assert!(list.contains(r#"href="/admin/NewOrder">New</a>"#));
+
+    assert_eq!(
+        customers(&page("/admin/Orders?year=2025").await?),
+        ["Old Aalto"]
+    );
+    assert_eq!(
+        customers(&page("/admin/Orders?ordering=price&orderDir=descending").await?),
+        ["Bertta Aalto", "Cecilia Aalto", "Aino Aalto"]
+    );
+    assert_eq!(
+        customers(&page("/admin/Orders?excludePaid=on&excludeInvoiced=on").await?),
+        ["Cecilia Aalto"]
+    );
+    assert_eq!(
+        customers(&page("/admin/Orders?q=%20BERTTA").await?),
+        ["Bertta Aalto"]
+    );
+    let none = page("/admin/Orders?year=1999").await?;
+    assert!(none.contains("<p>0 orders</p>") && !none.contains("<table"));
+    let response = send(&app, Method::GET, "/admin/Orders?year=abc", &session, &[]).await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    Ok(())
+}
+
+/// A delivery person sees the orders but can't mark them paid; a login
+/// without a role may not see them; someone not logged in logs in first
+#[sqlx::test(migrations = false)]
+async fn the_orders_are_for_those_who_may_see_them(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    listed_order(&db, "Cecilia", "2026-01-15 12:00:00+00", 300, "").await?;
+    let app = site(db.clone(), false);
+
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    let list = text(send(&app, Method::GET, "/admin/Orders", &driver, &[]).await?).await?;
+    assert_eq!(customers(&list), ["Cecilia Aalto"]);
+    assert!(!list.contains("Mark as paid"));
+    assert!(list.contains(r#"href="/admin/NewOrder">New</a>"#));
+
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    let list = text(send(&app, Method::GET, "/admin/Orders", &promoter, &[]).await?).await?;
+    assert!(!list.contains("NewOrder") && !list.contains("Mark as paid"));
+
+    let nobody = user_with(&db, "nobody@example.com", (false, false, false)).await?;
+    let response = send(&app, Method::GET, "/admin/Orders", &nobody, &[]).await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert!(text(response).await?.contains("<h1>Access denied</h1>"));
+
+    let response = send(
+        &app,
+        Method::GET,
+        "/admin/Orders?q=x",
+        &Session::default(),
+        &[],
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::FOUND);
+    let session = session_after(&response, &Session::default());
+    assert_eq!(
+        session.get_text(REDIRECT_AFTER_LOGIN).as_deref(),
+        Some("/admin/Orders?q=x")
+    );
+    Ok(())
+}

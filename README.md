@@ -129,8 +129,8 @@ The addresses below are examples; use the real ones.
       locations."/".proxyPass = "http://127.0.0.1:3302";
       extraConfig = "add_header X-Robots-Tag noindex;";
     };
-    # The public pages and the admin's login and welcome page to the Rust
-    # site, the rest (the admin, the static files) to the IHP app
+    # The public pages and the first of the admin's to the Rust site, the
+    # rest (the admin, the static files) to the IHP app
     virtualHosts."demo.tilaus.example.fi" = {
       enableACME = true;
       forceSSL = true;
@@ -215,7 +215,8 @@ message, the order form, the invoices and the newsletter form, from
 does, as the same user; the IHP app's services keep running, and its admin
 and email worker work as before, also for orders made in Rust. It also runs
 the admin's login and logout (`/admin/NewSession` and the like), the demo's
-one-click logins included, and the admin's welcome page with its menu: it reads and writes IHP's session cookie with the
+one-click logins included, the admin's welcome page with its menu, and its
+order list: it reads and writes IHP's session cookie with the
 instance's session key and checks IHP's password hashes, so a login there is
 a login in the IHP app's admin, and logins and lockouts carry over both ways.
 nginx sends these pages to it and the rest to the IHP app with

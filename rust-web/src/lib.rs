@@ -6,6 +6,7 @@
 //! email worker is `bosco-worker` (`worker.rs`), or the IHP app's.
 
 pub mod admin;
+pub mod admin_orders;
 pub mod db;
 pub mod l10n;
 pub mod mail;
@@ -412,6 +413,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         )
         .route("/admin/", get(admin::welcome).post(admin::welcome))
         .route(admin::WELCOME, get(admin::welcome).post(admin::welcome))
+        .route(
+            "/admin/Orders",
+            get(admin_orders::orders).post(admin_orders::orders),
+        )
         .route("/admin/CreateSession", post(admin::create_session))
         .route(
             "/admin/DeleteSession",

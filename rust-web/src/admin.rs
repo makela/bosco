@@ -1,6 +1,7 @@
 //! The admin's login and logout, the IHP app's `Admin/Controller/Sessions.hs`
-//! with IHP's `IHP.AuthSupport.Controller.Sessions`, and its welcome page,
-//! `Admin/Controller/Static.hs`. The rest of the admin is still the IHP
+//! with IHP's `IHP.AuthSupport.Controller.Sessions`, its welcome page,
+//! `Admin/Controller/Static.hs`, and what the admin's pages share: the
+//! layout, the breadcrumb and the login and permission checks. The rest of the admin is still the IHP
 //! app's: they share IHP's session cookie (`session.rs`), so a login here
 //! lets one into the IHP app's admin pages, and their flash messages show
 //! here.
@@ -70,7 +71,11 @@ pub const DEMO_LOGINS: [DemoLogin; 3] = [
 ];
 
 /// A response with the session's changes saved
-fn with_session(state: &AppState, session: &Session, response: impl IntoResponse) -> Response {
+pub(crate) fn with_session(
+    state: &AppState,
+    session: &Session,
+    response: impl IntoResponse,
+) -> Response {
     let mut response = response.into_response();
     session.set_cookie(
         &state.session_key,
@@ -92,7 +97,7 @@ fn see_other(to: &str) -> impl IntoResponse + use<> {
 
 /// The admin's layout (`Admin/View/Layout.hs`) with the flash messages the
 /// session has, which it then clears
-fn page(state: &AppState, mut session: Session, content: &Markup) -> Response {
+pub(crate) fn page(state: &AppState, mut session: Session, content: &Markup) -> Response {
     let success = session.take_text(FLASH_SUCCESS);
     let error = session.take_text(FLASH_ERROR);
     let site = &state.site;
@@ -354,4 +359,76 @@ pub async fn welcome(
         Err(to_login) => return Ok(to_login),
     };
     Ok(page(&state, session, &welcome_page(&user)))
+}
+
+/// The logged-in user if they may do this; the login page for someone not
+/// logged in, and "access denied" for a user who may not
+/// (`requirePermission`)
+pub async fn require_permission(
+    state: &AppState,
+    headers: &HeaderMap,
+    uri: &Uri,
+    permission: Permission,
+) -> Result<std::result::Result<(AdminUser, Session), Response>> {
+    let (user, session) = match require_user(state, headers, uri).await? {
+        Ok(found) => found,
+        Err(to_login) => return Ok(Err(to_login)),
+    };
+    if !user.roles.can(permission) {
+        tracing::info!(user = %user.id, ?permission, "access denied");
+        let content = html! {
+            h1 { "Access denied" }
+            p { "Your login may not see this page." }
+            p { a href=(WELCOME) { "Back to the start" } }
+        };
+        let mut response = page(state, session, &content);
+        *response.status_mut() = StatusCode::FORBIDDEN;
+        return Ok(Err(response));
+    }
+    Ok(Ok((user, session)))
+}
+
+/// A step of a page's breadcrumb, a link or the page itself
+pub struct Crumb<'a> {
+    label: &'a str,
+    url: Option<&'a str>,
+}
+
+impl<'a> Crumb<'a> {
+    pub fn link(label: &'a str, url: &'a str) -> Self {
+        Self {
+            label,
+            url: Some(url),
+        }
+    }
+
+    pub fn text(label: &'a str) -> Self {
+        Self { label, url: None }
+    }
+}
+
+/// IHP's Tailwind breadcrumb (`renderBreadcrumb`): a chevron after each
+/// step but the last
+pub fn breadcrumb(crumbs: &[Crumb]) -> Markup {
+    html! {
+        nav class="breadcrumbs bg-white my-4" aria-label="Breadcrumb" {
+            ol class="flex items-center space-x-2" role="list" {
+                @for (i, crumb) in crumbs.iter().enumerate() {
+                    @let last = i == crumbs.len() - 1;
+                    li class={ "flex flex-row space-x-2 text-gray-600 items-center" @if last { " active" } } {
+                        @if let Some(url) = crumb.url {
+                            a class="hover:text-gray-700" href=(url) { (crumb.label) }
+                        } @else {
+                            (crumb.label)
+                        }
+                        @if !last {
+                            svg xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" {
+                                path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

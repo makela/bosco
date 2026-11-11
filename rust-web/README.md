@@ -4,7 +4,7 @@ The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 [maud](https://maud.lambda.xyz/), [SQLx](https://github.com/launchbadge/sqlx)):
 the welcome message, the order form, an order's invoice and the newsletter
 form, in Finnish, English or French, demo mode included; the admin's login,
-logout and welcome page (its menu); and the email worker, IHP's job runner with
+logout, welcome page (its menu) and order list; and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
 so both can run at once: the rest of the admin stays in IHP, and either
 app's worker emails the invoices of either app's orders, as each order saves
@@ -32,6 +32,8 @@ emails keep working, and the markup and classes are the same, so
   `Admin/Controller/Sessions.hs` and IHP's sessions controller, its layout,
   the login check every admin page makes (`require_user`), and the welcome
   page, from `Admin/Controller/Static.hs`
+- `src/admin_orders.rs`: the admin's order list, from `OrdersAction` in
+  `Admin/Controller/Orders.hs` and `Admin/View/Orders/Index.hs`
 - `src/permission.rs`: what each role may do, from
   `Application/Permission.hs`
 - `src/session.rs`, `src/skein_mac.rs`: IHP's session cookie
@@ -95,6 +97,13 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   come one by one, so it doesn't show.
 - **A login without a password field** is answered with 400; IHP's was a
   500. The login form always sends one.
+- **The order list's years** start and end at midnight UTC; IHP's started
+  at midnight in the database's time zone (e.g. Finnish time), but listed
+  the years by UTC. Only orders in the first hours of a year can differ.
+- **A year that isn't a number** in the order list's address is answered
+  with 400; IHP's was a 500.
+- **Access denied** (a login whose roles don't allow the page) is a page in
+  the admin's layout; IHP showed its own branded page. Both are 403.
 - **A login's wrong passwords** are counted in the database (`+ 1`), so two
   at once both count; IHP counted from what it had read.
 
@@ -104,4 +113,5 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the admin's pages beyond its login and welcome page.
+Not done yet: the admin's pages beyond its login, welcome page and order
+list.
