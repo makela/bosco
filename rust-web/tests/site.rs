@@ -313,8 +313,8 @@ async fn order_form_lists_bosco_first_then_the_others(db: PgPool) -> TestResult 
     let oil = form.find("Oliiviöljyä").ok_or("no oil")?;
     assert!(honey < oil);
     assert!(form.contains(&format!(r#"name="{}""#, catalog.chocolate)));
-    assert!(form.contains("51 €"));
-    assert!(form.contains("10,10 €"));
+    assert!(form.contains("51\u{a0}€"));
+    assert!(form.contains("10,10\u{a0}€"));
     assert!(form.contains(r#"name="contact_me_by_fax_only""#));
     Ok(())
 }
@@ -397,7 +397,7 @@ async fn saves_the_customer_order_lines_and_email_job_together(db: PgPool) -> Te
     assert!(invoice.contains("<p>Oliivi Oy, 1234567-8</p><p>Anna-Liisa Virtanen</p>"));
     assert!(invoice.contains("<p>Testikatu 1</p>"));
     assert!(invoice.contains("<p>00100 Helsinki</p>"));
-    assert!(invoice.contains("81,30 €"), "51 € + 3 × 10,10 €");
+    assert!(invoice.contains("81,30\u{a0}€"), "51 € + 3 × 10,10 €");
     assert!(invoice.contains("Lasku on lähetetty myös sähköpostiinne."));
     assert!(!invoice.contains("<p></p>"));
     Ok(())

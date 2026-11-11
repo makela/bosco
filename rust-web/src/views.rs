@@ -8,7 +8,7 @@ use pulldown_cmark::{Event, Parser};
 use uuid::Uuid;
 
 use crate::db::{Invoice, NewCustomer, Producer, Product, WelcomeMessage};
-use crate::l10n::Text;
+use crate::l10n::{Locale, Text};
 use crate::{Flash, Site};
 
 /// The name of the field for bots only, see `honeypot_field`
@@ -84,12 +84,24 @@ pub fn markdown(text: &str) -> Markup {
     PreEscaped(out)
 }
 
-/// Cents as euros, the IHP app's `formatMoney`: 1010 → "10,10 €", 5100 →
-/// "51 €"
-pub fn money(cents: i64) -> String {
+/// An amount in cents in the locale's way, like the IHP app's
+/// `formatMoney'`: "10,10 €" in Finnish and French, "€10.10" in English.
+/// Whole euros leave out the cents, and the space before "€" doesn't break.
+pub fn money(locale: Locale, cents: i64) -> String {
     let sign = if cents < 0 { "-" } else { "" };
     let cents = cents.unsigned_abs();
-    format!("{sign}{},{:02} €", cents / 100, cents % 100).replace(",00", "")
+    let (euros, rest) = (cents / 100, cents % 100);
+    let number = |separator: char| {
+        if rest == 0 {
+            euros.to_string()
+        } else {
+            format!("{euros}{separator}{rest:02}")
+        }
+    };
+    match locale {
+        Locale::En => format!("{sign}€{}", number('.')),
+        Locale::Fi | Locale::Fr => format!("{sign}{}\u{a0}€", number(',')),
+    }
 }
 
 pub fn index(site: &Site, message: Option<&WelcomeMessage>) -> Markup {
@@ -181,7 +193,7 @@ fn product_row(site: &Site, product: &Product, quantity: Option<&i64>) -> Markup
             span.product-name { (product.name) }
             span.product-details {
                 span.product-package { (product.package) }
-                span.product-price { (money(i64::from(product.price))) }
+                span.product-price { (money(site.locale, i64::from(product.price))) }
             }
             span.product-quantity {
                 input type="number" min="0" name=(product.id)
@@ -296,16 +308,16 @@ pub fn invoice(site: &Site, invoice: &Invoice, payment_instruction: Option<&str>
                                 td.normal { (line.product.name) " (" (line.product.package) ")" }
                                 td { (line.quantity) }
                                 td { "*" }
-                                td { (money(i64::from(line.unit_price))) }
+                                td { (money(site.locale, i64::from(line.unit_price))) }
                                 td { "=" }
-                                td.last { (money(i64::from(line.unit_price) * i64::from(line.quantity))) }
+                                td.last { (money(site.locale, i64::from(line.unit_price) * i64::from(line.quantity))) }
                             }
                         }
                     }
                     tr.font-bold {
                         td { (t(Text::Total)) }
                         td {} td {} td {} td {}
-                        td.last { (money(invoice.total)) }
+                        td.last { (money(site.locale, invoice.total)) }
                     }
                 }
             }
@@ -340,12 +352,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn money_like_format_money() {
-        assert_eq!(money(5100), "51 €");
-        assert_eq!(money(1010), "10,10 €");
-        assert_eq!(money(5), "0,05 €");
-        assert_eq!(money(10_000), "100 €");
-        assert_eq!(money(100_050), "1000,50 €");
+    fn money_in_finnish_and_french() {
+        for locale in [Locale::Fi, Locale::Fr] {
+            assert_eq!(money(locale, 5100), "51\u{a0}€");
+            assert_eq!(money(locale, 1010), "10,10\u{a0}€");
+            assert_eq!(money(locale, 5), "0,05\u{a0}€");
+            assert_eq!(money(locale, 10_000), "100\u{a0}€");
+            assert_eq!(money(locale, 100_050), "1000,50\u{a0}€");
+            assert_eq!(money(locale, -1010), "-10,10\u{a0}€");
+        }
+    }
+
+    #[test]
+    fn money_in_english() {
+        assert_eq!(money(Locale::En, 5100), "€51");
+        assert_eq!(money(Locale::En, 1010), "€10.10");
+        assert_eq!(money(Locale::En, 5), "€0.05");
+        assert_eq!(money(Locale::En, 100_050), "€1000.50");
+        assert_eq!(money(Locale::En, -1010), "-€10.10");
     }
 
     #[test]
