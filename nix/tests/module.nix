@@ -425,6 +425,13 @@ let
           "= /admin/CreateProducer".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateProducer".proxyPass = "http://127.0.0.1:3403";
           "= /admin/DeleteProducer".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/Products".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/NewProduct".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/ShowProduct".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/EditProduct".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/CreateProduct".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/UpdateProduct".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/DeleteProduct".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateMarkPaidOrder".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateInvoiceOrder".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateDeliverOrder".proxyPass = "http://127.0.0.1:3403";

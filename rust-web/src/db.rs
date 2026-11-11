@@ -990,3 +990,100 @@ pub async fn delete_producer(db: &PgPool, id: Uuid) -> sqlx::Result<bool> {
     .await?;
     Ok(deleted.rows_affected() == 1)
 }
+
+/// A product as the admin edits it
+#[derive(Debug, Clone, FromRow)]
+pub struct CatalogProduct {
+    #[sqlx(flatten)]
+    pub product: Product,
+    /// Shown on the order form
+    pub enabled: bool,
+}
+
+/// Every product, in no particular order
+pub async fn catalog_products(db: &PgPool) -> sqlx::Result<Vec<CatalogProduct>> {
+    sqlx::query_as(
+        "SELECT id, producer_id, name, description, package, price, ordering, enabled FROM products",
+    )
+    .fetch_all(db)
+    .await
+}
+
+pub async fn catalog_product(db: &PgPool, id: Uuid) -> sqlx::Result<Option<CatalogProduct>> {
+    sqlx::query_as(
+        "SELECT id, producer_id, name, description, package, price, ordering, enabled
+         FROM products WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+pub async fn create_product(db: &PgPool, product: &CatalogProduct) -> sqlx::Result<Uuid> {
+    let p = &product.product;
+    sqlx::query_scalar(
+        "INSERT INTO products (producer_id, name, description, package, price, ordering, enabled)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+    )
+    .bind(p.producer_id)
+    .bind(&p.name)
+    .bind(&p.description)
+    .bind(&p.package)
+    .bind(p.price)
+    .bind(p.ordering)
+    .bind(product.enabled)
+    .fetch_one(db)
+    .await
+}
+
+/// Saves the product as edited, with the texts that changed in its
+/// history, all or nothing
+pub async fn update_product(
+    db: &PgPool,
+    user: Uuid,
+    before: &CatalogProduct,
+    after: &CatalogProduct,
+) -> sqlx::Result<()> {
+    let (b, a) = (&before.product, &after.product);
+    let mut tx = db.begin().await?;
+    record_text_changes(
+        &mut tx,
+        user,
+        Texts::Product(b.id),
+        &[
+            ("name", &b.name, &a.name),
+            ("description", &b.description, &a.description),
+            ("package", &b.package, &a.package),
+        ],
+    )
+    .await?;
+    sqlx::query(
+        "UPDATE products SET producer_id = $2, name = $3, description = $4, package = $5,
+                             price = $6, ordering = $7, enabled = $8
+         WHERE id = $1",
+    )
+    .bind(b.id)
+    .bind(a.producer_id)
+    .bind(&a.name)
+    .bind(&a.description)
+    .bind(&a.package)
+    .bind(a.price)
+    .bind(a.ordering)
+    .bind(after.enabled)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await
+}
+
+/// Deletes a product never ordered, and its text history; false (and
+/// nothing deleted) if it was
+pub async fn delete_product(db: &PgPool, id: Uuid) -> sqlx::Result<bool> {
+    let deleted = sqlx::query(
+        "DELETE FROM products WHERE id = $1
+           AND NOT EXISTS (SELECT 1 FROM ordered_products WHERE product_id = $1)",
+    )
+    .bind(id)
+    .execute(db)
+    .await?;
+    Ok(deleted.rows_affected() == 1)
+}

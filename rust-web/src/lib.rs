@@ -10,6 +10,7 @@ pub mod admin_customers;
 pub mod admin_forms;
 pub mod admin_orders;
 pub mod admin_producers;
+pub mod admin_products;
 pub mod admin_texts;
 pub mod db;
 pub mod l10n;
@@ -489,6 +490,31 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/DeleteProducer",
             delete(admin_producers::delete).post(admin_producers::delete_by_post),
+        )
+        .route(
+            "/admin/Products",
+            get(admin_products::list).post(admin_products::list),
+        )
+        .route(
+            "/admin/NewProduct",
+            get(admin_products::new).post(admin_products::new),
+        )
+        .route(
+            "/admin/ShowProduct",
+            get(admin_products::show).post(admin_products::show),
+        )
+        .route(
+            "/admin/EditProduct",
+            get(admin_products::edit).post(admin_products::edit),
+        )
+        .route("/admin/CreateProduct", post(admin_products::create))
+        .route(
+            "/admin/UpdateProduct",
+            post(admin_products::update).patch(admin_products::update),
+        )
+        .route(
+            "/admin/DeleteProduct",
+            delete(admin_products::delete).post(admin_products::delete_by_post),
         )
         .route(
             "/admin/NewOrder",

@@ -6,8 +6,8 @@ the welcome message, the order form, an order's invoice and the newsletter
 form, in Finnish, English or French, demo mode included; the admin's login,
 logout, welcome page (its menu), orders (the list, an order's page and its
 buttons, a new order, all ordered products), welcome messages, payment
-instructions, customers, the email lists and the producers; and the email
-worker, IHP's job runner with
+instructions, customers, the email lists, the producers and the products;
+and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
 so both can run at once: the rest of the admin stays in IHP, and either
 app's worker emails the invoices of either app's orders, as each order saves
@@ -47,6 +47,7 @@ emails keep working, and the markup and classes are the same, so
 - `src/admin_producers.rs`: the producers, from
   `Admin/Controller/Producers.hs`, with the text history of
   `Application/TextHistory.hs`
+- `src/admin_products.rs`: the products, from `Admin/Controller/Products.hs`
 - `src/admin_forms.rs`: the admin's form fields, as IHP's `formFor` makes
   them
 - `src/permission.rs`: what each role may do, from
@@ -123,6 +124,10 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   whichever the database gave.
 - **The email lists** have a breadcrumb back to the start, as the other
   admin pages.
+- **A product's form** lists the producers as the order form does, Bosco
+  Falconeria first, then A to Z (IHP's in the database's order), and says
+  what to fix in plain words; a product of a producer that doesn't exist
+  is refused there, where IHP's was a 500.
 - **Payment instructions** are listed oldest first; IHP listed them in
   whatever order the database gave, which is the same until one is edited.
 - **The admin's wording and markup are tidied** where IHP's generator left
@@ -148,4 +153,4 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the rest of the admin: products and changing one's password.
+Not done yet: changing one's password, the admin's last page in IHP.

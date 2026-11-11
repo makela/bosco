@@ -1830,3 +1830,138 @@ async fn a_producer_with_products_stays(db: PgPool) -> TestResult {
     assert_eq!(left, ["Täysi"]);
     Ok(())
 }
+
+#[sqlx::test(migrations = false)]
+async fn products_are_added_and_changed_with_their_history(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let quetzal = a_producer(&db, "Quetzal").await?;
+    let bosco = a_producer(&db, "Bosco Falconeria").await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+
+    // The producers to choose from, Bosco Falconeria first
+    let form = text(send(&app, Method::GET, "/admin/NewProduct", &boss, &[]).await?).await?;
+    assert!(
+        form.find(">Bosco Falconeria</option>").unwrap() < form.find(">Quetzal</option>").unwrap()
+    );
+    assert!(form.contains(r#"<option value="" selected disabled>Please select</option>"#));
+
+    // What isn't a whole number, or a producer, comes back to be fixed
+    let quetzal_id = quetzal.to_string();
+    let mut fields: Vec<(&str, &str)> = vec![
+        ("producerId", &quetzal_id),
+        ("name", "Suklaa"),
+        ("package", "60 g"),
+        ("price", "4,10"),
+        ("ordering", "x"),
+    ];
+    let page =
+        text(send(&app, Method::POST, "/admin/CreateProduct", &boss, &fields).await?).await?;
+    assert!(page.contains(r#"value="4,10""#));
+    assert_eq!(page.matches("is-invalid").count(), 2, "{page}");
+    let products: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM products")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(products, 0);
+
+    fields.retain(|(name, _)| !matches!(*name, "price" | "ordering"));
+    fields.extend([("price", "410"), ("ordering", ""), ("enabled", "off")]);
+    let response = send(&app, Method::POST, "/admin/CreateProduct", &boss, &fields).await?;
+    let (id, ordering, enabled): (Uuid, Option<i32>, bool) =
+        sqlx::query_as("SELECT id, ordering, enabled FROM products")
+            .fetch_one(&db)
+            .await?;
+    assert_eq!((ordering, enabled), (None, false));
+    assert_eq!(
+        location(&response),
+        format!("/admin/ShowProduct?productId={id}")
+    );
+
+    // A promoter changes only the texts, and the change is kept
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    let bosco_id = bosco.to_string();
+    let update = format!("/admin/UpdateProduct?productId={id}");
+    send(
+        &app,
+        Method::POST,
+        &update,
+        &promoter,
+        &[
+            ("name", "Chilisuklaa"),
+            ("price", "1"),
+            ("producerId", &bosco_id),
+        ],
+    )
+    .await?;
+    let row: (String, i32, Uuid) = sqlx::query_as("SELECT name, price, producer_id FROM products")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(row, ("Chilisuklaa".to_string(), 410, quetzal));
+    let shown = text(
+        send(
+            &app,
+            Method::GET,
+            &format!("/admin/ShowProduct?productId={id}"),
+            &promoter,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(shown.contains(" · promo@example.com · name</summary>"));
+    assert!(shown.contains("<p>4,10\u{a0}€ / 60 g</p>"));
+
+    // The list, in the order form's order: Bosco Falconeria's first
+    sqlx::query("INSERT INTO products (producer_id, name, description, package, price) VALUES ($1, 'Öljy', '', '3 l', 5100)")
+        .bind(bosco)
+        .execute(&db)
+        .await?;
+    let list = text(send(&app, Method::GET, "/admin/Products", &promoter, &[]).await?).await?;
+    assert!(list.find(">Öljy</a>").unwrap() < list.find(">Chilisuklaa</a>").unwrap());
+    assert!(!list.contains("NewProduct"));
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn an_ordered_product_stays(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let order = listed_order(&db, "Eeva", "2026-01-15 12:00:00+00", 300, "").await?;
+    let ordered: Uuid =
+        sqlx::query_scalar("SELECT product_id FROM ordered_products WHERE order_id = $1")
+            .bind(order)
+            .fetch_one(&db)
+            .await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let response = send(
+        &app,
+        Method::DELETE,
+        &format!("/admin/DeleteProduct?productId={ordered}"),
+        &boss,
+        &[],
+    )
+    .await?;
+    assert_eq!(
+        location(&response),
+        format!("/admin/EditProduct?productId={ordered}")
+    );
+    assert!(
+        session_after(&response, &boss)
+            .get_text(FLASH_ERROR)
+            .is_some()
+    );
+    let products: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM products")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(products, 1);
+
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    for (method, uri) in [
+        (Method::GET, "/admin/NewProduct".to_string()),
+        (Method::POST, "/admin/CreateProduct".to_string()),
+    ] {
+        let response = send(&app, method, &uri, &promoter, &[]).await?;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{uri}");
+    }
+    Ok(())
+}

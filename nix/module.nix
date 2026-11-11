@@ -242,8 +242,9 @@ let
             database: the welcome message, the order form, the invoices and the
             newsletter form, and of the admin, which shares IHP's session, the
             login, logout, welcome page, everything about orders, the welcome
-            messages, the payment instructions, the customers, the email lists
-            and the producers. The rest of the admin stays in IHP. nginx sends these pages
+            messages, the payment instructions, the customers, the email lists,
+            the producers and the products. Only changing one's password stays
+            in IHP. nginx sends these pages
             to it with nginxLocations
           '';
 
@@ -349,6 +350,13 @@ let
     "/admin/CreateProducer"
     "/admin/UpdateProducer"
     "/admin/DeleteProducer"
+    "/admin/Products"
+    "/admin/NewProduct"
+    "/admin/ShowProduct"
+    "/admin/EditProduct"
+    "/admin/CreateProduct"
+    "/admin/UpdateProduct"
+    "/admin/DeleteProduct"
     "/admin/UpdateMarkPaidOrder"
     "/admin/UpdateInvoiceOrder"
     "/admin/UpdateDeliverOrder"
