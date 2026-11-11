@@ -187,7 +187,7 @@ fn param(params: &Params, name: &str) -> String {
 
 /// The customer's fields of a form, the name and address trimmed, as the
 /// IHP app does; the email and phone as they were written
-fn customer_from(params: &Params) -> NewCustomer {
+pub(crate) fn customer_from(params: &Params) -> NewCustomer {
     let trimmed = |name: &str| param(params, name).trim().to_string();
     NewCustomer {
         first_name: trimmed("firstName"),
@@ -202,7 +202,7 @@ fn customer_from(params: &Params) -> NewCustomer {
 }
 
 /// The fields' checks, the first failing one of each field
-fn check(customer: NewCustomer, checks: &[FieldCheck]) -> CustomerForm {
+pub(crate) fn check(customer: NewCustomer, checks: &[FieldCheck]) -> CustomerForm {
     let mut errors = HashMap::new();
     for (name, check) in checks {
         let value = match *name {
@@ -220,9 +220,25 @@ fn check(customer: NewCustomer, checks: &[FieldCheck]) -> CustomerForm {
     CustomerForm { customer, errors }
 }
 
+/// The quantities ordered: a product's is in the field named by its id.
+/// Empty is 0, as in the IHP app; None (a 400) for anything else but a
+/// whole number.
+pub(crate) fn quantities(params: &Params, products: &[db::Product]) -> Option<HashMap<Uuid, i64>> {
+    let mut quantities = HashMap::new();
+    for product in products {
+        match params.get(&product.id.to_string()).map(String::as_str) {
+            None | Some("") => {}
+            Some(value) => {
+                quantities.insert(product.id, value.parse::<i64>().ok()?);
+            }
+        }
+    }
+    Some(quantities)
+}
+
 /// An order needs the whole address; the last name is optional, for the few
 /// who have only one name
-const ORDER_CHECKS: &[FieldCheck] = &[
+pub(crate) const ORDER_CHECKS: &[FieldCheck] = &[
     ("firstName", validate::required),
     ("email", validate::email),
     ("phone", validate::phone),
@@ -257,6 +273,7 @@ async fn new_order(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Re
     let content = views::order_form(
         &state.site,
         &OrderForm {
+            action: "/CreateOrder",
             producers: &producers,
             products: &products,
             quantities: &HashMap::new(),
@@ -289,20 +306,9 @@ async fn create_order(
     let (producers, products) = db::catalog(&state.db).await?;
     let all_products = db::all_products(&state.db).await?;
 
-    // A product's quantity is in the field named by its id. Empty is 0, as
-    // in the IHP app; anything else but a whole number is refused.
-    let mut quantities = HashMap::new();
-    for product in &all_products {
-        match params.get(&product.id.to_string()).map(String::as_str) {
-            None | Some("") => {}
-            Some(value) => match value.parse::<i64>() {
-                Ok(quantity) => {
-                    quantities.insert(product.id, quantity);
-                }
-                Err(_) => return Ok(StatusCode::BAD_REQUEST.into_response()),
-            },
-        }
-    }
+    let Some(quantities) = quantities(&params, &all_products) else {
+        return Ok(StatusCode::BAD_REQUEST.into_response());
+    };
     let ordered = |id: &Uuid| quantities.get(id).is_some_and(|&q| q > 0);
     let lines: Vec<_> = products
         .iter()
@@ -323,6 +329,7 @@ async fn create_order(
         let content = views::order_form(
             &state.site,
             &OrderForm {
+                action: "/CreateOrder",
                 producers: &producers,
                 products: &products,
                 quantities: &shown,
@@ -333,7 +340,7 @@ async fn create_order(
         );
         return Ok(page(&state, &headers, StatusCode::OK, &content));
     }
-    let order_id = db::create_order(&state.db, &form.customer, &lines).await?;
+    let order_id = db::create_order(&state.db, &form.customer, &lines, true).await?;
     Ok(redirect_with(
         Flash::OrderSent,
         &format!("/ShowOrder?orderId={order_id}"),
@@ -419,6 +426,15 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/Orders",
             get(admin_orders::orders).post(admin_orders::orders),
+        )
+        .route(
+            "/admin/NewOrder",
+            get(admin_orders::new_order).post(admin_orders::new_order),
+        )
+        .route("/admin/CreateOrder", post(admin_orders::create_order))
+        .route(
+            "/admin/OrderedProducts",
+            get(admin_orders::ordered_products).post(admin_orders::ordered_products),
         )
         .route(
             "/admin/ShowOrder",

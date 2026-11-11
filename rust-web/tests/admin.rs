@@ -1046,3 +1046,157 @@ async fn the_order_pages_check_who_and_what(db: PgPool) -> TestResult {
     );
     Ok(())
 }
+
+/// The customer's fields of the order form, filled in
+const CUSTOMER: [(&str, &str); 8] = [
+    ("firstName", " Matti "),
+    ("lastName", "Meikäläinen"),
+    ("billingName", ""),
+    ("email", "matti%40example.com"),
+    ("phone", "040 123 4567"),
+    ("streetAddress", "Katu 1"),
+    ("postalCode", "00100"),
+    ("city", "Helsinki"),
+];
+
+/// A disabled product of a disabled producer, which the admin can still
+/// take an order of
+async fn disabled_product(db: &PgPool) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "WITH p AS (INSERT INTO producers (name, subject, description, enabled)
+                    VALUES ('Zeta Oy', '', '', false) RETURNING id)
+         INSERT INTO products (producer_id, name, description, package, price, enabled)
+         SELECT id, 'Zetaöljy', '', '1 l', 1500, false FROM p RETURNING id",
+    )
+    .fetch_one(db)
+    .await
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_admin_takes_an_order_of_anything_without_an_email(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let zeta = disabled_product(&db).await?;
+    let app = site(db.clone(), false);
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+
+    let form = text(send(&app, Method::GET, "/admin/NewOrder", &driver, &[]).await?).await?;
+    assert!(form.contains(r#"<form method="POST" action="/admin/CreateOrder">"#));
+    assert!(form.contains("<h2>Zeta Oy</h2>") && form.contains(&format!(r#"name="{zeta}""#)));
+    assert!(
+        form.contains("<title>Manage Bosco Falconeria</title>"),
+        "the admin's layout"
+    );
+
+    let quantity = zeta.to_string();
+    let mut fields: Vec<(&str, &str)> = CUSTOMER.to_vec();
+    fields.push((&quantity, "2"));
+    let response = send(&app, Method::POST, "/admin/CreateOrder", &driver, &fields).await?;
+    assert_eq!(response.status(), StatusCode::FOUND);
+    let (order, first_name, lines, jobs): (Uuid, String, i64, i64) = sqlx::query_as(
+        "SELECT orders.id, first_name,
+                (SELECT SUM(quantity * unit_price) FROM ordered_products WHERE order_id = orders.id),
+                (SELECT COUNT(*) FROM email_order_jobs)
+         FROM orders JOIN customers ON customers.id = orders.customer_id",
+    )
+    .fetch_one(&db)
+    .await?;
+    assert_eq!(
+        location(&response),
+        format!("/admin/ShowOrder?orderId={order}")
+    );
+    assert_eq!(
+        session_after(&response, &driver)
+            .get_text(FLASH_SUCCESS)
+            .as_deref(),
+        Some("Order created")
+    );
+    assert_eq!((first_name.as_str(), lines, jobs), ("Matti", 3000, 0));
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_admins_order_form_says_what_is_missing(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let zeta = disabled_product(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let quantity = zeta.to_string();
+
+    // No products: the form again, filled in, saying so
+    let mut fields: Vec<(&str, &str)> = CUSTOMER.to_vec();
+    fields.push((&quantity, "0"));
+    let response = send(&app, Method::POST, "/admin/CreateOrder", &boss, &fields).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let page = text(response).await?;
+    assert!(page.contains(r#"<div class="unavailable-notice" role="alert">"#));
+    assert!(page.contains(r#"value="Meikäläinen""#));
+
+    // A missing name: the form again, with the quantity kept
+    let mut fields: Vec<(&str, &str)> = CUSTOMER
+        .iter()
+        .filter(|(k, _)| *k != "firstName")
+        .copied()
+        .collect();
+    fields.push((&quantity, "2"));
+    let page = text(send(&app, Method::POST, "/admin/CreateOrder", &boss, &fields).await?).await?;
+    assert!(page.contains("is-invalid"));
+    assert!(page.contains(&format!(r#"name="{zeta}" value="2""#)));
+
+    let mut fields: Vec<(&str, &str)> = CUSTOMER.to_vec();
+    fields.push((&quantity, "abc"));
+    let response = send(&app, Method::POST, "/admin/CreateOrder", &boss, &fields).await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    for (method, uri) in [
+        (Method::GET, "/admin/NewOrder"),
+        (Method::POST, "/admin/CreateOrder"),
+    ] {
+        let response = send(&app, method, uri, &promoter, &CUSTOMER).await?;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+    let orders: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM orders")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(orders, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn all_ordered_products_per_year(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    listed_order(&db, "Old", "2024-06-01 12:00:00+00", 1000, "").await?;
+    listed_order(&db, "New", "2026-02-01 12:00:00+00", 500, "").await?;
+    listed_order(&db, "Gone", "2026-03-01 12:00:00+00", 700, "cancelled_at").await?;
+    // Of the same product, ordered in two years
+    sqlx::query(
+        "INSERT INTO ordered_products (order_id, product_id, quantity, unit_price)
+         SELECT o.id, p.id, 5, 100 FROM orders o, products p
+         WHERE o.ordered_at > '2026-01-01' AND o.cancelled_at IS NULL AND p.price = 1000",
+    )
+    .execute(&db)
+    .await?;
+    let app = site(db.clone(), false);
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    let page =
+        text(send(&app, Method::GET, "/admin/OrderedProducts", &promoter, &[]).await?).await?;
+    // Newest year first, a year without orders too; the cancelled order's
+    // product isn't there
+    assert!(
+        page.contains("<tr><th></th><th>2026</th><th>2025</th><th>2024</th></tr>"),
+        "{page}"
+    );
+    assert!(page.contains("<tr><td>Oil (1 l)</td><td>5</td><td>0</td><td>2</td></tr>"));
+    assert!(page.contains("<tr><td>Oil (1 l)</td><td>2</td><td>0</td><td>0</td></tr>"));
+    assert_eq!(page.matches("<td>Oil (1 l)</td>").count(), 2);
+    assert_eq!(
+        page.matches(r#"<th colspan="4">P</th>"#).count(),
+        2,
+        "one per producer"
+    );
+
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    let response = send(&app, Method::GET, "/admin/OrderedProducts", &driver, &[]).await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    Ok(())
+}

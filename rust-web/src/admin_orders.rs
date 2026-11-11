@@ -8,7 +8,12 @@
 //! - the buttons' actions: mark it invoiced, paid or delivered, cancel it,
 //!   and email the invoice again
 //!
-//! A new order from the admin is still the IHP app's.
+//! - a new order taken in the admin, `/admin/NewOrder`: the public order
+//!   form, with every product, also those that can't be ordered now, and
+//!   without an email to the customer
+//! - all ordered products, `/admin/OrderedProducts`
+//!   (`Admin/View/Orders/OrderedProducts.hs`): how many of each product
+//!   were ordered each year
 
 use std::sync::Arc;
 
@@ -23,7 +28,7 @@ use crate::admin::{self, Crumb};
 use crate::db::{self, EmailJob, ListedOrder, Step, Unhandled};
 use crate::permission::Permission;
 use crate::session::{FLASH_ERROR, FLASH_SUCCESS};
-use crate::views::{customer_block, invoice_rows, money};
+use crate::views::{CustomerForm, OrderForm, customer_block, invoice_rows, money, order_form};
 use crate::{AppState, Params, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -516,6 +521,161 @@ pub async fn send_invoice(
         &session,
         admin::found(&show_path(id)),
     ))
+}
+
+struct NewOrder<'a> {
+    producers: &'a [db::Producer],
+    products: &'a [db::Product],
+    quantities: &'a std::collections::HashMap<uuid::Uuid, i64>,
+    form: &'a CustomerForm,
+    no_products_selected: bool,
+}
+
+/// The public order form in the admin's layout, sent to the admin
+fn new_order_page(state: &AppState, order: &NewOrder) -> Markup {
+    order_form(
+        &state.site,
+        &OrderForm {
+            action: "/admin/CreateOrder",
+            producers: order.producers,
+            products: order.products,
+            quantities: order.quantities,
+            form: order.form,
+            unavailable: &[],
+            no_products_selected: order.no_products_selected,
+        },
+    )
+}
+
+pub async fn new_order(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Result<Response> {
+    let (_, session) =
+        match admin::require_permission(&state, &headers, &uri, Permission::CreateOrders).await? {
+            Ok(found) => found,
+            Err(response) => return Ok(response),
+        };
+    let (producers, products) = db::whole_catalog(&state.db).await?;
+    let content = new_order_page(
+        &state,
+        &NewOrder {
+            producers: &producers,
+            products: &products,
+            quantities: &Default::default(),
+            form: &CustomerForm::default(),
+            no_products_selected: false,
+        },
+    );
+    Ok(admin::page(&state, session, &content))
+}
+
+/// Saves an order taken in the admin, e.g. on the phone: any product, even
+/// one that can't be ordered now, and whether ordering is open or not. No
+/// email: the customer didn't fill in the form themselves.
+pub async fn create_order(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    form: std::result::Result<Form<Params>, FormRejection>,
+) -> Result<Response> {
+    let (user, mut session) =
+        match admin::require_permission(&state, &headers, &uri, Permission::CreateOrders).await? {
+            Ok(found) => found,
+            Err(response) => return Ok(response),
+        };
+    let params = form.map(|Form(params)| params).unwrap_or_default();
+    let (producers, products) = db::whole_catalog(&state.db).await?;
+    let Some(quantities) = crate::quantities(&params, &products) else {
+        return Ok(bad_request());
+    };
+    let lines: Vec<_> = products
+        .iter()
+        .filter_map(|product| {
+            let quantity = *quantities.get(&product.id)?;
+            (quantity > 0).then_some((product, quantity))
+        })
+        .collect();
+    let customer = crate::check(crate::customer_from(&params), crate::ORDER_CHECKS);
+    if !customer.errors.is_empty() || lines.is_empty() {
+        let shown = lines.iter().map(|(p, q)| (p.id, *q)).collect();
+        let content = new_order_page(
+            &state,
+            &NewOrder {
+                producers: &producers,
+                products: &products,
+                quantities: &shown,
+                form: &customer,
+                no_products_selected: lines.is_empty(),
+            },
+        );
+        return Ok(admin::page(&state, session, &content));
+    }
+    let id = db::create_order(&state.db, &customer.customer, &lines, false).await?;
+    tracing::info!(user = %user.id, order = %id, "took an order in the admin");
+    session.set_text(FLASH_SUCCESS, "Order created");
+    Ok(admin::with_session(
+        &state,
+        &session,
+        admin::found(&show_path(id)),
+    ))
+}
+
+/// How many of each product were ordered each year, newest first, under
+/// their producers
+fn ordered_products_page(
+    years: &[i32],
+    producers: &[db::Producer],
+    products: &[db::ProductYears],
+) -> Markup {
+    html! {
+        (admin::breadcrumb(&[
+            Crumb::link("Home", admin::WELCOME),
+            Crumb::text("All ordered products"),
+        ]))
+        div.table-responsive {
+            table.whitespace-nowrap {
+                thead {
+                    tr {
+                        th {}
+                        @for year in years { th { (year) } }
+                    }
+                }
+                tbody {
+                    @for producer in producers {
+                        tr { th colspan=(years.len() + 1) { (producer.name) } }
+                        @for ordered in products.iter().filter(|p| p.product.producer_id == producer.id) {
+                            tr {
+                                td { (ordered.product.name) " (" (ordered.product.package) ")" }
+                                @for year in years {
+                                    td { (ordered.by_year.get(year).copied().unwrap_or(0)) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub async fn ordered_products(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Result<Response> {
+    let (_, session) =
+        match admin::require_permission(&state, &headers, &uri, Permission::SeeOrderedProducts)
+            .await?
+        {
+            Ok(found) => found,
+            Err(response) => return Ok(response),
+        };
+    let years: Vec<i32> = db::order_years(&state.db).await?.rev().collect();
+    let (producers, products) = db::ordered_products(&state.db).await?;
+    let content = ordered_products_page(&years, &producers, &products);
+    Ok(admin::page(&state, session, &content))
 }
 
 #[cfg(test)]

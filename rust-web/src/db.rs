@@ -194,13 +194,14 @@ async fn insert_customer(
 }
 
 /// Saves the customer, the order, its lines at the products' prices now (so
-/// later price changes don't touch it) and the job that emails the invoice,
-/// all or nothing. The email worker (worker.rs, or the IHP app's) sends
-/// the email.
+/// later price changes don't touch it) and, with `email`, the job that
+/// emails the invoice, all or nothing. The email worker (worker.rs, or the
+/// IHP app's) sends the email. An order taken in the admin has none.
 pub async fn create_order(
     db: &PgPool,
     customer: &NewCustomer,
     lines: &[(&Product, i64)],
+    email: bool,
 ) -> sqlx::Result<Uuid> {
     let mut tx = db.begin().await?;
     let customer_id = insert_customer(&mut *tx, customer).await?;
@@ -221,10 +222,12 @@ pub async fn create_order(
         .execute(&mut *tx)
         .await?;
     }
-    sqlx::query("INSERT INTO email_order_jobs (order_id) VALUES ($1)")
-        .bind(order_id)
-        .execute(&mut *tx)
-        .await?;
+    if email {
+        sqlx::query("INSERT INTO email_order_jobs (order_id) VALUES ($1)")
+            .bind(order_id)
+            .execute(&mut *tx)
+            .await?;
+    }
     tx.commit().await?;
     Ok(order_id)
 }
@@ -561,4 +564,70 @@ pub async fn queue_invoice_email(db: &PgPool, order_id: Uuid) -> sqlx::Result<()
         .execute(db)
         .await
         .map(drop)
+}
+
+/// Every producer and product, also those that can't be ordered now, in
+/// display order: what the admin can take an order of
+pub async fn whole_catalog(db: &PgPool) -> sqlx::Result<(Vec<Producer>, Vec<Product>)> {
+    let mut producers: Vec<Producer> =
+        sqlx::query_as("SELECT id, name, description FROM producers")
+            .fetch_all(db)
+            .await?;
+    sort_producers(&mut producers);
+    let mut products = all_products(db).await?;
+    products.sort_by_key(product_order);
+    Ok((producers, products))
+}
+
+/// A product's ordered quantities, per year, in orders that weren't
+/// cancelled
+#[derive(Debug)]
+pub struct ProductYears {
+    pub product: Product,
+    pub by_year: HashMap<i32, i64>,
+}
+
+/// Every product ever ordered, in display order, with how many of it were
+/// ordered each year (in UTC), and the producers of these in display order
+pub async fn ordered_products(db: &PgPool) -> sqlx::Result<(Vec<Producer>, Vec<ProductYears>)> {
+    #[derive(FromRow)]
+    struct Row {
+        #[sqlx(flatten)]
+        product: Product,
+        year: i32,
+        quantity: i64,
+    }
+    let rows: Vec<Row> = sqlx::query_as(
+        "SELECT products.id, producer_id, name, description, package, price, ordering,
+                EXTRACT(YEAR FROM ordered_at AT TIME ZONE 'UTC')::int4 AS year,
+                SUM(quantity)::int8 AS quantity
+         FROM ordered_products
+         JOIN orders ON orders.id = ordered_products.order_id
+         JOIN products ON products.id = ordered_products.product_id
+         WHERE cancelled_at IS NULL
+         GROUP BY products.id, year",
+    )
+    .fetch_all(db)
+    .await?;
+    let mut products: Vec<ProductYears> = Vec::new();
+    for row in rows {
+        match products.iter_mut().find(|p| p.product.id == row.product.id) {
+            Some(known) => {
+                known.by_year.insert(row.year, row.quantity);
+            }
+            None => products.push(ProductYears {
+                by_year: HashMap::from([(row.year, row.quantity)]),
+                product: row.product,
+            }),
+        }
+    }
+    products.sort_by_key(|p| product_order(&p.product));
+    let ids: Vec<Uuid> = products.iter().map(|p| p.product.producer_id).collect();
+    let mut producers: Vec<Producer> =
+        sqlx::query_as("SELECT id, name, description FROM producers WHERE id = ANY($1)")
+            .bind(&ids)
+            .fetch_all(db)
+            .await?;
+    sort_producers(&mut producers);
+    Ok((producers, products))
 }

@@ -241,9 +241,8 @@ let
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
             newsletter form, and of the admin, which shares IHP's session, the
-            login, logout, welcome page, and the orders and their buttons
-            (except a new order from the admin). The rest of the admin stays in
-            IHP. nginx sends these pages
+            login, logout, welcome page, and everything about orders. The rest
+            of the admin stays in IHP. nginx sends these pages
             to it with nginxLocations
           '';
 
@@ -316,6 +315,9 @@ let
     "/admin/Welcome"
     "/admin/Orders"
     "/admin/ShowOrder"
+    "/admin/NewOrder"
+    "/admin/CreateOrder"
+    "/admin/OrderedProducts"
     "/admin/UpdateMarkPaidOrder"
     "/admin/UpdateInvoiceOrder"
     "/admin/UpdateDeliverOrder"

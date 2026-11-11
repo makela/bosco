@@ -127,6 +127,8 @@ pub struct CustomerForm {
 
 /// The order form, empty or as it was sent when something has to be fixed
 pub struct OrderForm<'a> {
+    /// Where it's sent: `/CreateOrder`, or the admin's
+    pub action: &'a str,
     pub producers: &'a [Producer],
     pub products: &'a [Product],
     pub quantities: &'a HashMap<Uuid, i64>,
@@ -140,7 +142,7 @@ pub fn order_form(site: &Site, order: &OrderForm) -> Markup {
     let t = |text: Text| text.text(site.locale);
     html! {
         h1 { (t(Text::OrderForm)) }
-        form method="POST" action="/CreateOrder" {
+        form method="POST" action=(order.action) {
             @if !order.unavailable.is_empty() {
                 div.unavailable-notice role="alert" {
                     p { (t(Text::NoLongerAvailable)) }
@@ -197,7 +199,7 @@ fn product_row(site: &Site, product: &Product, quantity: Option<&i64>) -> Markup
             }
             span.product-quantity {
                 input type="number" min="0" name=(product.id)
-                    value=[quantity] aria-label=(format!("{}, {}", product.name, product.package));
+                    value=(quantity.map(i64::to_string).unwrap_or_default()) aria-label=(format!("{}, {}", product.name, product.package));
                 " " (Text::Pieces.text(site.locale))
             }
             span.product-description { (product.description) }

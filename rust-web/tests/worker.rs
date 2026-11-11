@@ -54,7 +54,7 @@ async fn order(db: &PgPool, product: &Product) -> sqlx::Result<Uuid> {
         city: "Helsinki".into(),
         ..NewCustomer::default()
     };
-    db::create_order(db, &customer, &[(product, 2)]).await
+    db::create_order(db, &customer, &[(product, 2)], true).await
 }
 
 #[derive(Debug, sqlx::FromRow)]

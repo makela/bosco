@@ -5,7 +5,7 @@ The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 the welcome message, the order form, an order's invoice and the newsletter
 form, in Finnish, English or French, demo mode included; the admin's login,
 logout, welcome page (its menu) and orders (the list, an order's page and
-its buttons); and the email worker, IHP's job runner with
+its buttons, a new order, all ordered products); and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
 so both can run at once: the rest of the admin stays in IHP, and either
 app's worker emails the invoices of either app's orders, as each order saves
@@ -34,7 +34,8 @@ emails keep working, and the markup and classes are the same, so
   the login check every admin page makes (`require_user`), and the welcome
   page, from `Admin/Controller/Static.hs`
 - `src/admin_orders.rs`: the admin's orders, from `Admin/Controller/Orders.hs`
-  and `Admin/View/Orders`: the list, an order's page, and its buttons
+  and `Admin/View/Orders`: the list, an order's page and its buttons, a new
+  order, and all ordered products
 - `src/permission.rs`: what each role may do, from
   `Application/Permission.hs`
 - `src/session.rs`, `src/skein_mac.rs`: IHP's session cookie
@@ -98,9 +99,10 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   come one by one, so it doesn't show.
 - **A login without a password field** is answered with 400; IHP's was a
   500. The login form always sends one.
-- **The order list's years** start and end at midnight UTC; IHP's started
-  at midnight in the database's time zone (e.g. Finnish time), but listed
-  the years by UTC. Only orders in the first hours of a year can differ.
+- **The admin's order list and all ordered products** count years from
+  midnight UTC; IHP's started at midnight in the database's time zone
+  (e.g. Finnish time), but listed the years by UTC. Only orders in the
+  first hours of a year can differ.
 - **A year that isn't a number** in the order list's address is answered
   with 400; IHP's was a 500.
 - **Access denied** (a login whose roles don't allow the page) is a page in
@@ -117,6 +119,5 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the rest of the admin: a new order from the admin, all
-ordered products, customers, producers, products, welcome messages, payment
+Not done yet: the rest of the admin: customers, producers, products, welcome messages, payment
 instructions, email lists and changing one's password.
