@@ -34,10 +34,16 @@ Without direnv, set the variables for one run instead, e.g.
 - `nix/tests/migrations.nix`: bootstraps a staging database and migrates a
   copy of production's schema with the deployment's own programs.
 
-`make check` runs all of them through `nix flake check`, starting its own
-PostgreSQL. New files must be `git add`ed before the flake can see them. A
-pre-push hook in `.githooks/` runs `make check` before every push (`git push
---no-verify` skips it). Enable it once per clone:
+`make check` runs all of them as the flake's checks, starting its own
+PostgreSQL, and builds the app and the Rust site. A change rebuilds only
+what depends on it: a change to `rust-web/` doesn't rebuild the IHP app,
+and the Rust site's dependencies are compiled again only when its
+`Cargo.lock` changes. It leaves out the app's optimized (`-O2`) build,
+which only compiles the same code more slowly; `make check-all` runs that
+too. The build's whole log is in `.devenv/check.log`. New files must be
+`git add`ed before the flake can see them. A pre-push hook in `.githooks/`
+runs `make check-all` before every push (`git push --no-verify` skips it).
+Enable it once per clone:
 
 ```sh
 git config core.hooksPath .githooks
