@@ -1965,3 +1965,125 @@ async fn an_ordered_product_stays(db: PgPool) -> TestResult {
     }
     Ok(())
 }
+
+#[sqlx::test(migrations = false)]
+async fn changing_ones_password(db: PgPool) -> TestResult {
+    let user = admin(&db).await?;
+    let app = site(db.clone(), false);
+    let mut session = Session::default();
+    session.login(user);
+
+    let form = text(send(&app, Method::GET, "/admin/NewPassword", &session, &[]).await?).await?;
+    assert!(form.contains(r#"<form method="POST" action="/admin/UpdatePassword">"#));
+
+    for (old, new, confirm, problem) in [
+        (
+            "wrong",
+            "uusi salasana",
+            "uusi salasana",
+            "The old password isn't right.",
+        ),
+        (
+            "salasana",
+            "uusi salasana",
+            "uusi salasanaa",
+            "The new password and its confirmation differ.",
+        ),
+        (
+            "salasana",
+            "lyhyt",
+            "lyhyt",
+            "The new password must be 8 to 64 characters long.",
+        ),
+    ] {
+        let response = send(
+            &app,
+            Method::POST,
+            "/admin/UpdatePassword",
+            &session,
+            &[
+                ("oldPassword", old),
+                ("newPassword", new),
+                ("confirmPassword", confirm),
+            ],
+        )
+        .await?;
+        assert_eq!(location(&response), "/admin/NewPassword");
+        assert_eq!(
+            session_after(&response, &session)
+                .get_text(FLASH_ERROR)
+                .as_deref(),
+            Some(problem)
+        );
+    }
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/UpdatePassword",
+        &session,
+        &[
+            ("oldPassword", "salasana"),
+            ("newPassword", "uusi salasana"),
+            ("confirmPassword", "uusi salasana"),
+        ],
+    )
+    .await?;
+    assert_eq!(location(&response), "/admin/Welcome");
+    // The new one logs in, the old one doesn't
+    let response = login(
+        &app,
+        &Session::default(),
+        "admin@example.com",
+        "uusi salasana",
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    let response = login(&app, &Session::default(), "admin@example.com", "salasana").await?;
+    assert_eq!(response.status(), StatusCode::FOUND);
+    Ok(())
+}
+
+/// Everyone shares a demo's logins: one visitor mustn't lock out the rest
+#[sqlx::test(migrations = false)]
+async fn a_demo_logins_password_stays(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), true);
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/DemoLogin?role=admin",
+        &Session::default(),
+        &[],
+    )
+    .await?;
+    let session = session_after(&response, &Session::default());
+    let before: String =
+        sqlx::query_scalar("SELECT password_hash FROM users WHERE email = 'admin@demo.invalid'")
+            .fetch_one(&db)
+            .await?;
+    for (method, uri) in [
+        (Method::GET, "/admin/NewPassword"),
+        (Method::POST, "/admin/UpdatePassword"),
+    ] {
+        let response = send(
+            &app,
+            method,
+            uri,
+            &session,
+            &[("newPassword", "x"), ("confirmPassword", "x")],
+        )
+        .await?;
+        assert_eq!(location(&response), "/admin/Welcome", "{uri}");
+        assert!(
+            session_after(&response, &session)
+                .get_text(FLASH_ERROR)
+                .is_some()
+        );
+    }
+    let after: String =
+        sqlx::query_scalar("SELECT password_hash FROM users WHERE email = 'admin@demo.invalid'")
+            .fetch_one(&db)
+            .await?;
+    assert_eq!(before, after);
+    Ok(())
+}

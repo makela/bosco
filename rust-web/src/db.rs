@@ -1087,3 +1087,20 @@ pub async fn delete_product(db: &PgPool, id: Uuid) -> sqlx::Result<bool> {
     .await?;
     Ok(deleted.rows_affected() == 1)
 }
+
+/// The login's password hash, IHP's (`password.rs`)
+pub async fn password_hash(db: &PgPool, user: Uuid) -> sqlx::Result<Option<String>> {
+    sqlx::query_scalar("SELECT password_hash FROM users WHERE id = $1")
+        .bind(user)
+        .fetch_optional(db)
+        .await
+}
+
+pub async fn set_password_hash(db: &PgPool, user: Uuid, hash: &str) -> sqlx::Result<()> {
+    sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+        .bind(user)
+        .bind(hash)
+        .execute(db)
+        .await
+        .map(drop)
+}

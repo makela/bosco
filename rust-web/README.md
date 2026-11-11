@@ -3,15 +3,11 @@
 The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 [maud](https://maud.lambda.xyz/), [SQLx](https://github.com/launchbadge/sqlx)):
 the welcome message, the order form, an order's invoice and the newsletter
-form, in Finnish, English or French, demo mode included; the admin's login,
-logout, welcome page (its menu), orders (the list, an order's page and its
-buttons, a new order, all ordered products), welcome messages, payment
-instructions, customers, the email lists, the producers and the products;
-and the email worker, IHP's job runner with
+form, in Finnish, English or French, demo mode included; the whole admin,
+`Admin/`; and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
-so both can run at once: the rest of the admin stays in IHP, and either
-app's worker emails the invoices of either app's orders, as each order saves
-its email job the same way.
+so both can run at once, and either app's worker emails the invoices of
+either app's orders, as each order saves its email job the same way.
 
 The login uses IHP's session cookie, `SESSION`, encrypted and signed as IHP
 does with the IHP app's key, and IHP's password hashes, so a login here
@@ -48,6 +44,8 @@ emails keep working, and the markup and classes are the same, so
   `Admin/Controller/Producers.hs`, with the text history of
   `Application/TextHistory.hs`
 - `src/admin_products.rs`: the products, from `Admin/Controller/Products.hs`
+- `src/admin_password.rs`: changing one's password, from
+  `Admin/Controller/Passwords.hs`
 - `src/admin_forms.rs`: the admin's form fields, as IHP's `formFor` makes
   them
 - `src/permission.rs`: what each role may do, from
@@ -111,6 +109,9 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   left out.
 - **The worker does one job at a time**; IHP's does up to 16 at once. Orders
   come one by one, so it doesn't show.
+- **Changing one's password** says what's wrong (the old password, the
+  confirmation, or the new one's length and characters); IHP said only
+  "Passwords do not meet the requirements". The rules are IHP's.
 - **A login without a password field** is answered with 400; IHP's was a
   500. The login form always sends one.
 - **The admin's order list and all ordered products** count years from
@@ -153,4 +154,6 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: changing one's password, the admin's last page in IHP.
+Not done yet: the IHP app's scripts (`Application/Script/`: making a
+login, the demo's reset, the dev data), its migrations, and the static
+files, which the IHP app still serves.

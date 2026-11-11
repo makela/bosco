@@ -9,6 +9,7 @@ pub mod admin;
 pub mod admin_customers;
 pub mod admin_forms;
 pub mod admin_orders;
+pub mod admin_password;
 pub mod admin_producers;
 pub mod admin_products;
 pub mod admin_texts;
@@ -515,6 +516,14 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/DeleteProduct",
             delete(admin_products::delete).post(admin_products::delete_by_post),
+        )
+        .route(
+            "/admin/NewPassword",
+            get(admin_password::new).post(admin_password::new),
+        )
+        .route(
+            "/admin/UpdatePassword",
+            post(admin_password::update).patch(admin_password::update),
         )
         .route(
             "/admin/NewOrder",

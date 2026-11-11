@@ -432,6 +432,8 @@ let
           "= /admin/CreateProduct".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateProduct".proxyPass = "http://127.0.0.1:3403";
           "= /admin/DeleteProduct".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/NewPassword".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/UpdatePassword".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateMarkPaidOrder".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateInvoiceOrder".proxyPass = "http://127.0.0.1:3403";
           "= /admin/UpdateDeliverOrder".proxyPass = "http://127.0.0.1:3403";

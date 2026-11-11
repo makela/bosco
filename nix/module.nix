@@ -45,9 +45,9 @@
 # - bosco-<name>-worker runs the jobs that send the order emails
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
-# rustWeb.enable, bosco-<name>-rust-web runs the public pages and the admin's
-# login, welcome page, orders, texts and customers in Rust next to them, with the same session key, and nginx sends
-# those pages to it (rustWeb.nginxLocations). With
+# rustWeb.enable, bosco-<name>-rust-web runs the public pages and the admin in
+# Rust next to them, with the same session key, and nginx sends those pages to
+# it (rustWeb.nginxLocations). With
 # rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
 # of IHP's.
 {
@@ -240,12 +240,9 @@ let
           enable = lib.mkEnableOption ''
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
-            newsletter form, and of the admin, which shares IHP's session, the
-            login, logout, welcome page, everything about orders, the welcome
-            messages, the payment instructions, the customers, the email lists,
-            the producers and the products. Only changing one's password stays
-            in IHP. nginx sends these pages
-            to it with nginxLocations
+            newsletter form, and the whole admin, which shares IHP's session.
+            nginx sends these pages to it with nginxLocations, and the rest, the
+            static files, to the IHP app
           '';
 
           port = lib.mkOption {
@@ -303,8 +300,7 @@ let
   listenAddress = instance: listenAddressOf instance.host instance.port;
 
   # The Rust site's pages: the IHP app's public addresses (Web/) and the
-  # admin's login, welcome page, orders, texts and customers, see the routes in
-  # rust-web/src/lib.rs
+  # admin's (Admin/), see the routes in rust-web/src/lib.rs
   rustWebPaths = [
     "/"
     "/Orders"
@@ -357,6 +353,8 @@ let
     "/admin/CreateProduct"
     "/admin/UpdateProduct"
     "/admin/DeleteProduct"
+    "/admin/NewPassword"
+    "/admin/UpdatePassword"
     "/admin/UpdateMarkPaidOrder"
     "/admin/UpdateInvoiceOrder"
     "/admin/UpdateDeliverOrder"

@@ -135,8 +135,8 @@ The addresses below are examples; use the real ones.
       locations."/".proxyPass = "http://127.0.0.1:3302";
       extraConfig = "add_header X-Robots-Tag noindex;";
     };
-    # The public pages and the first of the admin's to the Rust site, the
-    # rest (the admin, the static files) to the IHP app
+    # The public pages and the admin to the Rust site, the rest (the
+    # static files) to the IHP app
     virtualHosts."demo.tilaus.example.fi" = {
       enableACME = true;
       forceSSL = true;
@@ -218,16 +218,12 @@ With `rustWeb.enable = true`, an instance runs the public pages, the welcome
 message, the order form, the invoices and the newsletter form, from
 `rust-web/` in Rust, as `bosco-<name>-rust-web` on port `rustWeb.port`
 (`port` + 100 by default). It uses the instance's database as the IHP app
-does, as the same user; the IHP app's services keep running, and its admin
-and email worker work as before, also for orders made in Rust. It also runs
-the admin's login and logout (`/admin/NewSession` and the like), the demo's
-one-click logins included, the admin's welcome page with its menu, and its
-orders: the list, an order's page and its buttons, a new order taken in the
-admin, and all ordered products; the welcome messages and payment
-instructions; the customers and the email lists; and the producers and
-products: it reads and writes IHP's session cookie with the
-instance's session key and checks IHP's password hashes, so a login there is
-a login in the IHP app's admin, and logins and lockouts carry over both ways.
+does, as the same user; the IHP app's services keep running, and its email
+worker works as before, also for orders made in Rust. It also runs the whole
+admin (`/admin/…`), the demo's one-click logins included. It reads and
+writes IHP's session cookie with the instance's session key and checks and
+makes IHP's password hashes, so a login in either app is a login in the
+other, and logins, lockouts and changed passwords carry over both ways.
 nginx sends these pages to it and the rest to the IHP app with
 `rustWeb.nginxLocations`, as for the demo above. Without it, an instance runs
 them in IHP as before. See `rust-web/README.md` for the few differences.
