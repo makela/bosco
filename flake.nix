@@ -87,7 +87,15 @@
                     inherit pkgs;
                     inherit (self'.packages) migrate;
                     bootstrapSchema = pkgs.callPackage ./nix/bootstrap-schema.nix { };
-                    src = ./.;
+                    # What it reads, so that other changes don't rerun it
+                    src = pkgs.lib.fileset.toSource {
+                        root = ./.;
+                        fileset = pkgs.lib.fileset.unions [
+                            ./Application/Schema.sql
+                            ./Application/Fixtures.sql
+                            ./Application/Migration
+                        ];
+                    };
                     ihpSchema = "${ihp}/ihp-schema-compiler/data/IHPSchema.sql";
                 };
 
