@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs `make check` (nix flake check: builds plus unit and integration tests)
-# before every push. Skip it once with `git push --no-verify`.
+# Runs `make check-all` (nix flake check: every build, the -O2 one too, plus
+# the unit and integration tests) before every push. Skip it once with `git push --no-verify`.
 #
 # Enable in a fresh clone with: git config core.hooksPath .githooks
 set -euo pipefail
@@ -12,10 +12,10 @@ if ! git diff --quiet HEAD; then
     echo "pre-push: warning: uncommitted changes are included in the check" >&2
 fi
 
-echo "pre-push: running make check" >&2
+echo "pre-push: running make check-all" >&2
 if [ -n "${IHP:-}" ]; then
-    make check
+    make check-all
 else
     # Not inside the dev shell, where ${IHP}/Makefile.dist is available
-    direnv exec . make check
+    direnv exec . make check-all
 fi

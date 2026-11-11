@@ -26,7 +26,18 @@
                 ihp = {
                     appName = "bosco";
                     enable = true;
-                    projectPath = ./.;
+                    # The app's own files only, so that a change to the Rust site, the
+                    # NixOS module or the docs doesn't rebuild and retest the IHP app
+                    projectPath = pkgs.lib.fileset.toSource {
+                        root = ./.;
+                        fileset = pkgs.lib.fileset.difference ./. (pkgs.lib.fileset.unions [
+                            ./rust-web
+                            ./nix
+                            ./README.md
+                            ./flake.nix
+                            ./flake.lock
+                        ]);
+                    };
                     packages = with pkgs; [
                         # Native dependencies, e.g. imagemagick
                         watchman
