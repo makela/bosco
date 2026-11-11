@@ -122,6 +122,15 @@ pub fn arrange(orders: Vec<ListedOrder>, filter: &Filter) -> Vec<ListedOrder> {
 /// IHP's `dateTime`: the time in UTC, which its scripts show in the
 /// browser's time zone
 pub fn date_time(at: DateTime<Utc>) -> Markup {
+    time_element("date-time", at)
+}
+
+/// IHP's `timeAgo`, which its scripts show as e.g. "3 days ago"
+pub fn time_ago(at: DateTime<Utc>) -> Markup {
+    time_element("time-ago", at)
+}
+
+fn time_element(class: &str, at: DateTime<Utc>) -> Markup {
     let micros = at.timestamp_subsec_micros();
     let fraction = if micros == 0 {
         String::new()
@@ -129,7 +138,7 @@ pub fn date_time(at: DateTime<Utc>) -> Markup {
         format!(".{micros:06}").trim_end_matches('0').to_string()
     };
     let iso = format!("{}{fraction}Z", at.format("%Y-%m-%dT%H:%M:%S"));
-    html! { time class="date-time" datetime=(iso) { (at.format("%d.%m.%Y, %H:%M")) } }
+    html! { time class=(class) datetime=(iso) { (at.format("%d.%m.%Y, %H:%M")) } }
 }
 
 fn selected(on: bool) -> Option<&'static str> {

@@ -4,8 +4,9 @@ The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 [maud](https://maud.lambda.xyz/), [SQLx](https://github.com/launchbadge/sqlx)):
 the welcome message, the order form, an order's invoice and the newsletter
 form, in Finnish, English or French, demo mode included; the admin's login,
-logout, welcome page (its menu) and orders (the list, an order's page and
-its buttons, a new order, all ordered products); and the email worker, IHP's job runner with
+logout, welcome page (its menu), orders (the list, an order's page and its
+buttons, a new order, all ordered products), welcome messages and payment
+instructions; and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
 so both can run at once: the rest of the admin stays in IHP, and either
 app's worker emails the invoices of either app's orders, as each order saves
@@ -36,6 +37,10 @@ emails keep working, and the markup and classes are the same, so
 - `src/admin_orders.rs`: the admin's orders, from `Admin/Controller/Orders.hs`
   and `Admin/View/Orders`: the list, an order's page and its buttons, a new
   order, and all ordered products
+- `src/admin_texts.rs`: the welcome messages and payment instructions, from
+  `Admin/Controller/WelcomeMessages.hs` and `PaymentInstructions.hs`, with
+  IHP's generated forms
+- `src/pagination.rs`: IHP's pagination of the admin's lists
 - `src/permission.rs`: what each role may do, from
   `Application/Permission.hs`
 - `src/session.rs`, `src/skein_mac.rs`: IHP's session cookie
@@ -105,6 +110,10 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   first hours of a year can differ.
 - **A year that isn't a number** in the order list's address is answered
   with 400; IHP's was a 500.
+- **Payment instructions** are listed oldest first; IHP listed them in
+  whatever order the database gave, which is the same until one is edited.
+- **A page number that isn't a number** (`?page=`, `?maxItems=`) is
+  answered with 400; IHP's was a 500.
 - **Access denied** (a login whose roles don't allow the page) is a page in
   the admin's layout; IHP showed its own branded page. Both are 403.
 - **After "Mark as paid"** the admin goes back to the page they were on
@@ -119,5 +128,5 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the rest of the admin: customers, producers, products, welcome messages, payment
-instructions, email lists and changing one's password.
+Not done yet: the rest of the admin: customers, producers, products, email
+lists and changing one's password.

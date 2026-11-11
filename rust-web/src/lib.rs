@@ -7,9 +7,11 @@
 
 pub mod admin;
 pub mod admin_orders;
+pub mod admin_texts;
 pub mod db;
 pub mod l10n;
 pub mod mail;
+pub mod pagination;
 pub mod password;
 pub mod permission;
 pub mod session;
@@ -408,7 +410,7 @@ pub(crate) async fn not_found(State(state): State<Arc<AppState>>, headers: Heade
 /// them, or else not found.
 pub fn app(state: Arc<AppState>) -> Router {
     let static_files = ServeDir::new(&state.static_dir);
-    Router::new()
+    let router = Router::new()
         .route("/", get(index))
         .route("/Orders", get(index))
         .route("/NewOrder", get(new_order))
@@ -469,7 +471,8 @@ pub fn app(state: Arc<AppState>) -> Router {
             "/admin/DemoLogin",
             get(admin::demo_login).post(admin::demo_login),
         )
-        .nest_service("/static", static_files.clone())
+        .nest_service("/static", static_files.clone());
+    admin_texts::routes(router)
         .fallback_service(static_files.fallback(get(not_found).with_state(state.clone())))
         .layer(TraceLayer::new_for_http())
         .with_state(state)

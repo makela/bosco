@@ -46,7 +46,7 @@
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
 # rustWeb.enable, bosco-<name>-rust-web runs the public pages and the admin's
-# login, welcome page and orders in Rust next to them, with the same session key, and nginx sends
+# login, welcome page, orders and texts in Rust next to them, with the same session key, and nginx sends
 # those pages to it (rustWeb.nginxLocations). With
 # rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
 # of IHP's.
@@ -241,8 +241,9 @@ let
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
             newsletter form, and of the admin, which shares IHP's session, the
-            login, logout, welcome page, and everything about orders. The rest
-            of the admin stays in IHP. nginx sends these pages
+            login, logout, welcome page, everything about orders, the welcome
+            messages and the payment instructions. The rest of the admin stays
+            in IHP. nginx sends these pages
             to it with nginxLocations
           '';
 
@@ -301,7 +302,7 @@ let
   listenAddress = instance: listenAddressOf instance.host instance.port;
 
   # The Rust site's pages: the IHP app's public addresses (Web/) and the
-  # admin's login, welcome page and orders, see the routes in
+  # admin's login, welcome page, orders and texts, see the routes in
   # rust-web/src/lib.rs
   rustWebPaths = [
     "/"
@@ -318,6 +319,20 @@ let
     "/admin/NewOrder"
     "/admin/CreateOrder"
     "/admin/OrderedProducts"
+    "/admin/WelcomeMessages"
+    "/admin/NewWelcomeMessage"
+    "/admin/ShowWelcomeMessage"
+    "/admin/EditWelcomeMessage"
+    "/admin/CreateWelcomeMessage"
+    "/admin/UpdateWelcomeMessage"
+    "/admin/DeleteWelcomeMessage"
+    "/admin/PaymentInstructions"
+    "/admin/NewPaymentInstruction"
+    "/admin/ShowPaymentInstruction"
+    "/admin/EditPaymentInstruction"
+    "/admin/CreatePaymentInstruction"
+    "/admin/UpdatePaymentInstruction"
+    "/admin/DeletePaymentInstruction"
     "/admin/UpdateMarkPaidOrder"
     "/admin/UpdateInvoiceOrder"
     "/admin/UpdateDeliverOrder"

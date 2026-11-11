@@ -631,3 +631,119 @@ pub async fn ordered_products(db: &PgPool) -> sqlx::Result<(Vec<Producer>, Vec<P
     sort_producers(&mut producers);
     Ok((producers, products))
 }
+
+/// The admin's two published texts: the welcome message, which also opens
+/// and closes ordering, and the payment instructions
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextKind {
+    Welcome,
+    Payment,
+}
+
+/// A welcome message or payment instructions
+#[derive(Debug, Clone, FromRow)]
+pub struct Published {
+    pub id: Uuid,
+    pub text: String,
+    pub published_at: DateTime<Utc>,
+    /// Ordering is open: welcome messages only
+    pub is_ordering_enabled: Option<bool>,
+}
+
+pub async fn count_published(db: &PgPool, kind: TextKind) -> sqlx::Result<i64> {
+    let sql = match kind {
+        TextKind::Welcome => "SELECT COUNT(*) FROM welcome_messages",
+        TextKind::Payment => "SELECT COUNT(*) FROM payment_instructions",
+    };
+    sqlx::query_scalar(sql).fetch_one(db).await
+}
+
+/// A page of them: welcome messages newest first, payment instructions
+/// oldest first (IHP listed these in no particular order)
+pub async fn published_page(
+    db: &PgPool,
+    kind: TextKind,
+    limit: i64,
+    offset: i64,
+) -> sqlx::Result<Vec<Published>> {
+    let sql = match kind {
+        TextKind::Welcome => {
+            "SELECT id, text, published_at, is_ordering_enabled FROM welcome_messages
+             ORDER BY published_at DESC LIMIT $1 OFFSET $2"
+        }
+        TextKind::Payment => {
+            "SELECT id, text, published_at, NULL::bool AS is_ordering_enabled
+             FROM payment_instructions ORDER BY published_at, id LIMIT $1 OFFSET $2"
+        }
+    };
+    sqlx::query_as(sql)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(db)
+        .await
+}
+
+pub async fn published(db: &PgPool, kind: TextKind, id: Uuid) -> sqlx::Result<Option<Published>> {
+    let sql = match kind {
+        TextKind::Welcome => {
+            "SELECT id, text, published_at, is_ordering_enabled FROM welcome_messages WHERE id = $1"
+        }
+        TextKind::Payment => {
+            "SELECT id, text, published_at, NULL::bool AS is_ordering_enabled
+             FROM payment_instructions WHERE id = $1"
+        }
+    };
+    sqlx::query_as(sql).bind(id).fetch_optional(db).await
+}
+
+/// Publishes a new one now
+pub async fn create_published(
+    db: &PgPool,
+    kind: TextKind,
+    text: &str,
+    is_ordering_enabled: bool,
+) -> sqlx::Result<Uuid> {
+    match kind {
+        TextKind::Welcome => sqlx::query_scalar(
+            "INSERT INTO welcome_messages (text, is_ordering_enabled) VALUES ($1, $2) RETURNING id",
+        )
+        .bind(text)
+        .bind(is_ordering_enabled)
+        .fetch_one(db)
+        .await,
+        TextKind::Payment => {
+            sqlx::query_scalar("INSERT INTO payment_instructions (text) VALUES ($1) RETURNING id")
+                .bind(text)
+                .fetch_one(db)
+                .await
+        }
+    }
+}
+
+/// Changes one; its publishing time stays
+pub async fn update_published(
+    db: &PgPool,
+    kind: TextKind,
+    changed: &Published,
+) -> sqlx::Result<()> {
+    let query = match kind {
+        TextKind::Welcome => sqlx::query(
+            "UPDATE welcome_messages SET text = $2, is_ordering_enabled = $3 WHERE id = $1",
+        )
+        .bind(changed.id)
+        .bind(&changed.text)
+        .bind(changed.is_ordering_enabled.unwrap_or(false)),
+        TextKind::Payment => sqlx::query("UPDATE payment_instructions SET text = $2 WHERE id = $1")
+            .bind(changed.id)
+            .bind(&changed.text),
+    };
+    query.execute(db).await.map(drop)
+}
+
+pub async fn delete_published(db: &PgPool, kind: TextKind, id: Uuid) -> sqlx::Result<()> {
+    let sql = match kind {
+        TextKind::Welcome => "DELETE FROM welcome_messages WHERE id = $1",
+        TextKind::Payment => "DELETE FROM payment_instructions WHERE id = $1",
+    };
+    sqlx::query(sql).bind(id).execute(db).await.map(drop)
+}

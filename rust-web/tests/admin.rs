@@ -1200,3 +1200,250 @@ async fn all_ordered_products_per_year(db: PgPool) -> TestResult {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
     Ok(())
 }
+
+#[sqlx::test(migrations = false)]
+async fn welcome_messages_are_written_changed_and_deleted(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+
+    // A new one opens ordering unless unticked; the checkbox comes before
+    // its hidden "off"
+    let form = text(send(&app, Method::GET, "/admin/NewWelcomeMessage", &boss, &[]).await?).await?;
+    assert!(form.contains(r#"id="welcomeMessage_isOrderingEnabled" checked="checked"><input type="hidden" name="isOrderingEnabled" value="off">"#));
+    assert!(form.contains(">Create Welcomemessage</button>"));
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/CreateWelcomeMessage",
+        &boss,
+        &[
+            ("text", "Tervetuloa"),
+            ("isOrderingEnabled", "on"),
+            ("isOrderingEnabled", "off"),
+        ],
+    )
+    .await?;
+    let (id, open): (Uuid, bool) =
+        sqlx::query_as("SELECT id, is_ordering_enabled FROM welcome_messages")
+            .fetch_one(&db)
+            .await?;
+    assert!(open);
+    assert_eq!(
+        location(&response),
+        format!("/admin/ShowWelcomeMessage?welcomeMessageId={id}")
+    );
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_SUCCESS)
+            .as_deref(),
+        Some("WelcomeMessage created")
+    );
+
+    // Unticked, it sends only "off"; the text stays when not sent
+    let update = format!("/admin/UpdateWelcomeMessage?welcomeMessageId={id}");
+    send(
+        &app,
+        Method::POST,
+        &update,
+        &boss,
+        &[("isOrderingEnabled", "off")],
+    )
+    .await?;
+    let row: (String, bool) =
+        sqlx::query_as("SELECT text, is_ordering_enabled FROM welcome_messages")
+            .fetch_one(&db)
+            .await?;
+    assert_eq!(row, ("Tervetuloa".to_string(), false));
+
+    let shown = text(
+        send(
+            &app,
+            Method::GET,
+            &format!("/admin/ShowWelcomeMessage?welcomeMessageId={id}"),
+            &boss,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(shown.contains("<p>Tervetuloa</p>"));
+    let edit = text(
+        send(
+            &app,
+            Method::GET,
+            &format!("/admin/EditWelcomeMessage?welcomeMessageId={id}"),
+            &boss,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(edit.contains(r#"class="js-delete back-button">Delete</a>"#));
+    assert!(edit.contains(">Save Welcomemessage</button>"));
+
+    let delete = format!("/admin/DeleteWelcomeMessage?welcomeMessageId={id}");
+    let response = send(&app, Method::POST, &delete, &boss, &[("_method", "DELETE")]).await?;
+    assert_eq!(location(&response), "/admin/WelcomeMessages");
+    let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM welcome_messages")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(left, 0);
+    Ok(())
+}
+
+/// More than a page: IHP's pagination under the list
+#[sqlx::test(migrations = false)]
+async fn long_lists_are_paged(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    sqlx::query(
+        "INSERT INTO welcome_messages (text, published_at)
+         SELECT 'Viesti ' || n, '2025-01-01'::timestamptz + n * interval '1 day'
+         FROM generate_series(1, 55) n",
+    )
+    .execute(&db)
+    .await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let first = text(send(&app, Method::GET, "/admin/WelcomeMessages", &boss, &[]).await?).await?;
+    assert_eq!(first.matches("ShowWelcomeMessage").count(), 50);
+    assert!(first.contains(r#"<a href="/admin/WelcomeMessages?page=2" class="relative inline-flex items-center px-4 py-2 border text-sm font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50">2</a>"#));
+    // Newest first: the oldest on the second page
+    let second = text(
+        send(
+            &app,
+            Method::GET,
+            "/admin/WelcomeMessages?page=2",
+            &boss,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert_eq!(second.matches("ShowWelcomeMessage").count(), 5);
+    assert!(second.contains(r#"datetime="2025-01-02T00:00:00Z""#));
+    let response = send(
+        &app,
+        Method::GET,
+        "/admin/WelcomeMessages?page=x",
+        &boss,
+        &[],
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    Ok(())
+}
+
+/// On a demo only ordering opens and closes: the welcome text and the
+/// payment details stay
+#[sqlx::test(migrations = false)]
+async fn a_demo_keeps_its_texts(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let welcome: Uuid = sqlx::query_scalar(
+        "INSERT INTO welcome_messages (text, is_ordering_enabled) VALUES ('Demo', true) RETURNING id",
+    )
+    .fetch_one(&db)
+    .await?;
+    let payment: Uuid =
+        sqlx::query_scalar("INSERT INTO payment_instructions (text) VALUES ('Fake') RETURNING id")
+            .fetch_one(&db)
+            .await?;
+    let app = site(db.clone(), true);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+
+    let update = format!("/admin/UpdateWelcomeMessage?welcomeMessageId={welcome}");
+    send(
+        &app,
+        Method::POST,
+        &update,
+        &boss,
+        &[("text", "Oma tili"), ("isOrderingEnabled", "off")],
+    )
+    .await?;
+    let row: (String, bool) =
+        sqlx::query_as("SELECT text, is_ordering_enabled FROM welcome_messages")
+            .fetch_one(&db)
+            .await?;
+    assert_eq!(row, ("Demo".to_string(), false));
+    let edit = text(
+        send(
+            &app,
+            Method::GET,
+            &format!("/admin/EditWelcomeMessage?welcomeMessageId={welcome}"),
+            &boss,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(edit.contains(r#"disabled="disabled">Demo</textarea>"#));
+    assert!(!edit.contains("js-delete"));
+
+    for (method, uri) in [
+        (Method::GET, "/admin/NewWelcomeMessage".to_string()),
+        (Method::POST, "/admin/CreateWelcomeMessage".to_string()),
+        (
+            Method::DELETE,
+            format!("/admin/DeleteWelcomeMessage?welcomeMessageId={welcome}"),
+        ),
+    ] {
+        let response = send(&app, method, &uri, &boss, &[("text", "x")]).await?;
+        assert_eq!(location(&response), "/admin/WelcomeMessages", "{uri}");
+        assert!(
+            session_after(&response, &boss)
+                .get_text(FLASH_ERROR)
+                .is_some()
+        );
+    }
+    for (method, uri) in [
+        (
+            Method::GET,
+            format!("/admin/EditPaymentInstruction?paymentInstructionId={payment}"),
+        ),
+        (
+            Method::POST,
+            format!("/admin/UpdatePaymentInstruction?paymentInstructionId={payment}"),
+        ),
+        (Method::POST, "/admin/CreatePaymentInstruction".to_string()),
+    ] {
+        let response = send(&app, method, &uri, &boss, &[("text", "Oma tili")]).await?;
+        assert_eq!(location(&response), "/admin/PaymentInstructions", "{uri}");
+    }
+    let texts: Vec<String> = sqlx::query_scalar(
+        "SELECT text FROM welcome_messages UNION ALL SELECT text FROM payment_instructions",
+    )
+    .fetch_all(&db)
+    .await?;
+    assert_eq!(texts, ["Demo", "Fake"]);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_texts_are_for_admins(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    for uri in ["/admin/WelcomeMessages", "/admin/NewPaymentInstruction"] {
+        let response = send(&app, Method::GET, uri, &promoter, &[]).await?;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{uri}");
+    }
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/CreatePaymentInstruction",
+        &promoter,
+        &[("text", "x")],
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let response = send(
+        &app,
+        Method::GET,
+        "/admin/ShowPaymentInstruction?paymentInstructionId=x",
+        &promoter,
+        &[],
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    Ok(())
+}

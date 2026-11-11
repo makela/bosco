@@ -410,6 +410,14 @@ impl<'a> Crumb<'a> {
         }
     }
 
+    /// A link whose label is markup, e.g. a time
+    pub fn markup_link(label: Markup, url: &'a str) -> Self {
+        Self {
+            label,
+            url: Some(url),
+        }
+    }
+
     pub fn text(label: impl maud::Render) -> Self {
         Self {
             label: html! { (label) },
