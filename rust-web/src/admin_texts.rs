@@ -32,16 +32,16 @@ use crate::{AppState, Result};
 /// Their names in addresses, forms and messages, as IHP's generator made
 /// them
 struct Names {
-    /// The list's title and link, "Welcome Messages"
+    /// The list's title and link, "Welcome messages"
     plural: &'static str,
+    /// One of them, in messages and on the form's button, "welcome message"
+    one: &'static str,
     /// In addresses: "/admin/NewWelcomeMessage"
     model: &'static str,
     /// The id's parameter, "welcomeMessageId"
     id_param: &'static str,
     /// The form's ids, "welcomeMessage_text"
     form: &'static str,
-    /// On the form's button, "Create Welcomemessage"
-    button: &'static str,
     /// What a demo says to a change it refuses
     demo_refusal: &'static str,
 }
@@ -49,19 +49,19 @@ struct Names {
 fn names(kind: TextKind) -> Names {
     match kind {
         TextKind::Welcome => Names {
-            plural: "Welcome Messages",
+            plural: "Welcome messages",
+            one: "welcome message",
             model: "WelcomeMessage",
             id_param: "welcomeMessageId",
             form: "welcomeMessage",
-            button: "Welcomemessage",
             demo_refusal: "The demo's welcome message is fixed: you can open and close ordering, but not change the text",
         },
         TextKind::Payment => Names {
-            plural: "Payment Instructions",
+            plural: "Payment instructions",
+            one: "payment instructions",
             model: "PaymentInstruction",
             id_param: "paymentInstructionId",
             form: "paymentInstruction",
-            button: "Paymentinstruction",
             demo_refusal: "The demo's payment details are fixed and can't be changed",
         },
     }
@@ -89,6 +89,19 @@ fn refused_on_demo(kind: TextKind, change: Change) -> bool {
         TextKind::Welcome => change != Change::Edit,
         TextKind::Payment => true,
     }
+}
+
+/// "Welcome message created" and the like
+fn created(kind: TextKind, what: &str) -> String {
+    let one = names(kind).one;
+    let mut first = one.chars();
+    let capital: String = first
+        .next()
+        .into_iter()
+        .flat_map(char::to_uppercase)
+        .chain(first)
+        .collect();
+    format!("{capital} {what}")
 }
 
 /// The demo's refusal: back to the list, saying why
@@ -133,10 +146,7 @@ pub async fn index(
     };
     let rows = db::all_published(&state.db, kind).await?;
     let n = names(kind);
-    let mut crumbs = vec![
-        Crumb::link("Home", admin::WELCOME),
-        Crumb::text(html! { span { (n.plural) } }),
-    ];
+    let mut crumbs = vec![Crumb::link("Home", admin::WELCOME), Crumb::text(n.plural)];
     let new_path = format!("/admin/New{}", n.model);
     if !state.site.demo {
         crumbs.push(Crumb::link("New", &new_path));
@@ -148,7 +158,7 @@ pub async fn index(
                 thead {
                     tr {
                         th { "Published" }
-                        @if kind == TextKind::Welcome { th { "Is Ordering Enabled" } }
+                        @if kind == TextKind::Welcome { th { "Ordering open" } }
                     }
                 }
                 tbody {
@@ -180,10 +190,10 @@ fn form(state: &AppState, kind: TextKind, text: &Published, editing: bool) -> Ma
     // A demo's welcome text is fixed
     let fixed = state.site.demo && kind == TextKind::Welcome;
     html! {
-        form method="POST" action=(action) id="" class=(if editing { "edit-form" } else { "new-form" }) data-disable-javascript-submission="false" {
+        form method="POST" action=(action) class=(if editing { "edit-form" } else { "new-form" }) {
             div class="flex flex-col my-6 space-y-2" id={ "form-group-" (field) } {
                 label class="font-medium text-gray-700" for=(field) { "Text" }
-                textarea name="text" placeholder="" id=(field) class="focus:ring-blue-500 focus:border-blue-500 block w-full border-gray-300 rounded-md" disabled=[fixed.then_some("disabled")] { (text.text) }
+                textarea name="text" id=(field) class="focus:ring-blue-500 focus:border-blue-500 block w-full border-gray-300 rounded-md" disabled=[fixed.then_some("disabled")] { (text.text) }
                 @if fixed {
                     p class="text-gray-600 text-xs italic" { "The demo's welcome text is fixed. You can still open and close ordering." }
                 }
@@ -198,14 +208,14 @@ fn form(state: &AppState, kind: TextKind, text: &Published, editing: bool) -> Ma
                                 input type="hidden" name="isOrderingEnabled" value="off";
                             }
                             div class="flex flex-col" {
-                                label class="font-medium text-gray-700 form-check-label" for=(field) { "Is Ordering Enabled" }
+                                label class="font-medium text-gray-700 form-check-label" for=(field) { "Ordering open" }
                             }
                         }
                     }
                 }
             }
             button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" type="submit" {
-                (if editing { "Save " } else { "Create " }) (n.button)
+                @if editing { "Save" } @else { "Create " (n.one) }
             }
         }
     }
@@ -327,12 +337,10 @@ fn edit_page(state: &AppState, kind: TextKind, text: &Published) -> Markup {
         Crumb::text("Edit"),
     ];
     if !(state.site.demo && refused_on_demo(kind, Change::Delete)) {
-        // A link in a link, as IHP's generated page has it; the inner one
-        // is the js-delete link that asks and sends the DELETE
-        crumbs.push(Crumb::markup_link(
-            html! { a href=(delete) class="js-delete back-button" { "Delete" } },
-            &delete,
-        ));
+        // The js-delete link asks first, then sends the DELETE
+        crumbs.push(Crumb::text(html! {
+            a href=(delete) class="js-delete back-button" { "Delete" }
+        }));
     }
     html! {
         (admin::breadcrumb(&crumbs))
@@ -397,7 +405,7 @@ pub async fn create(
     )
     .await?;
     tracing::info!(?kind, %id, "published");
-    session.set_text(FLASH_SUCCESS, &format!("{} created", names(kind).model));
+    session.set_text(FLASH_SUCCESS, &created(kind, "created"));
     Ok(admin::with_session(
         &state,
         &session,
@@ -421,7 +429,7 @@ pub async fn update(
     fill(kind, state.site.demo, &mut text, &fields, &uri);
     db::update_published(&state.db, kind, &text).await?;
     tracing::info!(?kind, id = %text.id, "updated");
-    session.set_text(FLASH_SUCCESS, &format!("{} updated", names(kind).model));
+    session.set_text(FLASH_SUCCESS, &created(kind, "updated"));
     Ok(admin::with_session(
         &state,
         &session,
@@ -442,7 +450,7 @@ pub async fn delete(
     };
     db::delete_published(&state.db, kind, text.id).await?;
     tracing::info!(?kind, id = %text.id, "deleted");
-    session.set_text(FLASH_SUCCESS, &format!("{} deleted", names(kind).model));
+    session.set_text(FLASH_SUCCESS, &created(kind, "deleted"));
     Ok(admin::with_session(
         &state,
         &session,

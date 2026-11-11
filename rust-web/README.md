@@ -112,6 +112,12 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   with 400; IHP's was a 500.
 - **Payment instructions** are listed oldest first; IHP listed them in
   whatever order the database gave, which is the same until one is edited.
+- **The admin's wording and markup are tidied** where IHP's generator left
+  quirks: "Create welcome message" (was "Create Welcomemessage"), "Welcome
+  message created" (was "WelcomeMessage created"), sentence case in the
+  menu and breadcrumbs, "1 order", "Please log in", a delete link that
+  isn't inside another link, and no empty `id`s or `placeholder`s. The
+  login fields have labels for screen readers.
 - **The admin's lists are on one page**: IHP's were in pages of 50 (with
   `?page=` and `?maxItems=`), which only the customers ever reached, and
   those are easier to find from one page, A to Z.

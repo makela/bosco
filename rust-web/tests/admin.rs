@@ -140,7 +140,7 @@ async fn state_of(db: &PgPool, user: Uuid) -> sqlx::Result<Login> {
 }
 
 #[sqlx::test(migrations = false)]
-async fn the_login_page_is_the_ihp_apps(db: PgPool) -> TestResult {
+async fn the_login_page(db: PgPool) -> TestResult {
     admin(&db).await?;
     let response = send(
         &site(db, false),
@@ -158,7 +158,7 @@ async fn the_login_page_is_the_ihp_apps(db: PgPool) -> TestResult {
     assert!(page.contains(r#"<script src="/static/prod.js?v=v1"></script>"#));
     assert!(page.contains(r#"<form method="POST" action="/admin/CreateSession">"#));
     assert!(page.contains(
-        r#"<input name="email" value="" type="email" class="form-control" placeholder="E-Mail" required="required" autofocus="autofocus">"#
+        r#"<input name="email" value="" type="email" class="form-control" placeholder="Email" aria-label="Email" required autofocus>"#
     ));
     assert!(!page.contains("demo"), "{page}");
     Ok(())
@@ -707,10 +707,9 @@ async fn lists_a_years_orders(db: PgPool) -> TestResult {
     assert_eq!(list.matches("Mark as paid").count(), 2);
     assert!(list.contains(r#"href="/admin/NewOrder">New</a>"#));
 
-    assert_eq!(
-        customers(&page("/admin/Orders?year=2025").await?),
-        ["Old Aalto"]
-    );
+    let old = page("/admin/Orders?year=2025").await?;
+    assert_eq!(customers(&old), ["Old Aalto"]);
+    assert!(old.contains("<p>1 order</p>"));
     assert_eq!(
         customers(&page("/admin/Orders?ordering=price&orderDir=descending").await?),
         ["Bertta Aalto", "Cecilia Aalto", "Aino Aalto"]
@@ -1211,7 +1210,7 @@ async fn welcome_messages_are_written_changed_and_deleted(db: PgPool) -> TestRes
     // its hidden "off"
     let form = text(send(&app, Method::GET, "/admin/NewWelcomeMessage", &boss, &[]).await?).await?;
     assert!(form.contains(r#"id="welcomeMessage_isOrderingEnabled" checked="checked"><input type="hidden" name="isOrderingEnabled" value="off">"#));
-    assert!(form.contains(">Create Welcomemessage</button>"));
+    assert!(form.contains(">Create welcome message</button>"));
     let response = send(
         &app,
         Method::POST,
@@ -1237,7 +1236,7 @@ async fn welcome_messages_are_written_changed_and_deleted(db: PgPool) -> TestRes
         session_after(&response, &boss)
             .get_text(FLASH_SUCCESS)
             .as_deref(),
-        Some("WelcomeMessage created")
+        Some("Welcome message created")
     );
 
     // Unticked, it sends only "off"; the text stays when not sent
@@ -1280,7 +1279,11 @@ async fn welcome_messages_are_written_changed_and_deleted(db: PgPool) -> TestRes
     )
     .await?;
     assert!(edit.contains(r#"class="js-delete back-button">Delete</a>"#));
-    assert!(edit.contains(">Save Welcomemessage</button>"));
+    assert!(
+        !edit.contains(r#"hover:text-gray-700" href="/admin/DeleteWelcomeMessage"#),
+        "one link, not two"
+    );
+    assert!(edit.contains(">Save</button>"));
 
     let delete = format!("/admin/DeleteWelcomeMessage?welcomeMessageId={id}");
     let response = send(&app, Method::POST, &delete, &boss, &[("_method", "DELETE")]).await?;

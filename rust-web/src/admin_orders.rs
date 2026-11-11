@@ -203,7 +203,10 @@ fn list_page(state: &AppState, view: &ListView) -> Markup {
             (checkbox("excludeDelivered", delivered, "Exclude delivered orders"))
             input type="search" placeholder="Search" name="q" value=(filter.q);
         }
-        p { (view.orders.len()) " orders" }
+        p {
+            (view.orders.len())
+            @if view.orders.len() == 1 { " order" } @else { " orders" }
+        }
         @if !view.orders.is_empty() {
             div.table-responsive {
                 table.table {

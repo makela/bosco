@@ -233,7 +233,7 @@ pub fn customer_field(
     html! {
         div class="flex flex-col my-6 space-y-2" id=(format!("form-group-{id}")) {
             label class="font-medium text-gray-700 " for=(id) { (label.text(site.locale)) }
-            input type="text" name=(name) placeholder="" id=(id)
+            input type="text" name=(name) id=(id)
                 required[!matches!(name, "lastName" | "billingName")]
                 autocomplete=(autocomplete) value=(value)
                 class=(field_class(error.is_some()));
@@ -275,7 +275,7 @@ pub fn subscribe_form(site: &Site, form: &CustomerForm) -> Markup {
             (customer_field(site, form, "lastName", Text::LastName, "family-name"))
             div class="flex flex-col my-6 space-y-2" id="form-group-customer_email" {
                 label class="font-medium text-gray-700 " for="customer_email" { (t(Text::Email)) }
-                input type="text" name="email" placeholder="" id="customer_email" required
+                input type="text" name="email" id="customer_email" required
                     value=(form.customer.email)
                     class=(field_class(error.is_some()));
                 @if let Some(error) = error {

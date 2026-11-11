@@ -156,7 +156,7 @@ fn login_form(demo: bool) -> Markup {
             div class="d-flex align-items-center" {
                 div.w-100 {
                     div style="max-width: 400px" class="mx-auto mb-5" {
-                        h2 { "Please login" }
+                        h2 { "Please log in" }
                         @if demo {
                             div.demo-logins {
                                 p { "Try it without an account, as an admin or as a delivery person who only sees orders:" }
@@ -171,10 +171,10 @@ fn login_form(demo: bool) -> Markup {
                         }
                         form method="POST" action="/admin/CreateSession" {
                             div.form-group {
-                                input name="email" value="" type="email" class="form-control" placeholder="E-Mail" required="required" autofocus="autofocus";
+                                input name="email" value="" type="email" class="form-control" placeholder="Email" aria-label="Email" required autofocus;
                             }
                             div.form-group {
-                                input name="password" type="password" class="form-control" placeholder="Password";
+                                input name="password" type="password" class="form-control" placeholder="Password" aria-label="Password";
                             }
                             button type="submit" class="btn btn-primary btn-block" { "Login" }
                         }
@@ -317,20 +317,20 @@ const MENU: &[(Permission, &str, &str)] = &[
     ),
     (
         Permission::SeeEmailLists,
-        "Emails for news letter",
+        "Emails for the newsletter",
         "/admin/EmailsForNewsLetter",
     ),
     (Permission::SeeOrders, "Orders", "/admin/Orders"),
     (
         Permission::ManageShop,
-        "Payment Instructions",
+        "Payment instructions",
         "/admin/PaymentInstructions",
     ),
     (Permission::EditShopTexts, "Producers", "/admin/Producers"),
     (Permission::EditShopTexts, "Products", "/admin/Products"),
     (
         Permission::ManageShop,
-        "Welcome Messages",
+        "Welcome messages",
         "/admin/WelcomeMessages",
     ),
 ];
