@@ -14,6 +14,7 @@ pub mod admin_producers;
 pub mod admin_products;
 pub mod admin_texts;
 pub mod db;
+pub mod demo_data;
 pub mod l10n;
 pub mod mail;
 pub mod password;

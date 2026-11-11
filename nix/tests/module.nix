@@ -533,6 +533,34 @@ let
       };
     };
 
+    # A demo with the Rust site resets its data with the Rust program
+    testTheRustSiteResetsTheDemo = {
+      expr =
+        let
+          config = evaluate {
+            demo = {
+              baseUrl = "https://demo.example.com";
+              port = 3303;
+              demo = true;
+              sendEmails = false;
+              rustWeb.enable = true;
+            };
+          };
+          reset = config.systemd.services.bosco-demo-reset-demo;
+        in
+        {
+          program = lib.hasSuffix "/bin/bosco-reset-demo" reset.serviceConfig.ExecStart;
+          inherit (reset.environment) APP_DEMO DATABASE_URL;
+          fixtures = lib.hasSuffix "Fixtures.sql" reset.environment.APP_FIXTURES;
+        };
+      expected = {
+        program = true;
+        APP_DEMO = "1";
+        DATABASE_URL = "postgresql:///bosco_demo?host=/run/postgresql&user=bosco_demo";
+        fixtures = true;
+      };
+    };
+
     testOnlyAnInstanceThatAsksRunsTheRustSite = {
       expr = lib.attrNames (lib.filterAttrs (name: _: lib.hasSuffix "-rust-web" name) services);
       expected = [ ];

@@ -17,8 +17,8 @@ let
     pname = "bosco-rust-web";
     version = "0.1.0";
 
-    # The crate, and what its tests read from the IHP app: the schema and the
-    # logo they ask for
+    # The crate, and what its tests read from the IHP app: the schema, the
+    # fixtures and the logo they ask for
     src = lib.fileset.toSource {
       root = ../.;
       fileset = lib.fileset.unions [
@@ -28,6 +28,7 @@ let
         ../rust-web/tests
         ../rust-web/test.sh
         ../Application/Schema.sql
+        ../Application/Fixtures.sql
         ../static/img/logo.jpg
       ];
     };

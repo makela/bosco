@@ -46,6 +46,9 @@ emails keep working, and the markup and classes are the same, so
 - `src/admin_products.rs`: the products, from `Admin/Controller/Products.hs`
 - `src/bin/bosco-create-user.rs`: makes a login, from
   `Application/Script/CreateUser.hs`
+- `src/demo_data.rs`, `src/bin/bosco-reset-demo.rs`: the demo's nightly
+  reset, from `Application/DemoData.hs`: the same made-up orders as the IHP
+  app's for the same day and time
 - `src/admin_password.rs`: changing one's password, from
   `Admin/Controller/Passwords.hs`
 - `src/admin_forms.rs`: the admin's form fields, as IHP's `formFor` makes

@@ -197,7 +197,9 @@ locked by typing wrong passwords, and their passwords can't be changed. Your
 own admin login, made with `CreateUser`, works as usual.
 
 Every night at 03:00 (`demoReset.time`), `bosco-<name>-reset-demo` resets
-the demo's data in one transaction (`Application/DemoData.hs`). It reloads
+the demo's data in one transaction (`Application/DemoData.hs`, or with
+`rustWeb.enable` its Rust port `rust-web/src/demo_data.rs`, which makes the
+same data). It reloads
 the catalog in the instance's language, `Fixtures.<locale>.sql` (so far
 `Fixtures.en.sql`), or else the Finnish `Fixtures.sql`. The catalogs have
 the same ids and prices, so a change to one belongs in the others too. It

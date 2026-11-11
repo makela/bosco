@@ -191,7 +191,7 @@ let
             type = lib.types.package;
             default = config.flake.packages.${system}.script-ResetDemo;
             defaultText = lib.literalExpression "flake.packages.\${system}.script-ResetDemo";
-            description = "The ResetDemo program (Application/Script/ResetDemo.hs).";
+            description = "The ResetDemo program (Application/Script/ResetDemo.hs), without rustWeb.enable.";
           };
         };
 
@@ -603,12 +603,27 @@ let
           "postgresql.service"
           migrate
         ];
-        environment = environment // {
-          APP_FIXTURES = fixtures;
-        };
+        # With the Rust site, the Rust program (bosco-reset-demo), which
+        # makes the same data
+        environment =
+          if instance.rustWeb.enable then
+            {
+              DATABASE_URL = rustDatabaseUrl;
+              APP_DEMO = "1";
+              APP_FIXTURES = fixtures;
+            }
+          else
+            environment
+            // {
+              APP_FIXTURES = fixtures;
+            };
         serviceConfig = serviceConfig // {
           Type = "oneshot";
-          ExecStart = "${instance.demoReset.package}/bin/ResetDemo";
+          ExecStart =
+            if instance.rustWeb.enable then
+              "${instance.rustWeb.package}/bin/bosco-reset-demo"
+            else
+              "${instance.demoReset.package}/bin/ResetDemo";
         };
       };
     };
