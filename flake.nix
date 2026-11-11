@@ -7,6 +7,9 @@
         flake-parts.follows = "ihp/flake-parts";
         devenv.follows = "ihp/devenv";
         systems.follows = "ihp/systems";
+        # Builds the Rust site with its dependencies in a derivation of their
+        # own, which is reused until rust-web/Cargo.lock changes
+        crane.url = "github:ipetkov/crane/v0.24.0";
         devenv-root = {
             url = "file+file:///dev/null";
             flake = false;
@@ -22,7 +25,9 @@
             # Runs the site on a NixOS server, see nix/module.nix and the README
             flake.nixosModules.default = ./nix/module.nix;
 
-            perSystem = { pkgs, self', ... }: {
+            perSystem = { pkgs, self', ... }: let
+                craneLib = inputs.crane.mkLib pkgs;
+            in {
                 ihp = {
                     appName = "bosco";
                     enable = true;
@@ -64,8 +69,8 @@
 
                 # The public site in Rust, see rust-web/ and the rustWeb option
                 # of nix/module.nix; the check runs its tests too
-                packages.rust-web = pkgs.callPackage ./nix/rust-web.nix { };
-                checks.rust-web-tests = pkgs.callPackage ./nix/rust-web.nix { runTests = true; };
+                packages.rust-web = pkgs.callPackage ./nix/rust-web.nix { inherit craneLib; };
+                checks.rust-web-tests = pkgs.callPackage ./nix/rust-web.nix { inherit craneLib; runTests = true; };
 
                 checks.nixos-module = import ./nix/tests/module.nix {
                     inherit pkgs;
