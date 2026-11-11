@@ -18,6 +18,7 @@
             pkgs.clippy
             pkgs.rustfmt
             pkgs.postgresql # test.sh's throwaway database
+            pkgs.watchexec # devenv up's process, see the project's flake.nix
           ];
         };
       });

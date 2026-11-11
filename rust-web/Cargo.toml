@@ -26,6 +26,10 @@ tower-http = { version = "0.7.0", features = ["fs", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
+# Only for its std feature: sqlx 0.9 turns it off, which leaves the stub that
+# names every user "anonymous", so a DATABASE_URL without a user (as in
+# development) logs in as "anonymous" instead of as the system user
+whoami = { version = "2", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

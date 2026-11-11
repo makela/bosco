@@ -36,28 +36,31 @@ emails keep working, and the markup and classes are the same, so
 
 ## Use
 
-With `devenv up` running in the project (the database, and Tailwind writing
-`static/app.css`), in another terminal:
+`devenv up` in the project runs the site at http://localhost:8003 next to
+the IHP app's (8000), on the same database, and builds and restarts it when
+its code changes (the `rust-web` process in the project's `flake.nix`). The
+first build takes a few minutes. Its log is the process's in `devenv up`.
+
+The admin's login at http://localhost:8003/admin/NewSession uses the IHP
+app's session key in `Config/client_session_key.aes`, so a login there works
+at http://localhost:8000/admin/ too (cookies don't tell ports apart, but
+`localhost` and `127.0.0.1` are different hosts to them).
+
+`APP_LOCALE` and `APP_DEMO` work as for the IHP app; `ADDR`, `STATIC_DIR`
+and `STYLESHEET` are in `src/main.rs`. To run it by hand (with `devenv up`
+stopped, or another `ADDR`), in the project's dev shell (`nix develop`),
+which has the database's `DATABASE_URL`:
 
 ```sh
 cd rust-web
-nix develop path:.
-DATABASE_URL="postgres:///app?host=$(ls -d /tmp/devenv-*/postgres)" cargo run
-# http://127.0.0.1:8002
+nix develop path:. -c cargo run
 ```
 
-`APP_LOCALE` and `APP_DEMO` work as for the IHP app; `ADDR`, `STATIC_DIR`
-and `STYLESHEET` are in `src/main.rs`. The admin's login at
-http://localhost:8002/admin/NewSession uses the IHP app's session key in
-`Config/client_session_key.aes`, so a login there works at
-http://localhost:8000/admin/ too (cookies don't tell ports apart, but
-`localhost` and `127.0.0.1` are different hosts to them).
-
-The email worker, instead of `devenv up`'s IHP worker or beside it:
+The email worker, instead of `devenv up`'s IHP worker or beside it, the same
+way:
 
 ```sh
-SEND_EMAILS=0 DATABASE_URL="postgres:///app?host=$(ls -d /tmp/devenv-*/postgres)" \
-  cargo run --bin bosco-worker
+SEND_EMAILS=0 nix develop path:. -c cargo run --bin bosco-worker
 ```
 
 With `SEND_EMAILS=0` it only logs the emails. Its SMTP settings are the IHP

@@ -78,6 +78,22 @@
                 devenv.shells.default = {
                     processes = {
                         tailwind.exec = "tailwindcss -i tailwind/app.css -o static/app.css --watch=always";
+                        # The Rust site (rust-web/) at http://localhost:8003, on
+                        # the dev database and with the IHP app's session key, so
+                        # its admin login works on the IHP app's admin. Built and
+                        # restarted when its code changes; the first build takes
+                        # a few minutes. The IHP app's worker sends the emails.
+                        # In rust-web's own shell, so its builds are the same as
+                        # by hand there.
+                        rust-web = {
+                            exec = ''
+                                cd "$DEVENV_ROOT/rust-web"
+                                exec nix develop path:. -c watchexec --restart \
+                                  --watch src --watch Cargo.toml --watch Cargo.lock \
+                                  -- cargo run --bin bosco-web
+                            '';
+                            after = [ "devenv:processes:postgres" ];
+                        };
                     };
                 };
             };

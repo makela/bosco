@@ -2,7 +2,7 @@
 //!
 //! - `DATABASE_URL`: the IHP app's database, e.g.
 //!   `postgresql:///bosco_fi?host=/run/postgresql`
-//! - `ADDR`: where to listen, `127.0.0.1:8002` by default
+//! - `ADDR`: where to listen, `127.0.0.1:8003` by default
 //! - `APP_LOCALE`: fi, en or fr, as for the IHP app
 //! - `APP_DEMO`: 1 for a public demo
 //! - `STATIC_DIR`: the IHP app's `static/`, `../static` by default
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let locale = Locale::parse(&setting("APP_LOCALE", ""))?;
     let demo = flag("APP_DEMO", false)?;
     let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?;
-    let addr = setting("ADDR", "127.0.0.1:8002");
+    let addr = setting("ADDR", "127.0.0.1:8003");
     let session_key = Key::load_or_create(
         setting(
             "IHP_SESSION_SECRET_FILE",
