@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "aes"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b169f7a6d4742236a0a00c541b845991d0ac43e546831af1249753ab4c3aa3a0"
+dependencies = [
+ "cfg-if",
+ "cipher",
+ "cpufeatures 0.2.17",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -316,14 +327,22 @@ dependencies = [
 name = "bosco-web"
 version = "0.1.0"
 dependencies = [
+ "aes",
  "axum",
+ "base64 0.22.1",
  "chrono",
+ "ctr",
+ "getrandom 0.3.4",
  "http-body-util",
  "lettre",
  "maud",
  "pulldown-cmark",
  "regex",
+ "sha2 0.10.9",
+ "skein",
  "sqlx",
+ "subtle",
+ "threefish",
  "tokio",
  "tower",
  "tower-http",
@@ -386,6 +405,16 @@ dependencies = [
  "iana-time-zone",
  "num-traits",
  "windows-link",
+]
+
+[[package]]
+name = "cipher"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
+dependencies = [
+ "crypto-common 0.1.6",
+ "inout",
 ]
 
 [[package]]
@@ -474,6 +503,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
 dependencies = [
  "hybrid-array",
+]
+
+[[package]]
+name = "ctr"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0369ee1ad671834580515889b80f2ea915f23b8be8d0daa4bbaf2ac5c7590835"
+dependencies = [
+ "cipher",
 ]
 
 [[package]]
@@ -745,13 +783,25 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "r-efi 5.3.0",
+ "wasip2",
+]
+
+[[package]]
+name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099"
 dependencies = [
  "cfg-if",
  "libc",
- "r-efi",
+ "r-efi 6.0.0",
  "rand_core",
 ]
 
@@ -1070,6 +1120,15 @@ checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
+]
+
+[[package]]
+name = "inout"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
+dependencies = [
+ "generic-array",
 ]
 
 [[package]]
@@ -1437,6 +1496,12 @@ checksum = "478e0585659a122aa407eb7e3c0e1fa51b1d8a870038bd29f0cf4a8551eea972"
 
 [[package]]
 name = "r-efi"
+version = "5.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
+
+[[package]]
+name = "r-efi"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
@@ -1698,6 +1763,16 @@ checksum = "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b"
 dependencies = [
  "errno",
  "libc",
+]
+
+[[package]]
+name = "skein"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96a90a220ab98dbbfeabeae7c558a79f37839c10b9ef55c77082a741a463cab7"
+dependencies = [
+ "digest 0.10.7",
+ "threefish",
 ]
 
 [[package]]
@@ -2002,6 +2077,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad99c4c6d32803332c548b1af0540b357b3f5fc0be8f6c6bfe8b2e6ae784070"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "threefish"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a693d0c8cf16973fac5a93fbe47b8c6452e7097d4fcac49f3d7a18e39c76e62e"
+dependencies = [
+ "cipher",
 ]
 
 [[package]]
@@ -2311,6 +2395,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
+name = "wasip2"
+version = "1.0.4+wasi-0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b67efb37e106e55ce722a510d6b5f9c17f083e5fc79afc2badeb12cc313d9487"
+dependencies = [
+ "wit-bindgen",
+]
+
+[[package]]
 name = "wasm-bindgen"
 version = "0.2.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2520,6 +2613,12 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "wit-bindgen"
+version = "0.57.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "writeable"

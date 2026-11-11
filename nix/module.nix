@@ -45,8 +45,9 @@
 # - bosco-<name>-worker runs the jobs that send the order emails
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
-# rustWeb.enable, bosco-<name>-rust-web runs the public pages in Rust next to
-# them, and nginx sends those pages to it (rustWeb.nginxLocations). With
+# rustWeb.enable, bosco-<name>-rust-web runs the public pages and the admin's
+# login in Rust next to them, with the same session key, and nginx sends
+# those pages to it (rustWeb.nginxLocations). With
 # rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
 # of IHP's.
 {
@@ -239,7 +240,8 @@ let
           enable = lib.mkEnableOption ''
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
-            newsletter form. The admin stays in IHP. nginx sends the public pages
+            newsletter form, and the admin's login and logout, which share IHP's
+            session. The rest of the admin stays in IHP. nginx sends these pages
             to it with nginxLocations
           '';
 
@@ -297,8 +299,8 @@ let
     host: port: if lib.hasInfix ":" host then "[${host}]:${toString port}" else "${host}:${toString port}";
   listenAddress = instance: listenAddressOf instance.host instance.port;
 
-  # The Rust site's pages: the IHP app's public addresses (Web/), see the
-  # routes in rust-web/src/lib.rs
+  # The Rust site's pages: the IHP app's public addresses (Web/) and the
+  # admin's login, see the routes in rust-web/src/lib.rs
   rustWebPaths = [
     "/"
     "/Orders"
@@ -307,6 +309,10 @@ let
     "/ShowOrder"
     "/NewEmail"
     "/CreateEmail"
+    "/admin/NewSession"
+    "/admin/CreateSession"
+    "/admin/DeleteSession"
+    "/admin/DemoLogin"
   ];
 
   # The services only read from the Nix store, write to their state directory,
@@ -503,6 +509,7 @@ let
           # version in its address as the IHP app gives it, so a new one
           # isn't taken from the browser's cache
           static = instance.flake.packages.${system}.static;
+          assetVersion = lib.substring 0 32 (baseNameOf "${static}");
         in
         {
           description = "Bosco Falconeria public site in Rust (${name})";
@@ -518,7 +525,12 @@ let
             APP_LOCALE = instance.locale;
             APP_DEMO = if instance.demo then "1" else "0";
             STATIC_DIR = "${static}";
-            STYLESHEET = "/prod.css?v=${lib.substring 0 32 (baseNameOf "${static}")}";
+            STYLESHEET = "/prod.css?v=${assetVersion}";
+            # The admin's stylesheet and scripts, /static/app.css?v=…
+            ASSET_VERSION = assetVersion;
+            # The admin's login is in IHP's session cookie, with its key
+            IHP_SESSION_SECRET_FILE = "${state}/session.aes";
+            IHP_BASEURL = instance.baseUrl;
             RUST_LOG = "info";
           };
           serviceConfig = serviceConfig // {

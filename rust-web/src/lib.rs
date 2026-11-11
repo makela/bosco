@@ -1,13 +1,18 @@
 //! Bosco's public site: the IHP app's `Web/` (the welcome message, the order
 //! form, the order's invoice and the newsletter form) in Rust, on the same
 //! PostgreSQL database. The URLs are IHP's, so links in sent emails and
-//! bookmarks keep working. The IHP app's admin and job worker keep running
-//! as they are: the worker emails the invoices of orders made here too.
+//! bookmarks keep working. Of the admin, the login and logout are here
+//! (`admin.rs`), with IHP's session cookie; the rest is the IHP app's. The
+//! email worker is `bosco-worker` (`worker.rs`), or the IHP app's.
 
+pub mod admin;
 pub mod db;
 pub mod l10n;
 pub mod mail;
+pub mod password;
+pub mod session;
 pub mod settings;
+pub mod skein_mac;
 pub mod validate;
 pub mod views;
 pub mod worker;
@@ -20,7 +25,7 @@ use axum::Router;
 use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::routing::get;
+use axum::routing::{delete, get, post};
 use maud::Markup;
 use sqlx::PgPool;
 use tower_http::services::ServeDir;
@@ -40,6 +45,9 @@ pub struct Site {
     pub demo: bool,
     /// The stylesheet's URL, e.g. the IHP app's dev build `/app.css`
     pub stylesheet: String,
+    /// The IHP app's assets' version in production, for the admin's
+    /// stylesheet and scripts (`/static/app.css?v=…`); none in development
+    pub asset_version: Option<String>,
 }
 
 pub struct AppState {
@@ -47,6 +55,11 @@ pub struct AppState {
     pub site: Site,
     /// The IHP app's `static/`: the logo and the stylesheet
     pub static_dir: PathBuf,
+    /// The key of IHP's session cookie, the IHP app's
+    pub session_key: session::Key,
+    /// Whether the session cookie is only sent over HTTPS, as IHP does when
+    /// its base URL is https
+    pub secure_cookies: bool,
 }
 
 /// The notice the next page shows once, like IHP's flash messages. Kept in
@@ -119,7 +132,7 @@ impl IntoResponse for AppError {
 }
 
 type Result<T> = std::result::Result<T, AppError>;
-type Params = HashMap<String, String>;
+pub(crate) type Params = HashMap<String, String>;
 /// A form field's name and its check
 type FieldCheck = (&'static str, fn(&str) -> validate::Check);
 
@@ -373,23 +386,39 @@ async fn create_email(
     Ok(redirect_with(Flash::DetailsSaved, "/"))
 }
 
-async fn not_found(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+pub(crate) async fn not_found(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let content = views::not_found(&state.site);
     page(&state, &headers, StatusCode::NOT_FOUND, &content)
 }
 
 /// All the site's routes. Other addresses are the IHP app's static files,
-/// the logo and the stylesheet, or else not found.
+/// the logo and the stylesheet, there and under /static/ as IHP serves
+/// them, or else not found.
 pub fn app(state: Arc<AppState>) -> Router {
     let static_files = ServeDir::new(&state.static_dir);
     Router::new()
         .route("/", get(index))
         .route("/Orders", get(index))
         .route("/NewOrder", get(new_order))
-        .route("/CreateOrder", axum::routing::post(create_order))
+        .route("/CreateOrder", post(create_order))
         .route("/ShowOrder", get(show_order))
         .route("/NewEmail", get(new_email))
-        .route("/CreateEmail", axum::routing::post(create_email))
+        .route("/CreateEmail", post(create_email))
+        // The methods IHP's AutoRoute takes for each
+        .route(
+            admin::NEW_SESSION,
+            get(admin::new_session).post(admin::new_session),
+        )
+        .route("/admin/CreateSession", post(admin::create_session))
+        .route(
+            "/admin/DeleteSession",
+            delete(admin::delete_session).post(admin::delete_session_by_post),
+        )
+        .route(
+            "/admin/DemoLogin",
+            get(admin::demo_login).post(admin::demo_login),
+        )
+        .nest_service("/static", static_files.clone())
         .fallback_service(static_files.fallback(get(not_found).with_state(state.clone())))
         .layer(TraceLayer::new_for_http())
         .with_state(state)

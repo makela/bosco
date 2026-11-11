@@ -300,3 +300,104 @@ pub async fn payment_instruction(db: &PgPool) -> sqlx::Result<Option<String>> {
         .fetch_optional(db)
         .await
 }
+
+/// A login to the admin
+#[derive(Debug, FromRow)]
+pub struct User {
+    pub id: Uuid,
+    pub password_hash: String,
+    pub locked_at: Option<DateTime<Utc>>,
+    pub failed_login_attempts: i32,
+}
+
+/// After this many wrong passwords in a row a login is locked, IHP's
+/// default
+pub const MAX_FAILED_LOGINS: i32 = 10;
+
+impl User {
+    /// Locked for an hour after the last of too many wrong passwords, as in
+    /// IHP
+    pub fn is_locked(&self, now: DateTime<Utc>) -> bool {
+        self.locked_at
+            .is_some_and(|locked_at| now - locked_at < chrono::TimeDelta::hours(1))
+    }
+}
+
+/// The login with this email, whatever its case, as IHP finds it
+pub async fn user_by_email(db: &PgPool, email: &str) -> sqlx::Result<Option<User>> {
+    sqlx::query_as(
+        "SELECT id, password_hash, locked_at, failed_login_attempts FROM users
+         WHERE LOWER(email) = LOWER($1) LIMIT 1",
+    )
+    .bind(email)
+    .fetch_optional(db)
+    .await
+}
+
+pub async fn login_succeeded(db: &PgPool, user: Uuid) -> sqlx::Result<()> {
+    sqlx::query("UPDATE users SET failed_login_attempts = 0 WHERE id = $1")
+        .bind(user)
+        .execute(db)
+        .await
+        .map(drop)
+}
+
+/// Counts a wrong password, and locks the login at the last one allowed
+pub async fn login_failed(db: &PgPool, user: Uuid) -> sqlx::Result<()> {
+    sqlx::query(
+        "UPDATE users
+         SET failed_login_attempts = failed_login_attempts + 1,
+             locked_at = CASE WHEN failed_login_attempts + 1 >= $2 THEN NOW() ELSE locked_at END
+         WHERE id = $1",
+    )
+    .bind(user)
+    .bind(MAX_FAILED_LOGINS)
+    .execute(db)
+    .await
+    .map(drop)
+}
+
+/// The roles a login has, see the IHP app's `Application/Permission.hs`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Roles {
+    pub admin: bool,
+    pub deliverer: bool,
+    pub promoter: bool,
+}
+
+/// The demo login's user with these roles, unlocked, made on its first use
+/// with a password nobody knows (`ensureDemoUser`)
+pub async fn ensure_demo_user(
+    db: &PgPool,
+    email: &str,
+    roles: Roles,
+    password_hash: impl FnOnce() -> String,
+) -> sqlx::Result<Uuid> {
+    let existing: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE users
+         SET is_admin = $2, is_deliverer = $3, is_promoter = $4,
+             locked_at = NULL, failed_login_attempts = 0
+         WHERE id = (SELECT id FROM users WHERE email = $1 LIMIT 1)
+         RETURNING id",
+    )
+    .bind(email)
+    .bind(roles.admin)
+    .bind(roles.deliverer)
+    .bind(roles.promoter)
+    .fetch_optional(db)
+    .await?;
+    if let Some(id) = existing {
+        return Ok(id);
+    }
+    sqlx::query_scalar(
+        "INSERT INTO users (email, password_hash, is_admin, is_deliverer, is_promoter)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id",
+    )
+    .bind(email)
+    .bind(password_hash())
+    .bind(roles.admin)
+    .bind(roles.deliverer)
+    .bind(roles.promoter)
+    .fetch_one(db)
+    .await
+}

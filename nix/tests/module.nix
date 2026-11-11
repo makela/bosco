@@ -345,8 +345,19 @@ let
         in
         {
           program = lib.hasSuffix "/bin/bosco-web" rust.serviceConfig.ExecStart;
-          inherit (rust.environment) DATABASE_URL ADDR APP_LOCALE APP_DEMO STATIC_DIR;
+          inherit (rust.environment)
+            DATABASE_URL
+            ADDR
+            APP_LOCALE
+            APP_DEMO
+            STATIC_DIR
+            IHP_SESSION_SECRET_FILE
+            IHP_BASEURL
+            ;
           stylesheet = rust.environment.STYLESHEET == "/prod.css?v=${lib.substring 0 32 (baseNameOf static)}";
+          assetVersion = rust.environment.ASSET_VERSION == lib.substring 0 32 (baseNameOf static);
+          # The same key as the IHP app's
+          sessionKey = rust.environment.IHP_SESSION_SECRET_FILE == demo.systemd.services.bosco-demo.environment.IHP_SESSION_SECRET_FILE;
           user = rust.serviceConfig.User;
           afterMigrations = lib.elem "bosco-demo-migrate.service" rust.after;
           ihpStillRuns = demo.systemd.services ? bosco-demo && demo.systemd.services ? bosco-demo-worker;
@@ -359,7 +370,11 @@ let
         APP_LOCALE = "en";
         APP_DEMO = "1";
         STATIC_DIR = "${self.packages.${system}.static}";
+        IHP_SESSION_SECRET_FILE = "/var/lib/bosco-demo/session.aes";
+        IHP_BASEURL = "https://demo.example.com";
         stylesheet = true;
+        assetVersion = true;
+        sessionKey = true;
         user = "bosco_demo";
         afterMigrations = true;
         ihpStillRuns = true;
@@ -371,6 +386,10 @@ let
           "= /ShowOrder".proxyPass = "http://127.0.0.1:3403";
           "= /NewEmail".proxyPass = "http://127.0.0.1:3403";
           "= /CreateEmail".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/NewSession".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/CreateSession".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/DeleteSession".proxyPass = "http://127.0.0.1:3403";
+          "= /admin/DemoLogin".proxyPass = "http://127.0.0.1:3403";
           "/".proxyPass = "http://127.0.0.1:3303";
         };
       };

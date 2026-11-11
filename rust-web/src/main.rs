@@ -8,11 +8,19 @@
 //! - `STATIC_DIR`: the IHP app's `static/`, `../static` by default
 //! - `STYLESHEET`: the stylesheet's URL, `/app.css` (the IHP app's dev
 //!   build, see `devenv up`) by default
+//! - `ASSET_VERSION`: in production, the IHP app's static files' version,
+//!   which the admin's addresses of them have (`IHP_ASSET_VERSION`)
+//! - `IHP_SESSION_SECRET_FILE`: the IHP app's session key, by default
+//!   `../Config/client_session_key.aes` as in its development; made if
+//!   there's none, as IHP does
+//! - `IHP_BASEURL`: the IHP app's, e.g. `https://bosco.makela.in`: with
+//!   https, the session cookie is only sent over HTTPS
 
 use std::env;
 use std::io::IsTerminal;
 use std::sync::Arc;
 
+use bosco_web::session::Key;
 use bosco_web::settings::{flag, setting};
 use bosco_web::{AppState, Site, app, l10n::Locale};
 use sqlx::postgres::PgPoolOptions;
@@ -33,6 +41,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let demo = flag("APP_DEMO", false)?;
     let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?;
     let addr = setting("ADDR", "127.0.0.1:8002");
+    let session_key = Key::load_or_create(
+        setting(
+            "IHP_SESSION_SECRET_FILE",
+            "../Config/client_session_key.aes",
+        )
+        .as_ref(),
+    )?;
+    let asset_version = Some(setting("ASSET_VERSION", "")).filter(|v| !v.is_empty());
 
     let db = PgPoolOptions::new()
         .max_connections(5)
@@ -44,8 +60,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             locale,
             demo,
             stylesheet: setting("STYLESHEET", "/app.css"),
+            asset_version,
         },
         static_dir: setting("STATIC_DIR", "../static").into(),
+        session_key,
+        secure_cookies: setting("IHP_BASEURL", "").starts_with("https://"),
     });
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
