@@ -45,9 +45,9 @@
 # - bosco-<name>-worker runs the jobs that send the order emails
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
-# rustWeb.enable, bosco-<name>-rust-web runs the public pages and the admin in
-# Rust next to them, with the same session key, and nginx sends those pages to
-# it (rustWeb.nginxLocations). With
+# rustWeb.enable, bosco-<name>-rust-web runs the whole site in Rust next to
+# them, with the same session key, and nginx sends everything to it
+# (rustWeb.nginxLocations). With
 # rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
 # of IHP's.
 {
@@ -240,9 +240,8 @@ let
           enable = lib.mkEnableOption ''
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
-            newsletter form, and the whole admin, which shares IHP's session.
-            nginx sends these pages to it with nginxLocations, and the rest, the
-            static files, to the IHP app
+            newsletter form, the whole admin, which shares IHP's session, and
+            the static files. nginx sends everything to it with nginxLocations
           '';
 
           port = lib.mkOption {
@@ -262,19 +261,12 @@ let
           nginxLocations = lib.mkOption {
             type = lib.types.attrsOf (lib.types.attrsOf lib.types.str);
             readOnly = true;
-            default =
-              let
-                proxy = address: { proxyPass = "http://${address}"; };
-                rust = proxy (listenAddressOf config.host config.rustWeb.port);
-              in
-              # The public pages exactly, whatever their query; the rest, the
-              # admin and the static files included, to IHP
-              lib.genAttrs (map (path: "= ${path}") rustWebPaths) (_: rust)
-              // { "/" = proxy (listenAddressOf config.host config.port); };
-            defaultText = lib.literalExpression ''{ "= /NewOrder".proxyPass = "http://127.0.0.1:3400"; …; "/".proxyPass = "http://127.0.0.1:3300"; }'';
+            default."/".proxyPass = "http://${listenAddressOf config.host config.rustWeb.port}";
+            defaultText = lib.literalExpression ''{ "/".proxyPass = "http://127.0.0.1:3400"; }'';
             description = ''
-              The instance's nginx locations with the Rust site: its public pages to
-              it, everything else to the IHP app. For an nginx virtual host:
+              The instance's nginx locations with the Rust site: everything to it,
+              the static files included, as it serves the whole site. For an nginx
+              virtual host:
               locations = config.services.bosco.instances.<name>.rustWeb.nginxLocations;
             '';
           };
@@ -298,73 +290,6 @@ let
   listenAddressOf =
     host: port: if lib.hasInfix ":" host then "[${host}]:${toString port}" else "${host}:${toString port}";
   listenAddress = instance: listenAddressOf instance.host instance.port;
-
-  # The Rust site's pages: the IHP app's public addresses (Web/) and the
-  # admin's (Admin/), see the routes in rust-web/src/lib.rs
-  rustWebPaths = [
-    "/"
-    "/Orders"
-    "/NewOrder"
-    "/CreateOrder"
-    "/ShowOrder"
-    "/NewEmail"
-    "/CreateEmail"
-    "/admin/"
-    "/admin/Welcome"
-    "/admin/Orders"
-    "/admin/ShowOrder"
-    "/admin/NewOrder"
-    "/admin/CreateOrder"
-    "/admin/OrderedProducts"
-    "/admin/WelcomeMessages"
-    "/admin/NewWelcomeMessage"
-    "/admin/ShowWelcomeMessage"
-    "/admin/EditWelcomeMessage"
-    "/admin/CreateWelcomeMessage"
-    "/admin/UpdateWelcomeMessage"
-    "/admin/DeleteWelcomeMessage"
-    "/admin/PaymentInstructions"
-    "/admin/NewPaymentInstruction"
-    "/admin/ShowPaymentInstruction"
-    "/admin/EditPaymentInstruction"
-    "/admin/CreatePaymentInstruction"
-    "/admin/UpdatePaymentInstruction"
-    "/admin/DeletePaymentInstruction"
-    "/admin/Customers"
-    "/admin/NewCustomer"
-    "/admin/ShowCustomer"
-    "/admin/EditCustomer"
-    "/admin/CreateCustomer"
-    "/admin/UpdateCustomer"
-    "/admin/DeleteCustomer"
-    "/admin/EmailsForDeliveryInfo"
-    "/admin/EmailsForNewsLetter"
-    "/admin/Producers"
-    "/admin/NewProducer"
-    "/admin/ShowProducer"
-    "/admin/EditProducer"
-    "/admin/CreateProducer"
-    "/admin/UpdateProducer"
-    "/admin/DeleteProducer"
-    "/admin/Products"
-    "/admin/NewProduct"
-    "/admin/ShowProduct"
-    "/admin/EditProduct"
-    "/admin/CreateProduct"
-    "/admin/UpdateProduct"
-    "/admin/DeleteProduct"
-    "/admin/NewPassword"
-    "/admin/UpdatePassword"
-    "/admin/UpdateMarkPaidOrder"
-    "/admin/UpdateInvoiceOrder"
-    "/admin/UpdateDeliverOrder"
-    "/admin/UpdateSendInvoiceOrder"
-    "/admin/DeleteCancelOrder"
-    "/admin/NewSession"
-    "/admin/CreateSession"
-    "/admin/DeleteSession"
-    "/admin/DemoLogin"
-  ];
 
   # The services only read from the Nix store, write to their state directory,
   # and talk to PostgreSQL, the reverse proxy and, from the worker, SMTP.

@@ -54,6 +54,8 @@ emails keep working, and the markup and classes are the same, so
 - `src/bin/bosco-migrate.rs`: runs the new migrations, as IHP's `migrate`;
   the deployment's migration test (`nix/tests/migrations.nix`) runs with
   both
+- `src/static_files.rs`: the IHP app's static files, by their content's
+  hash, as dates in the Nix store say nothing
 - `src/admin_password.rs`: changing one's password, from
   `Admin/Controller/Passwords.hs`
 - `src/admin_forms.rs`: the admin's form fields, as IHP's `formFor` makes
@@ -122,6 +124,11 @@ change to the schema shows here at once. Most are the IHP app's own tests of
 - **Changing one's password** says what's wrong (the old password, the
   confirmation, or the new one's length and characters); IHP said only
   "Passwords do not meet the requirements". The rules are IHP's.
+- **Static files** without a version in their address (the logo, the
+  favicon) are asked about again on each visit, a 304 when unchanged; IHP
+  let browsers keep them for a year. IHP's own development scripts
+  (`/static/helpers.js`, `/static/vendor/…`) aren't served: the pages use
+  `prod.js`, which has them.
 - **A failed migration** stops `bosco-migrate`; IHP's `migrate` went on to
   the next, which then failed too.
 - **A login without a password field** is answered with 400; IHP's was a
@@ -166,4 +173,5 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the static files, which the IHP app still serves.
+With `rustWeb.enable` and `rustWorker.enable`, the IHP app's services still
+run but get no work: the next step is turning them off.

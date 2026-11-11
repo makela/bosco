@@ -135,8 +135,7 @@ The addresses below are examples; use the real ones.
       locations."/".proxyPass = "http://127.0.0.1:3302";
       extraConfig = "add_header X-Robots-Tag noindex;";
     };
-    # The public pages and the admin to the Rust site, the rest (the
-    # static files) to the IHP app
+    # The whole site, in Rust
     virtualHosts."demo.tilaus.example.fi" = {
       enableACME = true;
       forceSSL = true;
@@ -226,7 +225,7 @@ admin (`/admin/…`), the demo's one-click logins included. It reads and
 writes IHP's session cookie with the instance's session key and checks and
 makes IHP's password hashes, so a login in either app is a login in the
 other, and logins, lockouts and changed passwords carry over both ways.
-nginx sends these pages to it and the rest to the IHP app with
+It serves the static files too, so nginx sends it everything with
 `rustWeb.nginxLocations`, as for the demo above. The instance's migrations
 then run with the Rust site's `bosco-migrate`, and a demo's nightly reset
 with its `bosco-reset-demo`. Without it, an instance runs all of these in

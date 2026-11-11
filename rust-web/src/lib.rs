@@ -23,6 +23,7 @@ pub mod query;
 pub mod session;
 pub mod settings;
 pub mod skein_mac;
+pub mod static_files;
 pub mod validate;
 pub mod views;
 pub mod worker;
@@ -38,7 +39,6 @@ use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{delete, get, post};
 use maud::Markup;
 use sqlx::PgPool;
-use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 
@@ -411,11 +411,22 @@ pub(crate) async fn not_found(State(state): State<Arc<AppState>>, headers: Heade
     page(&state, &headers, StatusCode::NOT_FOUND, &content)
 }
 
+/// A static file (`static_files.rs`), or else not found
+async fn static_or_not_found(
+    State(state): State<Arc<AppState>>,
+    uri: axum::http::Uri,
+    headers: HeaderMap,
+) -> Response {
+    match static_files::serve(&state.static_dir, &uri, &headers).await {
+        Some(file) => file,
+        None => not_found(State(state), headers).await,
+    }
+}
+
 /// All the site's routes. Other addresses are the IHP app's static files,
-/// the logo and the stylesheet, there and under /static/ as IHP serves
-/// them, or else not found.
+/// the logo, the stylesheets and the scripts, there and under /static/ as
+/// IHP serves them, or else not found.
 pub fn app(state: Arc<AppState>) -> Router {
-    let static_files = ServeDir::new(&state.static_dir);
     let router = Router::new()
         .route("/", get(index))
         .route("/Orders", get(index))
@@ -567,10 +578,9 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/DemoLogin",
             get(admin::demo_login).post(admin::demo_login),
-        )
-        .nest_service("/static", static_files.clone());
+        );
     admin_texts::routes(router)
-        .fallback_service(static_files.fallback(get(not_found).with_state(state.clone())))
+        .fallback(static_or_not_found)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
