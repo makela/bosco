@@ -43,6 +43,39 @@ impl Roles {
     }
 }
 
+/// The roles in `ROLES` of `bosco-create-user`, e.g. "deliverer, promoter":
+/// at least one, and only known ones, as a user without a role could log
+/// in but do nothing (`parseRoles` in the IHP app's `CreateUser.hs`)
+pub fn parse_roles(text: &str) -> Result<Roles, String> {
+    const KNOWN: [&str; 3] = ["admin", "deliverer", "promoter"];
+    let roles: Vec<String> = text
+        .split(',')
+        .map(|role| role.trim().to_lowercase())
+        .filter(|role| !role.is_empty())
+        .collect();
+    if roles.is_empty() {
+        return Err("ROLES should name at least one of admin, deliverer, promoter".to_string());
+    }
+    let unknown: Vec<&str> = roles
+        .iter()
+        .map(String::as_str)
+        .filter(|role| !KNOWN.contains(role))
+        .collect();
+    if !unknown.is_empty() {
+        return Err(format!(
+            "Unknown roles {}, known: {}",
+            unknown.join(", "),
+            KNOWN.join(", ")
+        ));
+    }
+    let has = |role: &str| roles.iter().any(|r| r == role);
+    Ok(Roles {
+        admin: has("admin"),
+        deliverer: has("deliverer"),
+        promoter: has("promoter"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,5 +129,20 @@ mod tests {
         assert_eq!(allowed(roles(false, false, false)), []);
         assert!(!roles(false, false, false).any());
         assert!(roles(false, false, true).any());
+    }
+
+    /// As the IHP app's CreateUser tests
+    #[test]
+    fn reads_roles() {
+        assert_eq!(parse_roles("admin"), Ok(roles(true, false, false)));
+        assert_eq!(
+            parse_roles(" Deliverer , promoter,"),
+            Ok(roles(false, true, true))
+        );
+        assert!(parse_roles(" , ").is_err());
+        assert_eq!(
+            parse_roles("admin, boss"),
+            Err("Unknown roles boss, known: admin, deliverer, promoter".to_string())
+        );
     }
 }

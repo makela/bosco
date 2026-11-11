@@ -1104,3 +1104,31 @@ pub async fn set_password_hash(db: &PgPool, user: Uuid, hash: &str) -> sqlx::Res
         .await
         .map(drop)
 }
+
+/// Whether a login with this email exists, as written
+pub async fn login_exists(db: &PgPool, email: &str) -> sqlx::Result<bool> {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users WHERE email = $1)")
+        .bind(email)
+        .fetch_one(db)
+        .await
+}
+
+/// A new login with these roles and password hash
+pub async fn create_login(
+    db: &PgPool,
+    email: &str,
+    password_hash: &str,
+    roles: Roles,
+) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO users (email, password_hash, is_admin, is_deliverer, is_promoter)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id",
+    )
+    .bind(email)
+    .bind(password_hash)
+    .bind(roles.admin)
+    .bind(roles.deliverer)
+    .bind(roles.promoter)
+    .fetch_one(db)
+    .await
+}

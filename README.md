@@ -260,8 +260,15 @@ made it, when, and the text before and after (`text_changes`). A product's
 and a producer's page in the admin list them, newest first.
 
 Only an admin marks orders invoiced or paid, cancels them, emails invoices
-again and manages the shop. `CreateUser` makes logins, on the server as the
-instance's user:
+again and manages the shop. On an instance with `rustWeb.enable`,
+`bosco-<name>-create-user` makes logins, as root:
+
+```sh
+read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
+ADMIN_EMAIL=someone@example.com ROLES=deliverer,promoter bosco-fi-create-user
+```
+
+Without it, `CreateUser` does, on the server as the instance's user:
 
 ```sh
 read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD

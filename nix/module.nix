@@ -709,5 +709,18 @@ in
 
     systemd.services = lib.mkMerge (lib.mapAttrsToList services instances);
     systemd.timers = lib.mapAttrs' demoTimers (lib.filterAttrs (_: instance: instance.demo) instances);
+
+    # bosco-<name>-create-user makes a login on the instance's database, as
+    # the instance's user, with bosco-create-user from rustWeb.package:
+    #   read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
+    #   ADMIN_EMAIL=someone@example.com ROLES=deliverer,promoter bosco-fi-create-user
+    environment.systemPackages = lib.mapAttrsToList (
+      name: instance:
+      pkgs.writeShellScriptBin "bosco-${name}-create-user" ''
+        exec ${pkgs.util-linux}/bin/runuser -u ${instance.database} -- \
+          env DATABASE_URL="postgresql:///${instance.database}?host=/run/postgresql&user=${instance.database}" \
+          ${instance.rustWeb.package}/bin/bosco-create-user
+      ''
+    ) (lib.filterAttrs (_: instance: instance.rustWeb.enable) instances);
   };
 }

@@ -500,6 +500,39 @@ let
       ];
     };
 
+    # bosco-<name>-create-user, for an instance with the Rust site: the Rust
+    # program as the instance's user on its database
+    testAnInstanceWithTheRustSiteHasACreateUserCommand = {
+      expr =
+        let
+          config = evaluate {
+            demo = {
+              baseUrl = "https://demo.example.com";
+              port = 3303;
+              demo = true;
+              sendEmails = false;
+              rustWeb.enable = true;
+            };
+            fi.baseUrl = "https://tilaus.example.fi";
+          };
+          commands = lib.filter (p: lib.hasPrefix "bosco-" (p.name or "")) config.environment.systemPackages;
+          # Its text, without building it
+          script = (lib.head commands).drvAttrs.text;
+        in
+        {
+          names = map (p: p.name) commands;
+          asTheUser = lib.hasInfix "runuser -u bosco_demo" script;
+          program = lib.hasInfix "/bin/bosco-create-user" script;
+          database = lib.hasInfix "postgresql:///bosco_demo?host=/run/postgresql&user=bosco_demo" script;
+        };
+      expected = {
+        names = [ "bosco-demo-create-user" ];
+        asTheUser = true;
+        program = true;
+        database = true;
+      };
+    };
+
     testOnlyAnInstanceThatAsksRunsTheRustSite = {
       expr = lib.attrNames (lib.filterAttrs (name: _: lib.hasSuffix "-rust-web" name) services);
       expected = [ ];
