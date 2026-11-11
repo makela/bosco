@@ -5,8 +5,8 @@ The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 the welcome message, the order form, an order's invoice and the newsletter
 form, in Finnish, English or French, demo mode included; the admin's login,
 logout, welcome page (its menu), orders (the list, an order's page and its
-buttons, a new order, all ordered products), welcome messages and payment
-instructions; and the email worker, IHP's job runner with
+buttons, a new order, all ordered products), welcome messages, payment
+instructions, customers and the email lists; and the email worker, IHP's job runner with
 `Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
 so both can run at once: the rest of the admin stays in IHP, and either
 app's worker emails the invoices of either app's orders, as each order saves
@@ -41,6 +41,8 @@ emails keep working, and the markup and classes are the same, so
   `Admin/Controller/WelcomeMessages.hs` and `PaymentInstructions.hs`, with
   IHP's generated forms
 - `src/query.rs`: reading an address's query string as IHP does
+- `src/admin_customers.rs`: the customers and the email lists, from
+  `Admin/Controller/Customers.hs`
 - `src/permission.rs`: what each role may do, from
   `Application/Permission.hs`
 - `src/session.rs`, `src/skein_mac.rs`: IHP's session cookie
@@ -110,6 +112,11 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   first hours of a year can differ.
 - **A year that isn't a number** in the order list's address is answered
   with 400; IHP's was a 500.
+- **The customer list** shows each name once, as IHP's did, but as the
+  name's newest customer (the latest email and phone); IHP showed
+  whichever the database gave.
+- **The email lists** have a breadcrumb back to the start, as the other
+  admin pages.
 - **Payment instructions** are listed oldest first; IHP listed them in
   whatever order the database gave, which is the same until one is edited.
 - **The admin's wording and markup are tidied** where IHP's generator left
@@ -135,5 +142,5 @@ see "The public site in Rust" in the project's README. Its
 package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
-Not done yet: the rest of the admin: customers, producers, products, email
-lists and changing one's password.
+Not done yet: the rest of the admin: producers, products and changing one's
+password.

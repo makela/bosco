@@ -730,3 +730,111 @@ pub async fn delete_published(db: &PgPool, kind: TextKind, id: Uuid) -> sqlx::Re
     };
     sqlx::query(sql).bind(id).execute(db).await.map(drop)
 }
+
+/// A customer as the admin sees and edits them
+#[derive(Debug, FromRow)]
+pub struct AdminCustomer {
+    pub id: Uuid,
+    #[sqlx(flatten)]
+    pub customer: Customer,
+    /// The name and address as written before they were split into their
+    /// parts (migration 1794227624), to check the parts against
+    pub name: String,
+    pub address: String,
+}
+
+/// One customer per name, A to Z by the last name, each name's newest: a
+/// customer who ordered every year is in once, as they wrote it last
+pub async fn customers_by_name(db: &PgPool) -> sqlx::Result<Vec<AdminCustomer>> {
+    sqlx::query_as(
+        "SELECT DISTINCT ON (reverse_name) id, email, phone, first_name, last_name, street_address,
+                postal_code, city, billing_name, name, address
+         FROM customers ORDER BY reverse_name, created_at DESC, id",
+    )
+    .fetch_all(db)
+    .await
+}
+
+pub async fn admin_customer(db: &PgPool, id: Uuid) -> sqlx::Result<Option<AdminCustomer>> {
+    sqlx::query_as(
+        "SELECT id, email, phone, first_name, last_name, street_address, postal_code, city,
+                billing_name, name, address
+         FROM customers WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+/// A customer the admin adds, e.g. for the newsletter
+pub async fn create_customer(db: &PgPool, customer: &NewCustomer) -> sqlx::Result<Uuid> {
+    insert_customer(db, customer).await
+}
+
+pub async fn update_customer(db: &PgPool, id: Uuid, customer: &NewCustomer) -> sqlx::Result<()> {
+    sqlx::query(
+        "UPDATE customers
+         SET first_name = $2, last_name = $3, billing_name = $4, email = $5, phone = $6,
+             street_address = $7, postal_code = $8, city = $9, reverse_name = $10
+         WHERE id = $1",
+    )
+    .bind(id)
+    .bind(&customer.first_name)
+    .bind(&customer.last_name)
+    .bind(&customer.billing_name)
+    .bind(&customer.email)
+    .bind(&customer.phone)
+    .bind(&customer.street_address)
+    .bind(&customer.postal_code)
+    .bind(&customer.city)
+    .bind(customer.reverse_name())
+    .execute(db)
+    .await
+    .map(drop)
+}
+
+/// Deletes a customer without orders; false (and nothing deleted) if they
+/// have any
+pub async fn delete_customer(db: &PgPool, id: Uuid) -> sqlx::Result<bool> {
+    let deleted = sqlx::query(
+        "DELETE FROM customers WHERE id = $1
+           AND NOT EXISTS (SELECT 1 FROM orders WHERE customer_id = $1)",
+    )
+    .bind(id)
+    .execute(db)
+    .await?;
+    Ok(deleted.rows_affected() == 1)
+}
+
+/// The emails in lower case, each once, A to Z, as the IHP app made its
+/// lists: lower-cased here, as PostgreSQL leaves ä and the like alone in a
+/// database without a locale
+fn email_list(emails: Vec<String>) -> Vec<String> {
+    let mut emails: Vec<String> = emails.iter().map(|email| email.to_lowercase()).collect();
+    emails.sort();
+    emails.dedup();
+    emails
+}
+
+/// The emails of the year's customers, who get to know when their order is
+/// delivered: of the orders that weren't cancelled (the year in UTC)
+pub async fn delivery_emails(db: &PgPool, year: i32) -> sqlx::Result<Vec<String>> {
+    let emails = sqlx::query_scalar(
+        "SELECT email FROM orders JOIN customers ON customers.id = orders.customer_id
+         WHERE cancelled_at IS NULL
+           AND ordered_at >= make_timestamptz($1, 1, 1, 0, 0, 0, 'UTC')
+           AND ordered_at < make_timestamptz($1 + 1, 1, 1, 0, 0, 0, 'UTC')",
+    )
+    .bind(year)
+    .fetch_all(db)
+    .await?;
+    Ok(email_list(emails))
+}
+
+/// Every customer's email, for the newsletter
+pub async fn newsletter_emails(db: &PgPool) -> sqlx::Result<Vec<String>> {
+    let emails = sqlx::query_scalar("SELECT email FROM customers")
+        .fetch_all(db)
+        .await?;
+    Ok(email_list(emails))
+}

@@ -6,6 +6,7 @@
 //! email worker is `bosco-worker` (`worker.rs`), or the IHP app's.
 
 pub mod admin;
+pub mod admin_customers;
 pub mod admin_orders;
 pub mod admin_texts;
 pub mod db;
@@ -428,6 +429,39 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/Orders",
             get(admin_orders::orders).post(admin_orders::orders),
+        )
+        .route(
+            "/admin/Customers",
+            get(admin_customers::list).post(admin_customers::list),
+        )
+        .route(
+            "/admin/NewCustomer",
+            get(admin_customers::new).post(admin_customers::new),
+        )
+        .route(
+            "/admin/ShowCustomer",
+            get(admin_customers::show).post(admin_customers::show),
+        )
+        .route(
+            "/admin/EditCustomer",
+            get(admin_customers::edit).post(admin_customers::edit),
+        )
+        .route("/admin/CreateCustomer", post(admin_customers::create))
+        .route(
+            "/admin/UpdateCustomer",
+            post(admin_customers::update).patch(admin_customers::update),
+        )
+        .route(
+            "/admin/DeleteCustomer",
+            delete(admin_customers::delete).post(admin_customers::delete_by_post),
+        )
+        .route(
+            "/admin/EmailsForDeliveryInfo",
+            get(admin_customers::delivery_emails).post(admin_customers::delivery_emails),
+        )
+        .route(
+            "/admin/EmailsForNewsLetter",
+            get(admin_customers::newsletter_emails).post(admin_customers::newsletter_emails),
         )
         .route(
             "/admin/NewOrder",

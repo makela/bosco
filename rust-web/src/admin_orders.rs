@@ -141,6 +141,21 @@ fn time_element(class: &str, at: DateTime<Utc>) -> Markup {
     html! { time class=(class) datetime=(iso) { (at.format("%d.%m.%Y, %H:%M")) } }
 }
 
+/// The years to choose from, the one shown selected; choosing one sends
+/// the form (`renderYearSelect`)
+pub fn year_select(years: std::ops::RangeInclusive<i32>, shown: i32) -> Markup {
+    html! {
+        label {
+            "Year "
+            select name="year" onchange="this.form.submit()" {
+                @for year in years {
+                    option selected=[selected(year == shown)] { (year) }
+                }
+            }
+        }
+    }
+}
+
 fn selected(on: bool) -> Option<&'static str> {
     on.then_some("selected")
 }
@@ -172,14 +187,7 @@ fn list_page(state: &AppState, view: &ListView) -> Markup {
     html! {
         (admin::breadcrumb(&crumbs))
         form method="GET" action="/admin/Orders" {
-            label {
-                "Year "
-                select name="year" onchange="this.form.submit()" {
-                    @for year in view.years.clone() {
-                        option selected=[selected(year == view.year)] { (year) }
-                    }
-                }
-            }
+            (year_select(view.years.clone(), view.year))
             label {
                 "Sort by "
                 select name="ordering" onchange="this.form.submit()" {

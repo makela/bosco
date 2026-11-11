@@ -1437,3 +1437,238 @@ async fn the_texts_are_for_admins(db: PgPool) -> TestResult {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     Ok(())
 }
+
+/// A customer without orders, written before the name and address were
+/// split
+async fn old_customer(db: &PgPool) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO customers (first_name, last_name, email, phone, reverse_name, created_at,
+                                name, address, street_address)
+         VALUES ('Vanha', 'Asiakas', 'Vanha@Example.com', '040 123 4567', 'asiakas vanha',
+                 '2019-01-01', 'Vanha Asiakas', 'Katu 9, Helsinki', 'Katu 9')
+         RETURNING id",
+    )
+    .fetch_one(db)
+    .await
+}
+
+#[sqlx::test(migrations = false)]
+async fn customers_are_listed_once_per_name(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    listed_order(&db, "Eeva", "2026-01-15 12:00:00+00", 300, "").await?;
+    // An older customer of the same name: the list shows the newest
+    sqlx::query(
+        "INSERT INTO customers (first_name, last_name, email, phone, reverse_name, created_at)
+         VALUES ('Eeva', 'Aalto', 'old@example.com', '040', 'aalto eeva', '2020-01-01')",
+    )
+    .execute(&db)
+    .await?;
+    old_customer(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let list = text(send(&app, Method::GET, "/admin/Customers", &boss, &[]).await?).await?;
+    let eeva = list.find(">Eeva Aalto</a>").unwrap();
+    let vanha = list.find(">Vanha Asiakas</a>").unwrap();
+    assert!(eeva < vanha, "A to Z by the last name");
+    assert_eq!(list.matches(">Eeva Aalto</a>").count(), 1);
+    assert!(list.contains("<td>x@example.com</td>") && !list.contains("old@example.com"));
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn customers_are_added_changed_and_deleted(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+
+    // Without an address, which the admin may leave out
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/CreateCustomer",
+        &boss,
+        &[
+            ("firstName", " Ilman "),
+            ("email", "i%40example.com"),
+            ("phone", "040 123 4567"),
+        ],
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::FOUND);
+    let (id, first_name, reverse_name): (Uuid, String, String) =
+        sqlx::query_as("SELECT id, first_name, reverse_name FROM customers")
+            .fetch_one(&db)
+            .await?;
+    assert_eq!(
+        (first_name.as_str(), reverse_name.as_str()),
+        ("Ilman", "ilman")
+    );
+    assert_eq!(
+        location(&response),
+        format!("/admin/ShowCustomer?customerId={id}")
+    );
+
+    // What's wrong, under its field; nothing saved
+    let page = text(
+        send(
+            &app,
+            Method::POST,
+            "/admin/CreateCustomer",
+            &boss,
+            &[("email", "x"), ("postalCode", "12")],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(
+        page.contains(r#"<div class="text-red-500 text-xs italic">Tämä kenttä vaaditaan</div>"#)
+    );
+    assert!(page.contains("Postinumerossa on viisi numeroa"));
+    let customers: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM customers")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(customers, 1);
+
+    // A change of the city alone keeps the rest
+    let update = format!("/admin/UpdateCustomer?customerId={id}");
+    let response = send(&app, Method::POST, &update, &boss, &[("city", "Turku")]).await?;
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_SUCCESS)
+            .as_deref(),
+        Some("Customer updated")
+    );
+    let row: (String, String) = sqlx::query_as("SELECT email, city FROM customers")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(row, ("i@example.com".to_string(), "Turku".to_string()));
+
+    let delete = format!("/admin/DeleteCustomer?customerId={id}");
+    let response = send(&app, Method::POST, &delete, &boss, &[("_method", "DELETE")]).await?;
+    assert_eq!(location(&response), "/admin/Customers");
+    let customers: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM customers")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(customers, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn a_customer_with_orders_stays(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let order = listed_order(&db, "Eeva", "2026-01-15 12:00:00+00", 300, "").await?;
+    let id: Uuid = sqlx::query_scalar("SELECT customer_id FROM orders WHERE id = $1")
+        .bind(order)
+        .fetch_one(&db)
+        .await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let response = send(
+        &app,
+        Method::DELETE,
+        &format!("/admin/DeleteCustomer?customerId={id}"),
+        &boss,
+        &[],
+    )
+    .await?;
+    assert_eq!(
+        location(&response),
+        format!("/admin/EditCustomer?customerId={id}")
+    );
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_ERROR)
+            .as_deref(),
+        Some("Customer “Eeva Aalto” cannot be deleted because they have orders.")
+    );
+    let customers: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM customers")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(customers, 1);
+
+    // Its edit page shows the name and address as written before the split
+    let old = old_customer(&db).await?;
+    let edit = text(
+        send(
+            &app,
+            Method::GET,
+            &format!("/admin/EditCustomer?customerId={old}"),
+            &boss,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(edit.contains("<p>Name: Vanha Asiakas</p>"));
+    assert!(edit.contains(r#"value="Katu 9""#));
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_email_lists(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    listed_order(&db, "Old", "2025-06-01 12:00:00+00", 1000, "").await?;
+    listed_order(&db, "New", "2026-02-01 12:00:00+00", 500, "").await?;
+    listed_order(&db, "Gone", "2026-03-01 12:00:00+00", 700, "cancelled_at").await?;
+    old_customer(&db).await?;
+    sqlx::query(
+        "INSERT INTO customers (first_name, email, phone, reverse_name)
+         VALUES ('Ääni', 'Ääni@Example.FI', '040', 'ääni')",
+    )
+    .execute(&db)
+    .await?;
+    let app = site(db.clone(), false);
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    // listed_order gives everyone x@example.com: once in each list
+    let delivery = text(
+        send(
+            &app,
+            Method::GET,
+            "/admin/EmailsForDeliveryInfo",
+            &promoter,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(delivery.contains("<p>x@example.com</p>"), "{delivery}");
+    assert!(delivery.contains(r#"<option selected="selected">2026</option>"#));
+    let none = text(
+        send(
+            &app,
+            Method::GET,
+            "/admin/EmailsForDeliveryInfo?year=2024",
+            &promoter,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(none.contains("<p></p>"));
+    let newsletter = text(
+        send(
+            &app,
+            Method::GET,
+            "/admin/EmailsForNewsLetter",
+            &promoter,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(
+        newsletter.contains("<p>vanha@example.com, x@example.com, ääni@example.fi</p>"),
+        "{newsletter}"
+    );
+
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    for uri in [
+        "/admin/EmailsForNewsLetter",
+        "/admin/EmailsForDeliveryInfo",
+        "/admin/Customers",
+    ] {
+        let response = send(&app, Method::GET, uri, &driver, &[]).await?;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{uri}");
+    }
+    Ok(())
+}
