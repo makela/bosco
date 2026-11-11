@@ -192,7 +192,8 @@ async fn insert_customer(
 
 /// Saves the customer, the order, its lines at the products' prices now (so
 /// later price changes don't touch it) and the job that emails the invoice,
-/// all or nothing. The IHP app's job worker sends the email.
+/// all or nothing. The email worker (worker.rs, or the IHP app's) sends
+/// the email.
 pub async fn create_order(
     db: &PgPool,
     customer: &NewCustomer,

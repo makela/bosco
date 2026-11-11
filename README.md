@@ -223,6 +223,15 @@ Try it on the demo first. `journalctl -u bosco-demo-rust-web` shows its
 requests. To go back, set `rustWeb.enable = false` and point nginx's
 `locations."/"` at the IHP app again.
 
+With `rustWorker.enable = true`, the instance's email worker,
+`bosco-<name>-worker`, runs `bosco-worker` from `rust-web/` instead of IHP's
+`RunJobs`, with the same SMTP settings. It sends the same order emails from
+the same jobs, with a readable plain-text version and the `Date` and
+`Message-ID` headers IHP's left out. Jobs carry over either way, so
+switching back and forth loses none. `journalctl -u bosco-<name>-worker`
+logs each email sent or failed. It works without `rustWeb.enable`, and
+the other way round.
+
 ### Users and roles
 
 A login has one or more roles, and may do whatever any of them allows

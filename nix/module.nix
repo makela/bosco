@@ -46,7 +46,9 @@
 #
 # Their state, the session key, is in /var/lib/bosco-<name>. With
 # rustWeb.enable, bosco-<name>-rust-web runs the public pages in Rust next to
-# them, and nginx sends those pages to it (rustWeb.nginxLocations).
+# them, and nginx sends those pages to it (rustWeb.nginxLocations). With
+# rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
+# of IHP's.
 {
   config,
   lib,
@@ -237,8 +239,8 @@ let
           enable = lib.mkEnableOption ''
             the public site in Rust (rust-web/) next to the IHP app, on the same
             database: the welcome message, the order form, the invoices and the
-            newsletter form. The admin and the email worker stay in IHP. nginx
-            sends the public pages to it with nginxLocations
+            newsletter form. The admin stays in IHP. nginx sends the public pages
+            to it with nginxLocations
           '';
 
           port = lib.mkOption {
@@ -252,7 +254,7 @@ let
             type = lib.types.package;
             default = config.flake.packages.${system}.rust-web;
             defaultText = lib.literalExpression "flake.packages.\${system}.rust-web";
-            description = "The Rust site (nix/rust-web.nix).";
+            description = "The Rust programs, the site and the email worker (nix/rust-web.nix).";
           };
 
           nginxLocations = lib.mkOption {
@@ -275,6 +277,13 @@ let
             '';
           };
         };
+
+        rustWorker.enable = lib.mkEnableOption ''
+          the email worker in Rust (bosco-worker, from rustWeb.package) instead
+          of IHP's RunJobs, as the same bosco-<name>-worker service with the same
+          settings. It sends the same emails from the same job table, so either
+          can take over the other's jobs
+        '';
 
         rtsFlags = lib.mkOption {
           type = lib.types.str;
@@ -340,6 +349,8 @@ let
       state = "/var/lib/bosco-${name}";
       migrate = "bosco-${name}-migrate.service";
       databaseUrl = "postgresql:///${instance.database}?host=/run/postgresql";
+      # The user too: without one, SQLx doesn't take the service's
+      rustDatabaseUrl = "${databaseUrl}&user=${instance.database}";
       # The catalog in the instance's language, Fixtures.<locale>.sql, or
       # the Finnish one, Fixtures.sql, when there's none
       fixtures =
@@ -438,7 +449,7 @@ let
       };
 
       "bosco-${name}-worker" = {
-        description = "Bosco Falconeria email worker (${name})";
+        description = "Bosco Falconeria email worker${lib.optionalString instance.rustWorker.enable " in Rust"} (${name})";
         wantedBy = [ "multi-user.target" ];
         after = after ++ [ migrate ];
         requires = [
@@ -446,7 +457,16 @@ let
           migrate
         ];
         environment =
-          environment
+          (
+            if instance.rustWorker.enable then
+              {
+                DATABASE_URL = rustDatabaseUrl;
+                inherit (environment) APP_LOCALE APP_DEMO SEND_EMAILS;
+                RUST_LOG = "info";
+              }
+            else
+              environment
+          )
           // lib.optionalAttrs instance.sendEmails {
             SMTP_HOST = instance.smtp.host;
             SMTP_PORT = toString instance.smtp.port;
@@ -461,8 +481,15 @@ let
         serviceConfig =
           serviceConfig
           // {
-            ExecStart = "${instance.package}/bin/RunJobs";
+            ExecStart =
+              if instance.rustWorker.enable then
+                "${instance.rustWeb.package}/bin/bosco-worker"
+              else
+                "${instance.package}/bin/RunJobs";
             Restart = "always";
+          }
+          // lib.optionalAttrs instance.rustWorker.enable {
+            MemoryDenyWriteExecute = true;
           }
           // lib.optionalAttrs smtpPassword {
             LoadCredential = "smtp-password:${instance.smtp.passwordFile}";
@@ -486,8 +513,7 @@ let
             migrate
           ];
           environment = {
-            # The user too: without one, SQLx doesn't take the service's
-            DATABASE_URL = "${databaseUrl}&user=${instance.database}";
+            DATABASE_URL = rustDatabaseUrl;
             ADDR = listenAddressOf instance.host instance.rustWeb.port;
             APP_LOCALE = instance.locale;
             APP_DEMO = if instance.demo then "1" else "0";

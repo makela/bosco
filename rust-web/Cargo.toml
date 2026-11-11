@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2024"
 description = "Bosco's public site, the IHP app's Web/ ported to Rust, on the same PostgreSQL"
 publish = false
+default-run = "bosco-web"
 
 [dependencies]
 axum = "0.8.1"
 chrono = { version = "0.4.39", default-features = false, features = ["std", "clock"] }
+lettre = { version = "0.11.23", default-features = false, features = ["builder", "smtp-transport", "sendmail-transport", "tokio1-rustls-tls", "hostname", "pool"] }
 maud = { version = "0.27.0", features = ["axum"] }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 regex = "1"
@@ -16,7 +18,7 @@ tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "signal"] }
 tower-http = { version = "0.7.0", features = ["fs", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = "1"
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

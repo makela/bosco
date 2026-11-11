@@ -376,6 +376,58 @@ let
       };
     };
 
+    # The Rust email worker in the same service, with the same SMTP settings
+    # and password, as the same user
+    testTheRustWorkerTakesOverTheWorkerService = {
+      expr =
+        let
+          worker =
+            (evaluate {
+              fi = {
+                baseUrl = "https://tilaus.example.fi";
+                locale = "fi";
+                inherit smtp;
+                rustWorker.enable = true;
+              };
+            }).systemd.services.bosco-fi-worker;
+        in
+        {
+          program = lib.hasSuffix "/bin/bosco-worker" worker.serviceConfig.ExecStart;
+          inherit (worker.environment)
+            DATABASE_URL
+            APP_LOCALE
+            SEND_EMAILS
+            SMTP_HOST
+            SMTP_USER
+            SMTP_PASSWORD_FILE
+            ;
+          inherit (worker.serviceConfig) LoadCredential User MemoryDenyWriteExecute;
+          ihpSettings = worker.environment ? IHP_ENV || worker.environment ? GHCRTS;
+        };
+      expected = {
+        program = true;
+        DATABASE_URL = "postgresql:///bosco_fi?host=/run/postgresql&user=bosco_fi";
+        APP_LOCALE = "fi";
+        SEND_EMAILS = "1";
+        SMTP_HOST = "smtp.example.com";
+        SMTP_USER = "tilaus@example.fi";
+        SMTP_PASSWORD_FILE = "%d/smtp-password";
+        LoadCredential = "smtp-password:/var/lib/secrets/bosco/smtp-password";
+        User = "bosco_fi";
+        MemoryDenyWriteExecute = true;
+        ihpSettings = false;
+      };
+    };
+
+    testWorkersStayInIhpUnlessAsked = {
+      expr = map (name: lib.hasSuffix "/bin/RunJobs" services."bosco-${name}-worker".serviceConfig.ExecStart) instanceNames;
+      expected = [
+        true
+        true
+        true
+      ];
+    };
+
     testOnlyAnInstanceThatAsksRunsTheRustSite = {
       expr = lib.attrNames (lib.filterAttrs (name: _: lib.hasSuffix "-rust-web" name) services);
       expected = [ ];

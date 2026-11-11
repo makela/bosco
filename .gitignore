@@ -7,7 +7,7 @@ devenv.local.nix
 tmp
 result
 node_modules
-bin
+/bin
 *.iml
 Generated
 dist

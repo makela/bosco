@@ -6,8 +6,11 @@
 
 pub mod db;
 pub mod l10n;
+pub mod mail;
+pub mod settings;
 pub mod validate;
 pub mod views;
+pub mod worker;
 
 use std::collections::HashMap;
 use std::path::PathBuf;

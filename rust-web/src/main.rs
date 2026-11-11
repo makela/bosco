@@ -10,15 +10,13 @@
 //!   build, see `devenv up`) by default
 
 use std::env;
+use std::io::IsTerminal;
 use std::sync::Arc;
 
+use bosco_web::settings::{flag, setting};
 use bosco_web::{AppState, Site, app, l10n::Locale};
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::EnvFilter;
-
-fn setting(name: &str, default: &str) -> String {
-    env::var(name).unwrap_or_else(|_| default.to_string())
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,14 +25,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new("info,tower_http=info")),
         )
+        // Colours only in a terminal, not in the journal
+        .with_ansi(std::io::stdout().is_terminal())
         .init();
 
     let locale = Locale::parse(&setting("APP_LOCALE", ""))?;
-    let demo = match setting("APP_DEMO", "").as_str() {
-        "1" | "true" => true,
-        "" | "0" | "false" => false,
-        other => return Err(format!("APP_DEMO should be 1 or 0, got {other}").into()),
-    };
+    let demo = flag("APP_DEMO", false)?;
     let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?;
     let addr = setting("ADDR", "127.0.0.1:8002");
 
