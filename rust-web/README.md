@@ -49,6 +49,8 @@ emails keep working, and the markup and classes are the same, so
 - `src/demo_data.rs`, `src/bin/bosco-reset-demo.rs`: the demo's nightly
   reset, from `Application/DemoData.hs`: the same made-up orders as the IHP
   app's for the same day and time
+- `src/bin/bosco-seed-dev.rs`: fills a dev database with orders and logins
+  to browse, from `Application/Script/SeedDevData.hs`
 - `src/admin_password.rs`: changing one's password, from
   `Admin/Controller/Passwords.hs`
 - `src/admin_forms.rs`: the admin's form fields, as IHP's `formFor` makes
