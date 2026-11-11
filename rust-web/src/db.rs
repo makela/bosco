@@ -838,3 +838,155 @@ pub async fn newsletter_emails(db: &PgPool) -> sqlx::Result<Vec<String>> {
         .await?;
     Ok(email_list(emails))
 }
+
+/// A producer as the admin edits it
+#[derive(Debug, Clone, FromRow)]
+pub struct CatalogProducer {
+    pub id: Uuid,
+    pub name: String,
+    pub subject: String,
+    pub description: String,
+    /// Shown on the order form
+    pub enabled: bool,
+}
+
+/// Every producer, by name as the database sorts them
+pub async fn catalog_producers(db: &PgPool) -> sqlx::Result<Vec<CatalogProducer>> {
+    sqlx::query_as("SELECT id, name, subject, description, enabled FROM producers ORDER BY name")
+        .fetch_all(db)
+        .await
+}
+
+pub async fn catalog_producer(db: &PgPool, id: Uuid) -> sqlx::Result<Option<CatalogProducer>> {
+    sqlx::query_as("SELECT id, name, subject, description, enabled FROM producers WHERE id = $1")
+        .bind(id)
+        .fetch_optional(db)
+        .await
+}
+
+/// A change of a product's or producer's text, and who made it
+#[derive(Debug, FromRow)]
+pub struct TextChange {
+    pub created_at: DateTime<Utc>,
+    pub email: String,
+    pub field_name: String,
+    pub text_before: String,
+    pub text_after: String,
+}
+
+/// What a text change is of
+#[derive(Debug, Clone, Copy)]
+pub enum Texts {
+    Producer(Uuid),
+    Product(Uuid),
+}
+
+/// The text changes of a producer or product, newest first
+pub async fn text_changes(db: &PgPool, of: Texts) -> sqlx::Result<Vec<TextChange>> {
+    let (sql, id) = match of {
+        Texts::Producer(id) => (
+            "SELECT text_changes.created_at, email, field_name, text_before, text_after
+             FROM text_changes JOIN users ON users.id = text_changes.user_id
+             WHERE producer_id = $1 ORDER BY text_changes.created_at DESC",
+            id,
+        ),
+        Texts::Product(id) => (
+            "SELECT text_changes.created_at, email, field_name, text_before, text_after
+             FROM text_changes JOIN users ON users.id = text_changes.user_id
+             WHERE product_id = $1 ORDER BY text_changes.created_at DESC",
+            id,
+        ),
+    };
+    sqlx::query_as(sql).bind(id).fetch_all(db).await
+}
+
+/// Records which of the texts changed, (field, before, after), by whom
+async fn record_text_changes(
+    tx: &mut sqlx::PgConnection,
+    user: Uuid,
+    of: Texts,
+    texts: &[(&str, &str, &str)],
+) -> sqlx::Result<()> {
+    let (producer, product) = match of {
+        Texts::Producer(id) => (Some(id), None),
+        Texts::Product(id) => (None, Some(id)),
+    };
+    for (field, before, after) in texts {
+        if before != after {
+            sqlx::query(
+                "INSERT INTO text_changes (user_id, producer_id, product_id, field_name,
+                                           text_before, text_after)
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+            )
+            .bind(user)
+            .bind(producer)
+            .bind(product)
+            .bind(field)
+            .bind(before)
+            .bind(after)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+pub async fn create_producer(db: &PgPool, producer: &CatalogProducer) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO producers (name, subject, description, enabled) VALUES ($1, $2, $3, $4)
+         RETURNING id",
+    )
+    .bind(&producer.name)
+    .bind(&producer.subject)
+    .bind(&producer.description)
+    .bind(producer.enabled)
+    .fetch_one(db)
+    .await
+}
+
+/// Saves the producer as edited, with the texts that changed in its
+/// history, all or nothing
+pub async fn update_producer(
+    db: &PgPool,
+    user: Uuid,
+    before: &CatalogProducer,
+    after: &CatalogProducer,
+) -> sqlx::Result<()> {
+    let mut tx = db.begin().await?;
+    record_text_changes(
+        &mut tx,
+        user,
+        Texts::Producer(before.id),
+        &[
+            ("name", &before.name, &after.name),
+            ("subject", &before.subject, &after.subject),
+            ("description", &before.description, &after.description),
+        ],
+    )
+    .await?;
+    sqlx::query(
+        "UPDATE producers SET name = $2, subject = $3, description = $4, enabled = $5
+         WHERE id = $1",
+    )
+    .bind(before.id)
+    .bind(&after.name)
+    .bind(&after.subject)
+    .bind(&after.description)
+    .bind(after.enabled)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await
+}
+
+/// Deletes a producer without products, and its text history; false (and
+/// nothing deleted) if it has any
+pub async fn delete_producer(db: &PgPool, id: Uuid) -> sqlx::Result<bool> {
+    let deleted = sqlx::query(
+        "DELETE FROM producers WHERE id = $1
+           AND NOT EXISTS (SELECT 1 FROM products WHERE producer_id = $1)",
+    )
+    .bind(id)
+    .execute(db)
+    .await?;
+    Ok(deleted.rows_affected() == 1)
+}

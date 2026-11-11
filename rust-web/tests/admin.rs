@@ -1672,3 +1672,161 @@ async fn the_email_lists(db: PgPool) -> TestResult {
     }
     Ok(())
 }
+
+async fn a_producer(db: &PgPool, name: &str) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO producers (name, subject, description) VALUES ($1, 'Aihe', 'Kuvaus') RETURNING id",
+    )
+    .bind(name)
+    .fetch_one(db)
+    .await
+}
+
+#[sqlx::test(migrations = false)]
+async fn producers_are_added_and_changed_with_their_history(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/CreateProducer",
+        &boss,
+        &[("name", "Uusi Oy"), ("enabled", "off")],
+    )
+    .await?;
+    let (id, enabled): (Uuid, bool) = sqlx::query_as("SELECT id, enabled FROM producers")
+        .fetch_one(&db)
+        .await?;
+    assert!(!enabled);
+    assert_eq!(
+        location(&response),
+        format!("/admin/ShowProducer?producerId={id}")
+    );
+
+    // An admin's change of the name is in the history; of the rest, the texts
+    let update = format!("/admin/UpdateProducer?producerId={id}");
+    send(
+        &app,
+        Method::POST,
+        &update,
+        &boss,
+        &[("name", "Toinen Oy"), ("enabled", "on"), ("enabled", "off")],
+    )
+    .await?;
+    let shown = text(
+        send(
+            &app,
+            Method::GET,
+            &format!("/admin/ShowProducer?producerId={id}"),
+            &boss,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(
+        shown.contains(" · boss@example.com · name</summary>"),
+        "{shown}"
+    );
+    assert!(shown.contains("<p class=\"whitespace-pre-line\">Was: Uusi Oy</p>"));
+    let (name, enabled): (String, bool) = sqlx::query_as("SELECT name, enabled FROM producers")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!((name.as_str(), enabled), ("Toinen Oy", true));
+
+    // A promoter changes only the texts; the name and whether it's shown stay
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    let edit = text(
+        send(
+            &app,
+            Method::GET,
+            &format!("/admin/EditProducer?producerId={id}"),
+            &promoter,
+            &[],
+        )
+        .await?,
+    )
+    .await?;
+    assert!(edit.contains("<p>Name: Toinen Oy</p>") && !edit.contains(r#"name="name""#));
+    assert!(!edit.contains("js-delete"));
+    send(
+        &app,
+        Method::POST,
+        &update,
+        &promoter,
+        &[("name", "Ei"), ("subject", "Uusi"), ("enabled", "off")],
+    )
+    .await?;
+    let row: (String, String, bool) =
+        sqlx::query_as("SELECT name, subject, enabled FROM producers")
+            .fetch_one(&db)
+            .await?;
+    assert_eq!(row, ("Toinen Oy".to_string(), "Uusi".to_string(), true));
+    let changes: Vec<String> = sqlx::query_scalar(
+        "SELECT field_name || ' by ' || email FROM text_changes JOIN users ON users.id = user_id
+         ORDER BY text_changes.created_at",
+    )
+    .fetch_all(&db)
+    .await?;
+    assert_eq!(
+        changes,
+        ["name by boss@example.com", "subject by promo@example.com"]
+    );
+
+    for (method, uri) in [
+        (Method::GET, "/admin/NewProducer".to_string()),
+        (
+            Method::DELETE,
+            format!("/admin/DeleteProducer?producerId={id}"),
+        ),
+    ] {
+        let response = send(&app, method, &uri, &promoter, &[]).await?;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{uri}");
+    }
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn a_producer_with_products_stays(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let empty = a_producer(&db, "Tyhjä").await?;
+    let full = a_producer(&db, "Täysi").await?;
+    sqlx::query("INSERT INTO products (producer_id, name, description, package, price) VALUES ($1, 'P', '', '1 l', 100)")
+        .bind(full)
+        .execute(&db)
+        .await?;
+    let response = send(
+        &app,
+        Method::DELETE,
+        &format!("/admin/DeleteProducer?producerId={full}"),
+        &boss,
+        &[],
+    )
+    .await?;
+    assert_eq!(
+        location(&response),
+        format!("/admin/EditProducer?producerId={full}")
+    );
+    assert!(
+        session_after(&response, &boss)
+            .get_text(FLASH_ERROR)
+            .is_some()
+    );
+    let response = send(
+        &app,
+        Method::POST,
+        &format!("/admin/DeleteProducer?producerId={empty}"),
+        &boss,
+        &[("_method", "DELETE")],
+    )
+    .await?;
+    assert_eq!(location(&response), "/admin/Producers");
+    let left: Vec<String> = sqlx::query_scalar("SELECT name FROM producers")
+        .fetch_all(&db)
+        .await?;
+    assert_eq!(left, ["Täysi"]);
+    Ok(())
+}

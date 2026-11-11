@@ -7,7 +7,9 @@
 
 pub mod admin;
 pub mod admin_customers;
+pub mod admin_forms;
 pub mod admin_orders;
+pub mod admin_producers;
 pub mod admin_texts;
 pub mod db;
 pub mod l10n;
@@ -462,6 +464,31 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/EmailsForNewsLetter",
             get(admin_customers::newsletter_emails).post(admin_customers::newsletter_emails),
+        )
+        .route(
+            "/admin/Producers",
+            get(admin_producers::list).post(admin_producers::list),
+        )
+        .route(
+            "/admin/NewProducer",
+            get(admin_producers::new).post(admin_producers::new),
+        )
+        .route(
+            "/admin/ShowProducer",
+            get(admin_producers::show).post(admin_producers::show),
+        )
+        .route(
+            "/admin/EditProducer",
+            get(admin_producers::edit).post(admin_producers::edit),
+        )
+        .route("/admin/CreateProducer", post(admin_producers::create))
+        .route(
+            "/admin/UpdateProducer",
+            post(admin_producers::update).patch(admin_producers::update),
+        )
+        .route(
+            "/admin/DeleteProducer",
+            delete(admin_producers::delete).post(admin_producers::delete_by_post),
         )
         .route(
             "/admin/NewOrder",

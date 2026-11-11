@@ -224,7 +224,7 @@ the admin's login and logout (`/admin/NewSession` and the like), the demo's
 one-click logins included, the admin's welcome page with its menu, and its
 orders: the list, an order's page and its buttons, a new order taken in the
 admin, and all ordered products; the welcome messages and payment
-instructions; and the customers and the email lists: it reads and writes IHP's session cookie with the
+instructions; the customers and the email lists; and the producers: it reads and writes IHP's session cookie with the
 instance's session key and checks IHP's password hashes, so a login there is
 a login in the IHP app's admin, and logins and lockouts carry over both ways.
 nginx sends these pages to it and the rest to the IHP app with
