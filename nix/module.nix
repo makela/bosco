@@ -349,9 +349,9 @@ let
       # the Finnish one, Fixtures.sql, when there's none
       fixtures =
         let
-          localized = "${instance.flake}/Application/Fixtures.${instance.locale}.sql";
+          localized = "${instance.flake}/db/Fixtures.${instance.locale}.sql";
         in
-        if builtins.pathExists localized then localized else "${instance.flake}/Application/Fixtures.sql";
+        if builtins.pathExists localized then localized else "${instance.flake}/db/Fixtures.sql";
 
       after = [
         "network.target"
@@ -408,12 +408,12 @@ let
         requires = [ "postgresql.service" ];
         environment = {
           DATABASE_URL = databaseUrl;
-          IHP_MIGRATION_DIR = "${instance.flake}/Application/Migration/";
+          IHP_MIGRATION_DIR = "${instance.flake}/db/Migration/";
           MINIMUM_REVISION = toString instance.minimumRevision;
         }
         // lib.optionalAttrs instance.bootstrapSchema {
           IHP_SCHEMA = "${instance.flake}/db/IHPSchema.sql";
-          APP_SCHEMA = "${instance.flake}/Application/Schema.sql";
+          APP_SCHEMA = "${instance.flake}/db/Schema.sql";
           APP_FIXTURES = fixtures;
         };
         serviceConfig = serviceConfig // {

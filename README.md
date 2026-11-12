@@ -12,50 +12,50 @@ runs any number of them on one server.
 The site was built with [IHP](https://ihp.digitallyinduced.com/) (Haskell)
 and now runs in Rust (`rust-web/`, with axum, maud and SQLx), on the same
 database: the public site, the admin, the email worker, the migrations and
-the scripts. The NixOS module runs only the Rust programs (see "From the IHP
-app" below). The IHP app's code is still here for its dev environment, which
-is the project's until it has a replacement.
+the scripts. The Haskell code is gone; see "From the IHP app" below for
+what that changed on a server.
 
 ## Development
 
+In the dev shell (`nix develop`, or with direnv `use flake` after a
+`direnv allow`), which also enables the pre-push hook:
+
 ```sh
-devenv up        # the site at http://localhost:8000, the IDE at :8001
-make seed-dev    # orders, customers and logins to browse, in a fresh dev database
-make check       # all the tests, see below
+just dev      # the site at http://localhost:8003 and its email worker
+just seed     # orders, customers and logins to browse, in a fresh dev database
+just check    # lints, the tests, the NixOS module and the migrations
+just          # the other recipes, e.g. psql, db-reset, check-all
 ```
 
-The dev site is in Finnish. To try another language, set `APP_LOCALE=fr` (or
-`en`) in `.env` and restart `devenv up`. Texts are in
-`Application/Localization.hs`; a test fails if a language misses one.
+`just dev` starts a PostgreSQL of its own in `.dev/`, where it also keeps
+the session key and the logs. A new database gets the schema, the Finnish
+catalog and the migrations, as a new staging instance does. The site and the
+worker are rebuilt and restarted when their code changes, and the
+stylesheet when the markup does. The worker only logs the emails it would
+send (`SEND_EMAILS=0`).
 
-`.env` is read by `.envrc`, so it only takes effect once direnv is allowed
-to run it: `direnv allow` in the project directory (again whenever
-`.envrc` changes; `direnv status` says "Found RC allowed 0" when it is).
-Without direnv, set the variables for one run instead, e.g.
-`APP_LOCALE=en devenv up`.
+The dev site is in Finnish. To try another language, set `APP_LOCALE=fr` (or
+`en`) in `.env` and restart `just dev`, or run `APP_LOCALE=en just dev`. The
+texts are in `rust-web/src/l10n.rs`, where the compiler refuses a text that
+misses a language.
+
+The code is in `rust-web/` (see its README), the database in `db/`: the
+schema (`Schema.sql`), the migrations, the catalogs (`Fixtures*.sql`) and
+IHP's base schema (`IHPSchema.sql`), which a new database starts with.
 
 ### Tests
 
-- `Test/Main.hs`: unit tests, no database needed.
-- `Test/Integration.hs`: tests that use the controllers and a database.
+- `rust-web/tests/` and the unit tests in `rust-web/src/`: `just test`, each
+  test on a database of its own in a throwaway PostgreSQL.
 - `nix/tests/module.nix`: evaluates the NixOS module below.
 - `nix/tests/migrations.nix`: bootstraps a staging database and migrates a
   copy of production's schema with the deployment's own programs.
 
-`make check` runs all of them as the flake's checks, starting its own
-PostgreSQL, and builds the app and the Rust site. A change rebuilds only
-what depends on it: a change to `rust-web/` doesn't rebuild the IHP app,
-and the Rust site's dependencies are compiled again only when its
-`Cargo.lock` changes. It leaves out the app's optimized (`-O2`) build,
-which only compiles the same code more slowly; `make check-all` runs that
-too. The build's whole log is in `.devenv/check.log`. New files must be
-`git add`ed before the flake can see them. A pre-push hook in `.githooks/`
-runs `make check-all` before every push (`git push --no-verify` skips it).
-Enable it once per clone:
-
-```sh
-git config core.hooksPath .githooks
-```
+`just check` runs them all, with `cargo fmt` and clippy. `just check-all`
+runs every check of the flake (`nix flake check`), which also builds the
+release programs and runs the Rust tests in the Nix sandbox; the pre-push
+hook in `.githooks/` runs it before every push (`git push --no-verify`
+skips it). New files must be `git add`ed before the flake can see them.
 
 ## Deployment
 
@@ -186,14 +186,14 @@ with "[Demo]", the invoice says not to pay it and search engines are asked
 not to index the site. A demo must have `sendEmails = false`; the module and
 the server both refuse to start one that sends emails. Its invoices always
 show fake payment details (IBAN `FI00 0000 0000 0000 00`, from
-`Application/Demo.hs`) whatever the database holds, and its admin can't
+`rust-web/src/views.rs`) whatever the database holds, and its admin can't
 create, edit or delete payment instructions, so no visitor can put a real
 account on the demo's invoices. For the same reason the welcome message's
 text is fixed: visitors can open and close ordering, but not create, delete
 or reword messages.
 
 The demo's admin login page has one-click logins for everyone: an admin, a
-delivery person and a promoter (`Application/Demo.hs`). Their users
+delivery person and a promoter (`rust-web/src/admin.rs`). Their users
 are made on first use with a random password nobody knows, so they can't be
 locked by typing wrong passwords, and their passwords can't be changed. Your
 own admin login, made with `CreateUser`, works as usual.
@@ -231,13 +231,16 @@ programs, so:
   saying what to do instead.
 
 Logins carried over: the site reads the session cookie the IHP app made,
-with the same key, and checks the password hashes it made.
+with the same key, and checks the password hashes it made. Settings keep
+their IHP names, e.g. `IHP_BASEURL` and `IHP_SESSION_SECRET_FILE`. The
+database still starts from IHP's base schema (`db/IHPSchema.sql`), and the
+email jobs keep its `JOB_STATUS`.
 `rust-web/README.md` lists the few ways the Rust site behaves differently.
 
 ### Users and roles
 
 A login has one or more roles, and may do whatever any of them allows
-(`Application/Permission.hs`):
+(`rust-web/src/permission.rs`):
 
 - admin: everything;
 - deliverer: sees orders and their details, takes orders for customers in
@@ -282,7 +285,7 @@ None of these go into the Nix store, which every user of the server can read.
 1. Find the last migration the current database has. If it has a
    `schema_migrations` table, that lists them:
    `SELECT max(revision) FROM schema_migrations`. Otherwise it is the newest
-   file in `Application/Migration/` that was applied by hand. Set it as the
+   file in `db/Migration/` that was applied by hand. Set it as the
    `fi` instance's `minimumRevision` (1760540031 above).
 2. Clone the repository to `/srv/bosco`, add the configuration above and run
    `sudo nixos-rebuild switch`. The first build takes a while and needs

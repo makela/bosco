@@ -18,7 +18,7 @@ const IHP_SCHEMA: &str = include_str!("../../db/IHPSchema.sql");
 /// The schema, a product and payment instructions
 async fn shop(db: &PgPool) -> Result<Product, Box<dyn std::error::Error>> {
     sqlx::raw_sql(IHP_SCHEMA).execute(db).await?;
-    sqlx::raw_sql(include_str!("../../Application/Schema.sql"))
+    sqlx::raw_sql(include_str!("../../db/Schema.sql"))
         .execute(db)
         .await?;
     let producer: Uuid = sqlx::query_scalar(

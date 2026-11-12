@@ -198,7 +198,7 @@ let
 
     testMigrationsComeFromTheCheckout = {
       expr = services.bosco-fi-migrate.environment.IHP_MIGRATION_DIR;
-      expected = "${self}/Application/Migration/";
+      expected = "${self}/db/Migration/";
     };
 
     testMinimumRevisionIsPerInstance = {
@@ -226,7 +226,7 @@ let
       };
       expected = {
         program = true;
-        schema = "${self}/Application/Schema.sql";
+        schema = "${self}/db/Schema.sql";
       };
     };
 
@@ -599,7 +599,7 @@ let
         program = true;
         APP_DEMO = "1";
         SEND_EMAILS = "0";
-        APP_FIXTURES = "${self}/Application/Fixtures.sql";
+        APP_FIXTURES = "${self}/db/Fixtures.sql";
         user = "bosco_demo";
         afterMigrations = true;
         timer = "*-*-* 03:00:00";
@@ -635,12 +635,12 @@ let
         };
       expected = {
         en = {
-          reset = "${self}/Application/Fixtures.en.sql";
-          bootstrap = "${self}/Application/Fixtures.en.sql";
+          reset = "${self}/db/Fixtures.en.sql";
+          bootstrap = "${self}/db/Fixtures.en.sql";
         };
         fr = {
-          reset = "${self}/Application/Fixtures.sql";
-          bootstrap = "${self}/Application/Fixtures.sql";
+          reset = "${self}/db/Fixtures.sql";
+          bootstrap = "${self}/db/Fixtures.sql";
         };
       };
     };

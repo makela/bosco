@@ -11,11 +11,11 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 /// What IHP put in a database before the app's schema
 const IHP_SCHEMA: &str = include_str!("../../db/IHPSchema.sql");
 
-const FIXTURES: &str = include_str!("../../Application/Fixtures.sql");
+const FIXTURES: &str = include_str!("../../db/Fixtures.sql");
 
 async fn schema(db: &PgPool) -> TestResult {
     sqlx::raw_sql(IHP_SCHEMA).execute(db).await?;
-    sqlx::raw_sql(include_str!("../../Application/Schema.sql"))
+    sqlx::raw_sql(include_str!("../../db/Schema.sql"))
         .execute(db)
         .await?;
     Ok(())

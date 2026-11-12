@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the tests against a throwaway PostgreSQL in a temporary directory,
-# which is removed afterwards. In the dev shell: nix develop path:. -c ./test.sh
-# Extra arguments go to cargo test, e.g. ./test.sh refuses
+# which is removed afterwards: `just test` in the dev shell. Extra arguments
+# go to cargo test, e.g. `just test refuses`
 set -euo pipefail
 dir=$(mktemp -d)
 export PGDATA="$dir/data" PGHOST="$dir/socket"

@@ -32,7 +32,7 @@ fn key() -> Key {
 /// The schema and an admin, Admin@Example.com with the password "salasana"
 async fn admin(db: &PgPool) -> Result<Uuid, Box<dyn std::error::Error>> {
     sqlx::raw_sql(IHP_SCHEMA).execute(db).await?;
-    sqlx::raw_sql(include_str!("../../Application/Schema.sql"))
+    sqlx::raw_sql(include_str!("../../db/Schema.sql"))
         .execute(db)
         .await?;
     Ok(sqlx::query_scalar(

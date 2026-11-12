@@ -1,18 +1,16 @@
 # Bosco in Rust
 
-The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
+The site, ported from the IHP app's `Web/` to Rust ([axum](https://github.com/tokio-rs/axum),
 [maud](https://maud.lambda.xyz/), [SQLx](https://github.com/launchbadge/sqlx)):
 the welcome message, the order form, an order's invoice and the newsletter
 form, in Finnish, English or French, demo mode included; the whole admin,
 `Admin/`; and the email worker, IHP's job runner with
-`Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it is,
-so both can run at once, and either app's worker emails the invoices of
-either app's orders, as each order saves its email job the same way.
+`Web/Job/EmailOrder.hs`. It uses the IHP app's PostgreSQL database as it
+was, and the IHP app is gone (see the project's README).
 
 The login uses IHP's session cookie, `SESSION`, encrypted and signed as IHP
-does with the IHP app's key, and IHP's password hashes, so a login here
-lets one into the IHP app's admin pages, the two show each other's flash
-messages, and a login IHP sent here goes back to the admin page asked for.
+did with the instance's key, and IHP's password hashes, so the logins and
+passwords made in the IHP app still work.
 
 The addresses are the IHP app's (`/`, `/NewOrder`, `/CreateOrder`,
 `/ShowOrder?orderId=…`, `/NewEmail`, `/CreateEmail`), so links in sent
@@ -20,7 +18,7 @@ emails keep working, and the markup and classes are the same, so
 `tailwind/app.css` styles it.
 
 - `src/lib.rs`: the routes and what they do
-- `src/db.rs`: the queries, on the tables of `Application/Schema.sql`
+- `src/db.rs`: the queries, on the tables of `db/Schema.sql`
 - `src/views.rs`: the pages, from `Web/View`
 - `src/validate.rs`: the forms' checks, from `Application/Helper/Controller.hs`
 - `src/l10n.rs`: the texts, generated from `Application/Localization.hs`
@@ -68,40 +66,26 @@ emails keep working, and the markup and classes are the same, so
 
 ## Use
 
-`devenv up` in the project runs the site at http://localhost:8003 next to
-the IHP app's (8000), on the same database, and builds and restarts it when
-its code changes (the `rust-web` process in the project's `flake.nix`). The
-first build takes a few minutes. Its log is the process's in `devenv up`.
+`just dev` in the project runs the site at http://localhost:8003 and the
+email worker, on the development database in `.dev/`, and builds and
+restarts them when their code changes; see the project's README and
+Justfile. The first build takes a few minutes. The worker only logs the
+emails (`SEND_EMAILS=0`); its SMTP settings are in
+`src/bin/bosco-worker.rs`.
 
-The admin's login at http://localhost:8003/admin/NewSession uses the IHP
-app's session key in `Config/client_session_key.aes`, so a login there works
-at http://localhost:8000/admin/ too (cookies don't tell ports apart, but
-`localhost` and `127.0.0.1` are different hosts to them).
-
-`APP_LOCALE` and `APP_DEMO` work as for the IHP app; `ADDR`, `STATIC_DIR`
-and `ASSET_VERSION` are in `src/main.rs`. To run it by hand (with `devenv up`
-stopped, or another `ADDR`), in the project's dev shell (`nix develop`),
-which has the database's `DATABASE_URL`:
+`APP_LOCALE` and `APP_DEMO` work as for the IHP app; `ADDR`, `STATIC_DIR`,
+`ASSET_VERSION` and the session key's `IHP_SESSION_SECRET_FILE` are in
+`src/main.rs`. The Justfile sets the ones development needs, and `just run`
+runs any of the programs with them, e.g. a login of one's own:
 
 ```sh
-cd rust-web
-nix develop path:. -c cargo run
+ADMIN_EMAIL=me@example.com ADMIN_PASSWORD=… just run bosco-create-user
 ```
 
-The email worker, instead of `devenv up`'s IHP worker or beside it, the same
-way:
-
-```sh
-SEND_EMAILS=0 nix develop path:. -c cargo run --bin bosco-worker
-```
-
-With `SEND_EMAILS=0` it only logs the emails. Its SMTP settings are the IHP
-app's, see `src/bin/bosco-worker.rs`.
-
-`./test.sh` runs the tests against a throwaway PostgreSQL. Each test gets a
-database of its own with IHP's base schema and `Application/Schema.sql`, so a
-change to the schema shows here at once. Most are the IHP app's own tests of
-`Web/` (`Test/Web`), ported.
+`just test` runs the tests against a throwaway PostgreSQL. Each test gets a
+database of its own with IHP's base schema (`db/IHPSchema.sql`) and
+`db/Schema.sql`, so a change to the schema shows here at once. Most are the
+IHP app's own tests of `Web/` (`Test/Web`), ported.
 
 ## Differences from the IHP app
 

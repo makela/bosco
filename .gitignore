@@ -1,28 +1,13 @@
-.DS_Store
-.devenv*
-devenv.local.nix
+# The development database, session key and logs, see the Justfile
+.dev
 .direnv
 .env
-.idea
-tmp
 result
-node_modules
-/bin
-*.iml
-Generated
-dist
-*.dyn_hi
-*.dyn_o
-*.hi
-*.o
-build
-gen
-del
-static/prod.*
-Config/client_session_key.aes
-
-# Ignore locally checked out IHP version
-IHP
-
+# Built by `just dev` from tailwind/app.css
 static/app.css
+.DS_Store
 *.swp
+# Left behind by the IHP app's development environment
+.devenv*
+build
+Config

@@ -1,5 +1,5 @@
 -- Production's schema before the deploy that introduced the NixOS module:
--- Application/Schema.sql as of migration 1760540031, plus the helper function
+-- db/Schema.sql as of migration 1760540031, plus the helper function
 -- migration 1759991022 created and Schema.sql never listed.
 
 -- Your database schema. Use the Schema Designer at http://localhost:8001/ to add some tables.

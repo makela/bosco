@@ -8,13 +8,13 @@
 //! - `SEND_EMAILS`: 0 when the instance sends no emails, as the admin's
 //!   order pages then say
 //! - `STATIC_DIR`: the stylesheet, scripts and images, `../static` by
-//!   default, where `devenv up` builds the stylesheet; in production
+//!   default, where `just dev` builds the stylesheet; in production
 //!   nix/rust-static.nix's
 //! - `ASSET_VERSION`: in production, the static files' version, which the
 //!   stylesheet's and scripts' addresses have
-//! - `IHP_SESSION_SECRET_FILE`: the IHP app's session key, by default
-//!   `../Config/client_session_key.aes` as in its development; made if
-//!   there's none, as IHP does
+//! - `IHP_SESSION_SECRET_FILE`: the session cookies' key, by default
+//!   `../.dev/session.aes`, where `just dev` keeps the development state;
+//!   made if there's none. The name is the IHP app's, whose key it was
 //! - `IHP_BASEURL`: the instance's address, e.g. `https://example.com`: the
 //!   pages' og:url, and with https, the session cookie is only sent over
 //!   HTTPS
@@ -44,13 +44,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let demo = flag("APP_DEMO", false)?;
     let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?;
     let addr = setting("ADDR", "127.0.0.1:8003");
-    let session_key = Key::load_or_create(
-        setting(
-            "IHP_SESSION_SECRET_FILE",
-            "../Config/client_session_key.aes",
-        )
-        .as_ref(),
-    )?;
+    let session_key =
+        Key::load_or_create(setting("IHP_SESSION_SECRET_FILE", "../.dev/session.aes").as_ref())?;
     let asset_version = Some(setting("ASSET_VERSION", "")).filter(|v| !v.is_empty());
 
     let db = PgPoolOptions::new()

@@ -4,16 +4,12 @@
 //! subscribers, a welcome message, payment instructions and a login for
 //! each role: admin, delivery person and promoter. The passwords are
 //! printed at the end. The catalog must be there already (the fixtures,
-//! which `devenv up` loads into a new database).
+//! which `just db` loads into a new database).
 //!
 //! It refuses to run when the database already has orders, so it can't add
 //! made-up orders to a database that holds real ones. No email jobs are
-//! made, so nothing gets sent. `DATABASE_URL` is the database, as in the
-//! project's dev shell:
-//!
-//! ```sh
-//! cd rust-web && nix develop path:. -c cargo run --bin bosco-seed-dev
-//! ```
+//! made, so nothing gets sent. `DATABASE_URL` is the database; in the
+//! project's dev shell, `just seed` runs it on the development database.
 
 use std::env;
 

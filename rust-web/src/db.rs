@@ -1,4 +1,4 @@
-//! The public site's queries, on the IHP app's tables (`Application/Schema.sql`)
+//! The public site's queries, on the IHP app's tables (`db/Schema.sql`)
 //! as they are: the same database, both apps at once.
 
 use std::collections::HashMap;

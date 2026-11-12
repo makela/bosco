@@ -7,7 +7,7 @@
 //! - `DATABASE_URL`: the demo's database
 //! - `APP_DEMO`: must be 1: it refuses to run otherwise, so it can't empty a
 //!   real shop
-//! - `APP_FIXTURES`: the fixtures file, `../Application/Fixtures.sql` by
+//! - `APP_FIXTURES`: the fixtures file, `../db/Fixtures.sql` by
 //!   default
 
 use std::env;
@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "APP_DEMO is off: this would empty a real shop's orders. Not resetting.".into(),
         );
     }
-    let path = setting("APP_FIXTURES", "../Application/Fixtures.sql");
+    let path = setting("APP_FIXTURES", "../db/Fixtures.sql");
     let fixtures = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
     let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?;
     let db = PgPoolOptions::new()

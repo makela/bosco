@@ -1,6 +1,6 @@
 //! The public site against a real PostgreSQL: each test gets a database of
 //! its own (`sqlx::test`) with IHP's base schema and the IHP app's
-//! `Application/Schema.sql`, so the tables are the ones the IHP app uses.
+//! `db/Schema.sql`, so the tables are the ones the IHP app uses.
 //! Mostly the IHP app's own tests of `Web/` (Test/Web), ported. Run with
 //! `./test.sh`, which starts a throwaway PostgreSQL.
 
@@ -25,7 +25,7 @@ const IHP_SCHEMA: &str = include_str!("../../db/IHPSchema.sql");
 
 async fn schema(db: &PgPool) -> TestResult {
     sqlx::raw_sql(IHP_SCHEMA).execute(db).await?;
-    sqlx::raw_sql(include_str!("../../Application/Schema.sql"))
+    sqlx::raw_sql(include_str!("../../db/Schema.sql"))
         .execute(db)
         .await?;
     Ok(())

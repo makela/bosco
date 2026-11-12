@@ -28,8 +28,8 @@ let
         ../rust-web/tests
         ../rust-web/test.sh
         ../db/IHPSchema.sql
-        ../Application/Schema.sql
-        ../Application/Fixtures.sql
+        ../db/Schema.sql
+        ../db/Fixtures.sql
         ../static/img/logo.jpg
       ];
     };

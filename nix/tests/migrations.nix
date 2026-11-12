@@ -1,5 +1,5 @@
 # Runs the deployment's database steps against a temporary PostgreSQL, with
-# IHP's migrate program and bootstrap-schema as the NixOS module runs them:
+# bosco-migrate and bootstrap-schema as the NixOS module runs them:
 #
 # - a new staging database gets the schema, the fixtures and every migration
 # - production, at the schema of migration 1760540031 with some data, gets the
@@ -33,9 +33,9 @@ pkgs.runCommand "deploy-migration-tests"
     trap 'pg_ctl -D "$PGDATA" stop -m fast >/dev/null' EXIT
 
     export IHP_SCHEMA=${ihpSchema}
-    export APP_SCHEMA=${src}/Application/Schema.sql
-    export APP_FIXTURES=${src}/Application/Fixtures.sql
-    export IHP_MIGRATION_DIR=${src}/Application/Migration/
+    export APP_SCHEMA=${src}/db/Schema.sql
+    export APP_FIXTURES=${src}/db/Fixtures.sql
+    export IHP_MIGRATION_DIR=${src}/db/Migration/
     # Production's last migration before the NixOS deployment, as in the README
     minimumRevision=1760540031
 

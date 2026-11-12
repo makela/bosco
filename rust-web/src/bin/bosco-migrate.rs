@@ -5,7 +5,7 @@
 //! the first that fails, where IHP's went on to fail the rest. Its settings:
 //!
 //! - `DATABASE_URL`: the database
-//! - `IHP_MIGRATION_DIR`: the migrations, `../Application/Migration/` by
+//! - `IHP_MIGRATION_DIR`: the migrations, `../db/Migration/` by
 //!   default
 //! - `MINIMUM_REVISION`: older migrations are taken as part of the schema
 //!   already, for a database made from an older Schema.sql
@@ -57,7 +57,7 @@ fn migrations(dir: &Path) -> Result<Vec<Migration>, String> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL not set")?;
-    let dir = setting("IHP_MIGRATION_DIR", "../Application/Migration/");
+    let dir = setting("IHP_MIGRATION_DIR", "../db/Migration/");
     let minimum: i64 = match setting("MINIMUM_REVISION", "").trim() {
         "" => 0,
         text => text

@@ -1,4 +1,4 @@
--- What IHP puts in a database before the app's schema (Application/Schema.sql):
+-- What IHP puts in a database before the app's schema (db/Schema.sql):
 -- copied from IHP v1.6's ihp-schema-compiler/data/IHPSchema.sql (MIT License,
 -- digitally induced GmbH), so that a new database is the same as the ones IHP
 -- made, without IHP. The email jobs' status is still JOB_STATUS.
