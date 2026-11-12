@@ -53,20 +53,30 @@ pub struct Site {
     /// A public demo (`APP_DEMO`): banners, "[Demo]" titles, not indexed,
     /// and invoices with a fake account
     pub demo: bool,
-    /// The stylesheet's URL, e.g. the IHP app's dev build `/app.css`
-    pub stylesheet: String,
     /// The instance's address, `IHP_BASEURL`, e.g. `https://example.com`:
     /// the pages' og:url; none without it
     pub base_url: Option<String>,
-    /// The IHP app's assets' version in production, for the admin's
-    /// stylesheet and scripts (`/static/app.css?v=…`); none in development
+    /// The static files' version in production, in the stylesheet's and
+    /// scripts' addresses (`/static/app.css?v=…`); none in development
     pub asset_version: Option<String>,
+}
+
+impl Site {
+    /// A static file's address, with the version when there's one, e.g.
+    /// `/static/app.css?v=…`, which browsers may then keep for a year
+    pub fn asset(&self, path: &str) -> String {
+        match &self.asset_version {
+            Some(version) => format!("{path}?v={version}"),
+            None => path.to_string(),
+        }
+    }
 }
 
 pub struct AppState {
     pub db: PgPool,
     pub site: Site,
-    /// The IHP app's `static/`: the logo and the stylesheet
+    /// The static files: `static/` in development, built by
+    /// nix/rust-static.nix in production
     pub static_dir: PathBuf,
     /// The key of IHP's session cookie, the IHP app's
     pub session_key: session::Key,

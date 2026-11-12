@@ -515,10 +515,10 @@ let
     // lib.optionalAttrs instance.rustWeb.enable {
       "bosco-${name}-rust-web" =
         let
-          # The IHP app's static files: the logo, and prod.css with the same
-          # version in its address as the IHP app gives it, so a new one
-          # isn't taken from the browser's cache
-          static = instance.flake.packages.${system}.static;
+          # Its stylesheet, scripts and images (nix/rust-static.nix), with
+          # their package's hash as the version in their addresses, so a new
+          # one isn't taken from the browser's cache
+          static = instance.flake.packages.${system}.rust-static;
           assetVersion = lib.substring 0 32 (baseNameOf "${static}");
         in
         {
@@ -537,8 +537,7 @@ let
             # The admin's order pages say when emails are off
             SEND_EMAILS = if instance.sendEmails then "1" else "0";
             STATIC_DIR = "${static}";
-            STYLESHEET = "/prod.css?v=${assetVersion}";
-            # The admin's stylesheet and scripts, /static/app.css?v=…
+            # In the stylesheet's and scripts' addresses, /static/app.css?v=…
             ASSET_VERSION = assetVersion;
             # The admin's login is in IHP's session cookie, with its key
             IHP_SESSION_SECRET_FILE = "${state}/session.aes";

@@ -41,7 +41,7 @@ pub fn layout(site: &Site, flash: Option<Flash>, content: &Markup) -> Markup {
                 @if site.demo {
                     meta name="robots" content="noindex, nofollow";
                 }
-                link rel="stylesheet" href=(site.stylesheet);
+                link rel="stylesheet" href=(site.asset("/static/app.css"));
                 title { (title) }
             }
             body {

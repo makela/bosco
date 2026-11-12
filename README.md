@@ -14,10 +14,10 @@ and is being moved to Rust (`rust-web/`, with axum, maud and SQLx). The Rust
 version now does everything the IHP app does, on the same database: the
 public site, the admin, the email worker, the migrations and the scripts.
 On a server, `rustWeb.enable` and `rustWorker.enable` make an instance run
-the Rust version only (see "The public site in Rust" below). The IHP app is
-still here: it is the default, it builds the stylesheet and the scripts both
-versions use, and its dev environment is the project's. It will go once
-those have Rust replacements.
+the Rust version only (see "The public site in Rust" below). The Rust site
+has its own build of the stylesheet and scripts (`nix/rust-static.nix`). The
+IHP app is still here: it is the default, and its dev environment is the
+project's. It will go once that has a Rust replacement.
 
 ## Development
 

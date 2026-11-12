@@ -79,7 +79,7 @@ at http://localhost:8000/admin/ too (cookies don't tell ports apart, but
 `localhost` and `127.0.0.1` are different hosts to them).
 
 `APP_LOCALE` and `APP_DEMO` work as for the IHP app; `ADDR`, `STATIC_DIR`
-and `STYLESHEET` are in `src/main.rs`. To run it by hand (with `devenv up`
+and `ASSET_VERSION` are in `src/main.rs`. To run it by hand (with `devenv up`
 stopped, or another `ADDR`), in the project's dev shell (`nix develop`),
 which has the database's `DATABASE_URL`:
 
@@ -108,8 +108,11 @@ change to the schema shows here at once. Most are the IHP app's own tests of
 - **Notices** ("Order sent" and the like) are kept in a cookie by name
   rather than in IHP's session, so the two apps don't share them.
 - **No JavaScript** on the public pages: they don't load `prod.js`
-  (Turbolinks), which they don't need. The admin's login page does, as the
-  IHP app's admin pages.
+  (Turbolinks), which they don't need. The admin's pages load `app.js` and
+  `admin.js` (`static/`) instead of `prod.js`: they open external links in
+  a new tab, make the `js-delete` links ask and send a DELETE, and show
+  `date-time`s in the browser's time zone, which is all the admin uses of
+  IHP's. Pages change without Turbolinks, as plain page loads.
 - **Redirects** go to `/` instead of `/Orders` (the same page), with 303.
 - **A quantity that isn't a whole number** is answered with 400; IHP showed
   its error page. Browsers don't send one from the form.
@@ -129,9 +132,8 @@ change to the schema shows here at once. Most are the IHP app's own tests of
   "Passwords do not meet the requirements". The rules are IHP's.
 - **Static files** without a version in their address (the logo, the
   favicon) are asked about again on each visit, a 304 when unchanged; IHP
-  let browsers keep them for a year. IHP's own development scripts
-  (`/static/helpers.js`, `/static/vendor/…`) aren't served: the pages use
-  `prod.js`, which has them.
+  let browsers keep them for a year. IHP's scripts (`/static/prod.js`,
+  `/static/helpers.js`, `/static/vendor/…`) aren't served.
 - **A failed migration** stops `bosco-migrate`; IHP's `migrate` went on to
   the next, which then failed too.
 - **A login without a password field** is answered with 400; IHP's was a
@@ -177,6 +179,9 @@ package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
 check) runs these tests too.
 
 With `rustWeb.enable` and `rustWorker.enable`, nothing of the IHP app runs
-on an instance. Its code is still the source of the static files
-(`prod.css`, `prod.js`), of IHP's base schema (`IHPSchema.sql`) and of the
-dev environment; removing it is a later step.
+on an instance. Its static files are the Rust site's own,
+`nix/rust-static.nix`: the stylesheet built with Tailwind from
+`tailwind/app.css` for the Rust site's markup only, `static/app.js`,
+`static/admin.js` and the images. IHP is still the source of its base
+schema (`IHPSchema.sql`) and of the dev environment; removing it is a later
+step.

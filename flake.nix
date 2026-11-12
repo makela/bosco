@@ -84,6 +84,8 @@
                 # The public site in Rust, see rust-web/ and the rustWeb option
                 # of nix/module.nix; the check runs its tests too
                 packages.rust-web = pkgs.callPackage ./nix/rust-web.nix { inherit craneLib; };
+                # Its stylesheet, scripts and images, see nix/rust-static.nix
+                packages.rust-static = pkgs.callPackage ./nix/rust-static.nix { };
                 checks.rust-web-tests = pkgs.callPackage ./nix/rust-web.nix { inherit craneLib; runTests = true; };
 
                 checks.nixos-module = import ./nix/tests/module.nix {

@@ -107,10 +107,7 @@ pub(crate) fn page(state: &AppState, mut session: Session, content: &Markup) -> 
     } else {
         "Manage Bosco Falconeria"
     };
-    let asset = |path: &str| match &site.asset_version {
-        Some(version) => format!("{path}?v={version}"),
-        None => path.to_string(),
-    };
+    let asset = |path: &str| site.asset(path);
     let markup = html! {
         (DOCTYPE)
         html lang="fi" {
@@ -121,10 +118,9 @@ pub(crate) fn page(state: &AppState, mut session: Session, content: &Markup) -> 
                     meta name="robots" content="noindex, nofollow";
                 }
                 link rel="stylesheet" href=(asset("/static/app.css"));
-                // The IHP app's scripts, in production
-                @if site.asset_version.is_some() {
-                    script src=(asset("/static/prod.js")) {}
-                }
+                // External links in a new tab; the js-delete links and local times
+                script src=(asset("/static/app.js")) defer {}
+                script src=(asset("/static/admin.js")) defer {}
                 title { (title) }
             }
             body {

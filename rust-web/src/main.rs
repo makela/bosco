@@ -7,11 +7,11 @@
 //! - `APP_DEMO`: 1 for a public demo
 //! - `SEND_EMAILS`: 0 when the instance sends no emails, as the admin's
 //!   order pages then say
-//! - `STATIC_DIR`: the IHP app's `static/`, `../static` by default
-//! - `STYLESHEET`: the stylesheet's URL, `/app.css` (the IHP app's dev
-//!   build, see `devenv up`) by default
-//! - `ASSET_VERSION`: in production, the IHP app's static files' version,
-//!   which the admin's addresses of them have (`IHP_ASSET_VERSION`)
+//! - `STATIC_DIR`: the stylesheet, scripts and images, `../static` by
+//!   default, where `devenv up` builds the stylesheet; in production
+//!   nix/rust-static.nix's
+//! - `ASSET_VERSION`: in production, the static files' version, which the
+//!   stylesheet's and scripts' addresses have
 //! - `IHP_SESSION_SECRET_FILE`: the IHP app's session key, by default
 //!   `../Config/client_session_key.aes` as in its development; made if
 //!   there's none, as IHP does
@@ -62,7 +62,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         site: Site {
             locale,
             demo,
-            stylesheet: setting("STYLESHEET", "/app.css"),
             asset_version,
             base_url: Some(setting("IHP_BASEURL", "")).filter(|url| !url.is_empty()),
         },

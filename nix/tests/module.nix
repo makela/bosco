@@ -376,7 +376,7 @@ let
             };
           };
           rust = demo.systemd.services.bosco-demo-rust-web;
-          static = "${self.packages.${system}.static}";
+          static = "${self.packages.${system}.rust-static}";
         in
         {
           program = lib.hasSuffix "/bin/bosco-web" rust.serviceConfig.ExecStart;
@@ -390,7 +390,7 @@ let
             IHP_SESSION_SECRET_FILE
             IHP_BASEURL
             ;
-          stylesheet = rust.environment.STYLESHEET == "/prod.css?v=${lib.substring 0 32 (baseNameOf static)}";
+          stylesheet = !(rust.environment ? STYLESHEET);
           assetVersion = rust.environment.ASSET_VERSION == lib.substring 0 32 (baseNameOf static);
           # The same key as the IHP app's (its worker's here)
           sessionKey = rust.environment.IHP_SESSION_SECRET_FILE == demo.systemd.services.bosco-demo-worker.environment.IHP_SESSION_SECRET_FILE;
@@ -407,7 +407,7 @@ let
         APP_LOCALE = "en";
         APP_DEMO = "1";
         SEND_EMAILS = "0";
-        STATIC_DIR = "${self.packages.${system}.static}";
+        STATIC_DIR = "${self.packages.${system}.rust-static}";
         IHP_SESSION_SECRET_FILE = "/var/lib/bosco-demo/session.aes";
         IHP_BASEURL = "https://demo.example.com";
         stylesheet = true;

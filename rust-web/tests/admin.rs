@@ -52,7 +52,6 @@ fn site(db: PgPool, demo: bool) -> Router {
         site: Site {
             locale: Locale::Fi,
             demo,
-            stylesheet: "/app.css".into(),
             asset_version: Some("v1".into()),
             base_url: None,
         },
@@ -156,7 +155,9 @@ async fn the_login_page(db: PgPool) -> TestResult {
     let page = text(response).await?;
     assert!(page.contains("<title>Manage Bosco Falconeria</title>"));
     assert!(page.contains(r#"<link rel="stylesheet" href="/static/app.css?v=v1">"#));
-    assert!(page.contains(r#"<script src="/static/prod.js?v=v1"></script>"#));
+    assert!(page.contains(r#"<script src="/static/app.js?v=v1" defer></script>"#));
+    assert!(page.contains(r#"<script src="/static/admin.js?v=v1" defer></script>"#));
+    assert!(!page.contains("prod.js"), "{page}");
     assert!(page.contains(r#"<form method="POST" action="/admin/CreateSession">"#));
     assert!(page.contains(
         r#"<input name="email" value="" type="email" class="form-control" placeholder="Email" aria-label="Email" required autofocus>"#

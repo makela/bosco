@@ -40,7 +40,6 @@ fn site(db: PgPool, demo: bool) -> Router {
         site: Site {
             locale: Locale::Fi,
             demo,
-            stylesheet: "/app.css".into(),
             asset_version: None,
             base_url: None,
         },
@@ -269,6 +268,9 @@ async fn front_page_shows_the_welcome_message_and_the_order_button(db: PgPool) -
     assert!(page.contains(r#"href="/NewOrder""#));
     assert!(page.contains(r#"<html lang="fi">"#));
     assert!(page.contains("<title>Bosco Falconeria Öljytilaus</title>"));
+    // In development, without a version; no scripts on the public pages
+    assert!(page.contains(r#"<link rel="stylesheet" href="/static/app.css">"#));
+    assert!(!page.contains("<script"), "{page}");
 
     welcome(&db, "Tilaukset on suljettu", false).await?;
     let page = body(get(&app, "/Orders").await?).await?;
