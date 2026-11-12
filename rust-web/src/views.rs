@@ -46,7 +46,13 @@ pub fn layout(site: &Site, flash: Option<Flash>, content: &Markup) -> Markup {
             }
             body {
                 @if site.demo {
-                    div.demo-banner role="note" { (t(Text::DemoBanner)) }
+                    div.demo-banner role="note" {
+                        (t(Text::DemoBanner)) " "
+                        // The admin's login page, with its one-click logins
+                        (t(Text::DemoAdminBefore))
+                        a href="/admin/NewSession" { (t(Text::DemoAdminLink)) }
+                        (t(Text::DemoAdminAfter))
+                    }
                     div.demo-ribbon aria-hidden="true" { "DEMO" }
                 }
                 div.container {

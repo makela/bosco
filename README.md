@@ -193,7 +193,8 @@ text is fixed: visitors can open and close ordering, but not create, delete
 or reword messages.
 
 The demo's admin login page has one-click logins for everyone: an admin, a
-delivery person and a promoter (`rust-web/src/admin.rs`). Their users
+delivery person and a promoter (`rust-web/src/admin.rs`). The banner on the
+public pages invites visitors there. Their users
 are made on first use with a random password nobody knows, so they can't be
 locked by typing wrong passwords, and their passwords can't be changed. Your
 own admin login, made with `CreateUser`, works as usual.

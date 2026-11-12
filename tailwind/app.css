@@ -178,7 +178,12 @@ ul {
 /* A demo instance (APP_DEMO): a banner on top of every page, a ribbon in
    the corner and a stamp on the invoice's payment instructions */
 .demo-banner {
-  @apply bg-amber-300 text-amber-950 text-center font-semibold px-4 py-2;
+  @apply bg-amber-300 text-amber-950 text-center font-semibold px-16 py-2; /* px-16 clears the ribbon */
+}
+
+/* The link to the demo's admin, readable on the banner's yellow */
+.demo-banner a {
+  @apply underline text-amber-950;
 }
 
 .demo-ribbon {

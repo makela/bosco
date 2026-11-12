@@ -268,6 +268,8 @@ async fn front_page_shows_the_welcome_message_and_the_order_button(db: PgPool) -
     // In development, without a version; no scripts on the public pages
     assert!(page.contains(r#"<link rel="stylesheet" href="/static/app.css">"#));
     assert!(!page.contains("<script"), "{page}");
+    // Only a demo invites everyone to its admin
+    assert!(!page.contains("/admin/NewSession"), "{page}");
 
     welcome(&db, "Tilaukset on suljettu", false).await?;
     let page = body(get(&app, "/Orders").await?).await?;
@@ -287,6 +289,9 @@ async fn a_demo_says_so_and_shows_a_fake_account(db: PgPool) -> TestResult {
     assert!(page.contains("<title>[Demo] Bosco Falconeria Öljytilaus</title>"));
     assert!(page.contains("noindex, nofollow"));
     assert!(page.contains("demo-ribbon"));
+    assert!(page.contains(
+        r#"Kokeile myös <a href="/admin/NewSession">hallintaa</a>: kirjaudu yhdellä napsautuksella ylläpitäjänä, jakelijana tai markkinoijana."#
+    ), "{page}");
 
     let response = order(&app, "demo@example.com", &[], &[(catalog.oil, 1)]).await?;
     let invoice = body(get(&app, location(&response)).await?).await?;

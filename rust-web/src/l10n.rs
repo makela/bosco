@@ -37,6 +37,11 @@ pub enum Text {
     BillingName,
     CheckOrderAndResubmit,
     City,
+    /// The demo banner's invitation to the admin: the text before the
+    /// link, the link's and the text after it
+    DemoAdminAfter,
+    DemoAdminBefore,
+    DemoAdminLink,
     DemoBanner,
     DemoDoNotPay,
     DemoNoEmail,
@@ -205,6 +210,21 @@ impl Text {
             (Text::SiteDescription, Locale::En) => "Bosco Falconeria olive oil order form",
             (Text::SiteDescription, Locale::Fr) => {
                 "Bon de commande d'huile d'olive Bosco Falconeria"
+            }
+            (Text::DemoAdminBefore, Locale::Fi) => "Kokeile myös ",
+            (Text::DemoAdminLink, Locale::Fi) => "hallintaa",
+            (Text::DemoAdminAfter, Locale::Fi) => {
+                ": kirjaudu yhdellä napsautuksella ylläpitäjänä, jakelijana tai markkinoijana."
+            }
+            (Text::DemoAdminBefore, Locale::En) => "Try the ",
+            (Text::DemoAdminLink, Locale::En) => "admin",
+            (Text::DemoAdminAfter, Locale::En) => {
+                " too: log in with one click as an admin, a delivery person or a promoter."
+            }
+            (Text::DemoAdminBefore, Locale::Fr) => "Essayez aussi l'",
+            (Text::DemoAdminLink, Locale::Fr) => "administration",
+            (Text::DemoAdminAfter, Locale::Fr) => {
+                "\u{a0}: connectez-vous en un clic comme administrateur, livreur ou promoteur."
             }
             (Text::DemoBanner, Locale::Fi) => {
                 "Tämä on esittelyversio. Tilaukset eivät ole oikeita, eikä mitään toimiteta tai laskuteta. Käytä keksittyjä tietoja."
