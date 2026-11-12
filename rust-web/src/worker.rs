@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 use crate::db;
 use crate::l10n::Locale;
-use crate::mail::order_mail;
+use crate::mail::{Addresses, order_mail};
 
 /// Tries of a job before it's left failed, IHP's default
 pub const MAX_ATTEMPTS: i32 = 10;
@@ -113,6 +113,8 @@ pub struct Worker {
     pub db: PgPool,
     pub locale: Locale,
     pub mailer: Mailer,
+    /// Who the emails are from, and where replies go
+    pub addresses: Addresses,
     /// Marks the jobs this worker has taken (`locked_by`)
     pub id: Uuid,
 }
@@ -133,6 +135,7 @@ impl Worker {
             db,
             locale,
             mailer,
+            addresses: Addresses::default(),
             id: Uuid::new_v4(),
         }
     }
@@ -218,7 +221,12 @@ impl Worker {
             );
             return Ok(());
         }
-        let message = order_mail(self.locale, &invoice, instruction.as_deref())?;
+        let message = order_mail(
+            &self.addresses,
+            self.locale,
+            &invoice,
+            instruction.as_deref(),
+        )?;
         self.mailer.send(message).await
     }
 

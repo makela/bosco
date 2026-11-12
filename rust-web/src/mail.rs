@@ -10,13 +10,52 @@ use crate::db::{Invoice, words};
 use crate::l10n::{Locale, Text};
 use crate::views::{markdown, money};
 
-/// The sender, and where replies go, as in the IHP app
-const FROM: &str = "postmaster@boscofalconeria.it";
-const REPLY_TO: &str = "Olive Oil Bosco Falconeria <oliveoil@boscofalconeria.it>";
+/// Who the emails are from, and where replies go: the instance's
+/// `MAIL_FROM` and `MAIL_REPLY_TO`, as the IHP app's (see nix/module.nix)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Addresses {
+    pub from: Mailbox,
+    pub reply_to: Option<Mailbox>,
+}
+
+impl Default for Addresses {
+    /// A machine's own, for development
+    fn default() -> Self {
+        Self {
+            from: "postmaster@localhost".parse().expect("an address"),
+            reply_to: None,
+        }
+    }
+}
+
+impl Addresses {
+    /// From `MAIL_FROM` and `MAIL_REPLY_TO`, e.g.
+    /// "Olive Oil <oil@example.com>"; an error names the one that isn't an
+    /// address
+    pub fn parse(from: Option<&str>, reply_to: Option<&str>) -> Result<Self, String> {
+        let parse = |name: &str, value: &str| {
+            value
+                .trim()
+                .parse::<Mailbox>()
+                .map_err(|e| format!("{name} isn't an address: {value} ({e})"))
+        };
+        Ok(Self {
+            from: match from.filter(|v| !v.trim().is_empty()) {
+                Some(value) => parse("MAIL_FROM", value)?,
+                None => Self::default().from,
+            },
+            reply_to: match reply_to.filter(|v| !v.trim().is_empty()) {
+                Some(value) => Some(parse("MAIL_REPLY_TO", value)?),
+                None => None,
+            },
+        })
+    }
+}
 
 /// The order email to the customer, in HTML and as plain text. An error is
 /// for the job's last_error.
 pub fn order_mail(
+    addresses: &Addresses,
     locale: Locale,
     invoice: &Invoice,
     payment_instruction: Option<&str>,
@@ -30,9 +69,11 @@ pub fn order_mail(
             .parse()
             .map_err(|e| format!("the customer's email {address:?}: {e}"))?,
     );
-    Message::builder()
-        .from(FROM.parse().expect("FROM is an address"))
-        .reply_to(REPLY_TO.parse().expect("REPLY_TO is an address"))
+    let mut message = Message::builder().from(addresses.from.clone());
+    if let Some(reply_to) = &addresses.reply_to {
+        message = message.reply_to(reply_to.clone());
+    }
+    message
         .to(to)
         .subject(Text::SiteTitle.text(locale))
         // One of this machine's, which spam filters look for
@@ -226,17 +267,19 @@ mod tests {
 
     #[test]
     fn the_mail_goes_to_the_customer_by_name() {
-        let message = order_mail(Locale::En, &invoice(), None).unwrap();
+        let addresses = Addresses::parse(
+            Some("postmaster@example.com"),
+            Some("Olive Oil Example <oil@example.com>"),
+        )
+        .unwrap();
+        let message = order_mail(&addresses, Locale::En, &invoice(), None).unwrap();
         let headers = String::from_utf8(message.formatted()).unwrap();
         assert!(
             headers.contains("To: \"Anna-Liisa Virtanen\" <anna@example.com>"),
             "{headers}"
         );
-        assert!(headers.contains("From: postmaster@boscofalconeria.it"));
-        assert!(
-            headers
-                .contains("Reply-To: \"Olive Oil Bosco Falconeria\" <oliveoil@boscofalconeria.it>")
-        );
+        assert!(headers.contains("From: postmaster@example.com"));
+        assert!(headers.contains("Reply-To: \"Olive Oil Example\" <oil@example.com>"));
         assert!(headers.contains("Subject: Bosco Falconeria Olive Oil Order"));
         assert!(headers.contains("multipart/alternative"));
         assert!(headers.contains("Message-ID: <"));
@@ -246,7 +289,24 @@ mod tests {
     fn a_bad_address_is_an_error_for_the_job() {
         let mut invoice = invoice();
         invoice.order.customer.email = "not an address".into();
-        let error = order_mail(Locale::En, &invoice, None).unwrap_err();
+        let error = order_mail(&Addresses::default(), Locale::En, &invoice, None).unwrap_err();
         assert!(error.contains("\"not an address\""), "{error}");
+    }
+
+    #[test]
+    fn addresses_from_the_settings() {
+        assert_eq!(
+            Addresses::parse(None, Some(" ")).unwrap(),
+            Addresses::default()
+        );
+        let message = order_mail(&Addresses::default(), Locale::En, &invoice(), None).unwrap();
+        let headers = String::from_utf8(message.formatted()).unwrap();
+        assert!(headers.contains("From: postmaster@localhost"));
+        assert!(!headers.contains("Reply-To"));
+        assert!(
+            Addresses::parse(Some("not an address"), None)
+                .unwrap_err()
+                .contains("MAIL_FROM")
+        );
     }
 }

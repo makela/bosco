@@ -195,6 +195,24 @@ let
           };
         };
 
+        mail = {
+          from = lib.mkOption {
+            type = lib.types.str;
+            default = "postmaster@boscofalconeria.it";
+            example = "Example Shop <orders@example.com>";
+            description = ''
+              Who the order emails are from (MAIL_FROM): an address, or a name and
+              an address. The SMTP account must be allowed to send as it.
+            '';
+          };
+          replyTo = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = "Olive Oil Bosco Falconeria <oliveoil@boscofalconeria.it>";
+            example = "Example Shop <shop@example.com>";
+            description = "Where replies to the order emails go (MAIL_REPLY_TO), or null for the sender.";
+          };
+        };
+
         smtp = {
           host = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
@@ -362,6 +380,10 @@ let
         # Every program reads it at startup (Config.hs), and a demo refuses
         # to start without SEND_EMAILS=0
         SEND_EMAILS = if instance.sendEmails then "1" else "0";
+        MAIL_FROM = instance.mail.from;
+      }
+      // lib.optionalAttrs (instance.mail.replyTo != null) {
+        MAIL_REPLY_TO = instance.mail.replyTo;
       };
 
       serviceConfig = hardening // {
@@ -428,8 +450,11 @@ let
             if instance.rustWorker.enable then
               {
                 DATABASE_URL = rustDatabaseUrl;
-                inherit (environment) APP_LOCALE APP_DEMO SEND_EMAILS;
+                inherit (environment) APP_LOCALE APP_DEMO SEND_EMAILS MAIL_FROM;
                 RUST_LOG = "info";
+              }
+              // lib.optionalAttrs (environment ? MAIL_REPLY_TO) {
+                inherit (environment) MAIL_REPLY_TO;
               }
             else
               environment

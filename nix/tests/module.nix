@@ -466,6 +466,44 @@ let
       };
     };
 
+    # The order emails' sender and reply address reach both workers: the
+    # defaults, and an instance's own
+    testTheMailAddressesReachTheWorkers = {
+      expr =
+        let
+          config = evaluate {
+            fi = {
+              baseUrl = "https://tilaus.example.fi";
+              inherit smtp;
+            };
+            shop = {
+              baseUrl = "https://shop.example.com";
+              port = 3310;
+              inherit smtp;
+              rustWorker.enable = true;
+              mail = {
+                from = "Example Shop <orders@example.com>";
+                replyTo = null;
+              };
+            };
+          };
+          addresses = name: lib.getAttrs (lib.filter (n: lib.hasPrefix "MAIL_" n) (lib.attrNames config.systemd.services."bosco-${name}-worker".environment)) config.systemd.services."bosco-${name}-worker".environment;
+        in
+        {
+          ihp = addresses "fi";
+          rust = addresses "shop";
+        };
+      expected = {
+        ihp = {
+          MAIL_FROM = "postmaster@boscofalconeria.it";
+          MAIL_REPLY_TO = "Olive Oil Bosco Falconeria <oliveoil@boscofalconeria.it>";
+        };
+        rust = {
+          MAIL_FROM = "Example Shop <orders@example.com>";
+        };
+      };
+    };
+
     testWorkersStayInIhpUnlessAsked = {
       expr = map (name: lib.hasSuffix "/bin/RunJobs" services."bosco-${name}-worker".serviceConfig.ExecStart) instanceNames;
       expected = [

@@ -8,11 +8,15 @@
 //! - `SMTP_HOST`: the SMTP server; without it, the local `sendmail`
 //! - `SMTP_PORT` (587 by default), `SMTP_ENCRYPTION` (starttls, tls or
 //!   none; starttls by default), `SMTP_USER` and `SMTP_PASSWORD_FILE`
+//! - `MAIL_FROM`: who the emails are from, `postmaster@localhost` by
+//!   default; `MAIL_REPLY_TO`: where replies go, none by default. Either an
+//!   address or "Some Name <someone@example.com>"
 
 use std::fs;
 use std::io::IsTerminal;
 
 use bosco_web::l10n::Locale;
+use bosco_web::mail::Addresses;
 use bosco_web::settings::{flag, setting};
 use bosco_web::worker::{Encryption, Mailer, Worker};
 use sqlx::postgres::PgPoolOptions;
@@ -59,6 +63,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let locale = Locale::parse(&setting("APP_LOCALE", ""))?;
     let mailer = mailer()?;
+    let addresses = Addresses::parse(
+        std::env::var("MAIL_FROM").ok().as_deref(),
+        std::env::var("MAIL_REPLY_TO").ok().as_deref(),
+    )?;
     let database_url = std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?;
     let db = PgPoolOptions::new()
         .max_connections(3)
@@ -74,6 +82,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         tracing::info!("stopping");
     };
-    Worker::new(db, locale, mailer).run(shutdown).await?;
+    let mut worker = Worker::new(db, locale, mailer);
+    worker.addresses = addresses;
+    worker.run(shutdown).await?;
     Ok(())
 }

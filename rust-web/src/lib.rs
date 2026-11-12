@@ -55,6 +55,9 @@ pub struct Site {
     pub demo: bool,
     /// The stylesheet's URL, e.g. the IHP app's dev build `/app.css`
     pub stylesheet: String,
+    /// The instance's address, `IHP_BASEURL`, e.g. `https://example.com`:
+    /// the pages' og:url; none without it
+    pub base_url: Option<String>,
     /// The IHP app's assets' version in production, for the admin's
     /// stylesheet and scripts (`/static/app.css?v=…`); none in development
     pub asset_version: Option<String>,

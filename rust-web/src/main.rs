@@ -15,8 +15,9 @@
 //! - `IHP_SESSION_SECRET_FILE`: the IHP app's session key, by default
 //!   `../Config/client_session_key.aes` as in its development; made if
 //!   there's none, as IHP does
-//! - `IHP_BASEURL`: the IHP app's, e.g. `https://bosco.makela.in`: with
-//!   https, the session cookie is only sent over HTTPS
+//! - `IHP_BASEURL`: the instance's address, e.g. `https://example.com`: the
+//!   pages' og:url, and with https, the session cookie is only sent over
+//!   HTTPS
 
 use std::env;
 use std::io::IsTerminal;
@@ -63,6 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             demo,
             stylesheet: setting("STYLESHEET", "/app.css"),
             asset_version,
+            base_url: Some(setting("IHP_BASEURL", "")).filter(|url| !url.is_empty()),
         },
         static_dir: setting("STATIC_DIR", "../static").into(),
         session_key,

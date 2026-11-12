@@ -33,6 +33,10 @@ config = do
     demo <- envOrDefault "APP_DEMO" False
     either (error . cs) pure (checkDemoMode demo sendEmails)
     option (DemoMode demo)
+    -- The order emails' sender and where replies go, see nix/module.nix
+    mailFrom <- envOrDefault "MAIL_FROM" ("postmaster@localhost" :: Text)
+    mailReplyTo :: Maybe Text <- envOrNothing "MAIL_REPLY_TO"
+    option MailAddresses { mailFrom = parseAddress mailFrom, mailReplyTo = fmap parseAddress mailReplyTo }
     smtpHost <- envOrNothing "SMTP_HOST"
     case smtpHost of
         Nothing -> option Sendmail

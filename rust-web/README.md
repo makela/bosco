@@ -1,4 +1,4 @@
-# Bosco's public site in Rust
+# Bosco in Rust
 
 The IHP app's `Web/` ported to Rust ([axum](https://github.com/tokio-rs/axum),
 [maud](https://maud.lambda.xyz/), [SQLx](https://github.com/launchbadge/sqlx)):
@@ -116,6 +116,9 @@ change to the schema shows here at once. Most are the IHP app's own tests of
 - **Markdown** is rendered by pulldown-cmark rather than MMark; HTML in it
   is shown as text in both.
 - **Pages not found** have the site's layout.
+- **The order email's sender and reply address** are settings,
+  `MAIL_FROM` and `MAIL_REPLY_TO` (the module's `mail.from` and
+  `mail.replyTo`), in both apps now; they were in the IHP app's code.
 - **The email's plain-text version** has a line for each thing; IHP's ran
   them together. The email has `Date` and `Message-ID` headers, which IHP's
   left out.

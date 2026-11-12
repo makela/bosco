@@ -7,7 +7,8 @@ import IHP.Prelude
 import Test.Hspec
 
 import Application.Localization (Locale (..), parseLocale)
-import Application.Settings (checkDemoMode, smtpServer)
+import Application.Settings (checkDemoMode, parseAddress, smtpServer)
+import IHP.MailPrelude (Address (..))
 
 tests :: Spec
 tests = describe "Instance settings" do
@@ -21,6 +22,13 @@ tests = describe "Instance settings" do
         it "rejects other values and lists the valid ones" do
             parseLocale "FR" `shouldBe` Left "APP_LOCALE should be one of fi, en, fr, got FR"
             parseLocale "sv" `shouldSatisfy` isLeft
+
+    describe "parseAddress (MAIL_FROM, MAIL_REPLY_TO)" do
+        it "reads an address with or without a name" do
+            parseAddress " postmaster@example.com " `shouldBe` Address Nothing "postmaster@example.com"
+            parseAddress "Olive Oil <oil@example.com>" `shouldBe` Address (Just "Olive Oil") "oil@example.com"
+            parseAddress "\"Bosco, the shop\" <shop@example.com>" `shouldBe` Address (Just "Bosco, the shop") "shop@example.com"
+            parseAddress "<shop@example.com>" `shouldBe` Address Nothing "shop@example.com"
 
     describe "checkDemoMode (APP_DEMO)" do
         it "allows a demo that doesn't send emails, and any other instance" do

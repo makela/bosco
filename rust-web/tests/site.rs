@@ -42,6 +42,7 @@ fn site(db: PgPool, demo: bool) -> Router {
             demo,
             stylesheet: "/app.css".into(),
             asset_version: None,
+            base_url: None,
         },
         static_dir: PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../static")),
         session_key: bosco_web::session::Key::from_bytes(&[0; 96]).unwrap(),

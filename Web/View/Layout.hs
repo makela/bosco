@@ -2,6 +2,7 @@ module Web.View.Layout (defaultLayout, Html) where
 
 import IHP.ViewPrelude
 import IHP.Environment
+import qualified Data.Text as T
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Generated.Types
@@ -69,8 +70,12 @@ metaTags = [hsx|
     <meta name="viewport" content="width=device-width"/>
     <meta property="og:title" content={l10nText LSiteTitle}/>
     <meta property="og:type" content="website"/>
-    <meta property="og:url" content="https://bosco.makela.in/"/>
+    <meta property="og:url" content={siteUrl}/>
     <meta property="og:description" content={l10nText LSiteDescription}/>
     {demoHead}
     {autoRefreshMeta}
 |]
+  where
+    -- The instance's address, IHP_BASEURL, see nix/module.nix
+    siteUrl = T.dropWhileEnd (== '/') ?context.frameworkConfig.baseUrl <> "/"
+

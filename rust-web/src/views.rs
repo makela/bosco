@@ -34,7 +34,9 @@ pub fn layout(site: &Site, flash: Option<Flash>, content: &Markup) -> Markup {
                 meta name="viewport" content="width=device-width";
                 meta property="og:title" content=(t(Text::SiteTitle));
                 meta property="og:type" content="website";
-                meta property="og:url" content="https://bosco.makela.in/";
+                @if let Some(url) = &site.base_url {
+                    meta property="og:url" content={ (url.trim_end_matches('/')) "/" };
+                }
                 meta property="og:description" content=(t(Text::SiteDescription));
                 @if site.demo {
                     meta name="robots" content="noindex, nofollow";

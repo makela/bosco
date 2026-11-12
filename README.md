@@ -1,12 +1,23 @@
 # Bosco Falconeria orders
 
 Order form and admin for Bosco Falconeria's olive oil and other Sicilian
-products, built with [IHP](https://ihp.digitallyinduced.com/). Customers fill
-in the order form and get an invoice by email; the admin at `/admin` manages
-producers, products, orders, welcome messages and payment instructions.
+products. Customers fill in the order form and get an invoice by email; the
+admin at `/admin` manages producers, products, customers, orders, welcome
+messages and payment instructions.
 
 Each deployed instance serves one language (Finnish, English or French) and
-has its own database, products and orders.
+has its own database, products and orders. A NixOS module (`nix/module.nix`)
+runs any number of them on one server.
+
+The site was built with [IHP](https://ihp.digitallyinduced.com/) (Haskell),
+and is being moved to Rust (`rust-web/`, with axum, maud and SQLx). The Rust
+version now does everything the IHP app does, on the same database: the
+public site, the admin, the email worker, the migrations and the scripts.
+On a server, `rustWeb.enable` and `rustWorker.enable` make an instance run
+the Rust version only (see "The public site in Rust" below). The IHP app is
+still here: it is the default, it builds the stylesheet and the scripts both
+versions use, and its dev environment is the project's. It will go once
+those have Rust replacements.
 
 ## Development
 
@@ -170,10 +181,11 @@ The worker sends each order's invoice through the instance's SMTP server:
 `tls` (usually 465). Without `sendEmails`, as on staging, it only logs which
 order it would have emailed (`journalctl -u bosco-staging-worker`).
 
-The sender is `postmaster@boscofalconeria.it` with replies to
-`oliveoil@boscofalconeria.it` (`Web/Mail/Orders/Order.hs`), so the SMTP
-account must be allowed to send as it, and the domain's SPF and DKIM records
-should cover the SMTP server, or the emails end up as spam.
+The sender is `mail.from` and replies go to `mail.replyTo`, by default
+`postmaster@boscofalconeria.it` and `oliveoil@boscofalconeria.it`. The SMTP
+account must be allowed to send as the sender, and its domain's SPF and DKIM
+records should cover the SMTP server, or the emails end up as spam. The
+pages' `og:url` is the instance's `baseUrl`.
 
 ### Demo
 

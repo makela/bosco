@@ -5,11 +5,14 @@ module Application.Settings
     , DemoMode (..)
     , checkDemoMode
     , smtpServer
+    , MailAddresses (..)
+    , parseAddress
     ) where
 
 import qualified Data.Text as T
 
 import IHP.Mail.Types (MailServer (..), SMTPEncryption (..))
+import IHP.MailPrelude (Address (..))
 import IHP.Prelude
 
 -- | Whether this instance sends emails (SEND_EMAILS, on by default). A
@@ -20,6 +23,21 @@ newtype EmailsEnabled = EmailsEnabled Bool
 -- demo marks every page as one, keeps search engines out and tells
 -- customers not to pay its invoices.
 newtype DemoMode = DemoMode Bool
+
+-- | Who the order emails are from (MAIL_FROM), and where replies to them
+-- go (MAIL_REPLY_TO, none when unset)
+data MailAddresses = MailAddresses
+    { mailFrom :: Address
+    , mailReplyTo :: Maybe Address
+    }
+
+-- | An address as "someone@example.com" or "Some Name <someone@example.com>"
+parseAddress :: Text -> Address
+parseAddress text = case T.breakOnEnd "<" (T.strip text) of
+    (before, after) | not (T.null before), Just email <- T.stripSuffix ">" after ->
+        let name = T.strip (T.dropEnd 1 before) |> T.dropAround (== '"')
+        in Address { addressName = if T.null name then Nothing else Just name, addressEmail = T.strip email }
+    _ -> Address { addressName = Nothing, addressEmail = T.strip text }
 
 -- | A demo must not send emails: anyone could make it email any address,
 -- and its invoices must not reach anyone's inbox.

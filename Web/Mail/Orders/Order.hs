@@ -7,6 +7,8 @@ import Web.View.Orders.Show (OrderedProductsByProducer)
 import Web.View.Prelude
 
 import Application.Localization
+import Application.Settings (MailAddresses (..))
+import IHP.ControllerSupport (getAppConfig)
 
 import qualified Data.Map as Map
 
@@ -21,8 +23,9 @@ data OrderMail = OrderMail
 instance BuildMail OrderMail where
     subject = l10nText LSiteTitle
     to OrderMail { .. } = Address { addressName = Just (fullName order.customerId), addressEmail = order.customerId.email }
-    from = "postmaster@boscofalconeria.it"
-    replyTo OrderMail { .. } = Just Address { addressName = Just "Olive Oil Bosco Falconeria", addressEmail = "oliveoil@boscofalconeria.it" }
+    -- The instance's, MAIL_FROM and MAIL_REPLY_TO (Config.hs)
+    from = (getAppConfig @MailAddresses).mailFrom
+    replyTo _ = (getAppConfig @MailAddresses).mailReplyTo
     html OrderMail { .. } = [hsx|
         <h1>{l10nText LInvoice}</h1>
         <div>
