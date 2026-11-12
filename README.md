@@ -55,7 +55,8 @@ IHP's base schema (`IHPSchema.sql`), which a new database starts with.
 runs every check of the flake (`nix flake check`), which also builds the
 release programs and runs the Rust tests in the Nix sandbox; the pre-push
 hook in `.githooks/` runs it before every push (`git push --no-verify`
-skips it). New files must be `git add`ed before the flake can see them.
+skips it). The pre-commit hook refuses images with a GPS location, as the
+repository is public. New files must be `git add`ed before the flake can see them.
 
 ## Deployment
 
@@ -346,3 +347,11 @@ don't start: see `journalctl -u bosco-fi-migrate`. Logs are in
 `sudo nixos-rebuild switch --rollback` returns to the previous version of the
 code, but not of the database. After a migration, roll back only to a version
 that works with the migrated schema.
+
+## License
+
+The code is under the MIT license, see `LICENSE`. Bosco Falconeria's name,
+logo and photos (`static/img/`) and the producers' and products' texts
+(`db/Fixtures*.sql` and the migrations) belong to Bosco Falconeria and the
+producers and are all rights reserved. `db/IHPSchema.sql` is IHP's, under
+its MIT license.

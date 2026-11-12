@@ -2,7 +2,8 @@
 name = "bosco-web"
 version = "0.1.0"
 edition = "2024"
-description = "Bosco's public site, the IHP app's Web/ ported to Rust, on the same PostgreSQL"
+description = "Bosco Falconeria's order form and admin"
+license = "MIT"
 publish = false
 default-run = "bosco-web"
 

@@ -95,6 +95,8 @@
             pkgs.tailwindcss_4
             pkgs.watchexec
             pkgs.just
+            # For the pre-commit hook's photo location check
+            pkgs.exiftool
           ];
           shellHook = ''
             git config core.hooksPath .githooks
