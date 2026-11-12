@@ -172,14 +172,9 @@ change to the schema shows here at once. Most are the IHP app's own tests of
 - **A login's wrong passwords** are counted in the database (`+ 1`), so two
   at once both count; IHP counted from what it had read.
 
-On a server, the NixOS module runs the site next to the IHP app with
-`rustWeb.enable`, and the worker instead of IHP's with `rustWorker.enable`,
-see "The public site in Rust" in the project's README. Its
-package is `nix/rust-web.nix`, and `nix flake check` (the `rust-web-tests`
-check) runs these tests too.
-
-With `rustWeb.enable` and `rustWorker.enable`, nothing of the IHP app runs
-on an instance. Its static files are the Rust site's own,
+On a server, the NixOS module runs these programs, see "Deployment" in the
+project's README. Their package is `nix/rust-web.nix`, and `nix flake check`
+(the `rust-web-tests` check) runs these tests too. The static files are
 `nix/rust-static.nix`: the stylesheet built with Tailwind from
 `tailwind/app.css` for the Rust site's markup only, `static/app.js`,
 `static/admin.js` and the images. IHP's base schema, which a new database

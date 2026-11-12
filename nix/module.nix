@@ -37,19 +37,18 @@
 #     };
 #   };
 #
-# Each instance <name> has three services, all running as the system user
-# that owns the instance's PostgreSQL database (bosco_<name> by default):
+# Each instance <name> has three services, the programs of rust-web/, all
+# running as the system user that owns the instance's PostgreSQL database
+# (bosco_<name> by default):
 #
-# - bosco-<name>-migrate runs the migrations, before the other two start
-# - bosco-<name> is the web server, on the socket bosco-<name>.socket
-# - bosco-<name>-worker runs the jobs that send the order emails
+# - bosco-<name>-migrate runs the migrations (bosco-migrate), before the
+#   other two start
+# - bosco-<name> is the site and its admin (bosco-web), on port; nginx sends
+#   everything to it (nginxLocations)
+# - bosco-<name>-worker sends the order emails (bosco-worker)
 #
-# Their state, the session key, is in /var/lib/bosco-<name>. With
-# rustWeb.enable, bosco-<name>-rust-web runs the whole site in Rust instead of
-# bosco-<name>, with the same session key, and nginx sends everything to it
-# (rustWeb.nginxLocations). With
-# rustWorker.enable, bosco-<name>-worker runs the Rust email worker instead
-# of IHP's.
+# A demo has a fourth, bosco-<name>-reset-demo, started every night by its
+# timer. Their state, the session key, is in /var/lib/bosco-<name>.
 {
   config,
   lib,
@@ -84,16 +83,21 @@ let
 
         package = lib.mkOption {
           type = lib.types.package;
-          default = config.flake.packages.${system}.optimized-prod-server;
-          defaultText = lib.literalExpression "flake.packages.\${system}.optimized-prod-server";
-          description = "The site, with the RunProdServer and RunJobs programs and the static files.";
+          default = config.flake.packages.${system}.rust-web;
+          defaultText = lib.literalExpression "flake.packages.\${system}.rust-web";
+          description = "The programs: the site, the email worker, the migrations and the demo reset (nix/rust-web.nix).";
         };
 
-        migratePackage = lib.mkOption {
-          type = lib.types.package;
-          default = config.flake.packages.${system}.migrate;
-          defaultText = lib.literalExpression "flake.packages.\${system}.migrate";
-          description = "IHP's migrate program, without rustWeb.enable.";
+        nginxLocations = lib.mkOption {
+          type = lib.types.attrsOf (lib.types.attrsOf lib.types.str);
+          readOnly = true;
+          default."/".proxyPass = "http://${listenAddressOf config.host config.port}";
+          defaultText = lib.literalExpression ''{ "/".proxyPass = "http://127.0.0.1:3300"; }'';
+          description = ''
+            The instance's nginx locations: everything to the site, the static
+            files included. For an nginx virtual host:
+            locations = config.services.bosco.instances.<name>.nginxLocations;
+          '';
         };
 
         baseUrl = lib.mkOption {
@@ -187,12 +191,7 @@ let
             '';
           };
 
-          package = lib.mkOption {
-            type = lib.types.package;
-            default = config.flake.packages.${system}.script-ResetDemo;
-            defaultText = lib.literalExpression "flake.packages.\${system}.script-ResetDemo";
-            description = "The ResetDemo program (Application/Script/ResetDemo.hs), without rustWeb.enable.";
-          };
+          package = removed;
         };
 
         mail = {
@@ -254,57 +253,52 @@ let
           };
         };
 
+        # The IHP app's options, from when the Rust site was its replacement
+        # beside it. Kept, hidden, so an older configuration is told what to
+        # change rather than that an option doesn't exist.
         rustWeb = {
-          enable = lib.mkEnableOption ''
-            the public site in Rust (rust-web/) next to the IHP app, on the same
-            database: the welcome message, the order form, the invoices and the
-            newsletter form, the whole admin, which shares IHP's session, and
-            the static files, in place of the IHP app's web server, which then
-            doesn't run. nginx sends everything to it with nginxLocations
-          '';
-
-          port = lib.mkOption {
-            type = lib.types.port;
-            default = config.port + 100;
-            defaultText = lib.literalExpression "port + 100";
-            description = "Port the Rust site listens on, at host (instance ${name}).";
+          enable = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            visible = false;
+            description = "Was: run the Rust site instead of the IHP app's. It's the only one now.";
           };
-
-          package = lib.mkOption {
-            type = lib.types.package;
-            default = config.flake.packages.${system}.rust-web;
-            defaultText = lib.literalExpression "flake.packages.\${system}.rust-web";
-            description = "The Rust programs, the site and the email worker (nix/rust-web.nix).";
-          };
-
+          port = removed;
+          package = removed;
           nginxLocations = lib.mkOption {
             type = lib.types.attrsOf (lib.types.attrsOf lib.types.str);
             readOnly = true;
-            default."/".proxyPass = "http://${listenAddressOf config.host config.rustWeb.port}";
-            defaultText = lib.literalExpression ''{ "/".proxyPass = "http://127.0.0.1:3400"; }'';
-            description = ''
-              The instance's nginx locations with the Rust site: everything to it,
-              the static files included, as it serves the whole site. For an nginx
-              virtual host:
-              locations = config.services.bosco.instances.<name>.rustWeb.nginxLocations;
-            '';
+            visible = false;
+            default = config.nginxLocations;
+            description = "The same as nginxLocations.";
           };
         };
-
-        rustWorker.enable = lib.mkEnableOption ''
-          the email worker in Rust (bosco-worker, from rustWeb.package) instead
-          of IHP's RunJobs, as the same bosco-<name>-worker service with the same
-          settings. It sends the same emails from the same job table, so either
-          can take over the other's jobs
-        '';
-
-        rtsFlags = lib.mkOption {
-          type = lib.types.str;
-          default = "-A96m -n4m -N";
-          description = "Options of the GHC runtime (GHCRTS).";
+        rustWorker.enable = lib.mkOption {
+          type = lib.types.nullOr lib.types.bool;
+          default = null;
+          visible = false;
+          description = "Was: run the Rust email worker instead of the IHP app's. It's the only one now.";
         };
+        migratePackage = removed;
+        rtsFlags = removed;
       };
     };
+
+  # A removed option: null unless an older configuration still sets it
+  removed = lib.mkOption {
+    type = lib.types.nullOr lib.types.raw;
+    default = null;
+    visible = false;
+  };
+
+  # What an older configuration still sets, with what to do instead
+  removedOptions = instance: {
+    "rustWeb.port" = { value = instance.rustWeb.port; instead = "set port, which the site listens on now"; };
+    "rustWeb.package" = { value = instance.rustWeb.package; instead = "set package"; };
+    "migratePackage" = { value = instance.migratePackage; instead = "remove it: package has bosco-migrate"; };
+    "demoReset.package" = { value = instance.demoReset.package; instead = "remove it: package has bosco-reset-demo"; };
+    "rtsFlags" = { value = instance.rtsFlags; instead = "remove it: there's no GHC runtime"; };
+  };
 
   listenAddressOf =
     host: port: if lib.hasInfix ":" host then "[${host}]:${toString port}" else "${host}:${toString port}";
@@ -335,7 +329,7 @@ let
     RestrictRealtime = true;
     RestrictSUIDSGID = true;
     LockPersonality = true;
-    # No MemoryDenyWriteExecute: the GHC runtime may need executable memory
+    MemoryDenyWriteExecute = true;
     SystemCallArchitectures = "native";
     SystemCallFilter = [
       "@system-service"
@@ -349,9 +343,8 @@ let
     let
       state = "/var/lib/bosco-${name}";
       migrate = "bosco-${name}-migrate.service";
-      databaseUrl = "postgresql:///${instance.database}?host=/run/postgresql";
-      # The user too: without one, SQLx doesn't take the service's
-      rustDatabaseUrl = "${databaseUrl}&user=${instance.database}";
+      # With the user: without one, SQLx doesn't take the service's
+      databaseUrl = "postgresql:///${instance.database}?host=/run/postgresql&user=${instance.database}";
       # The catalog in the instance's language, Fixtures.<locale>.sql, or
       # the Finnish one, Fixtures.sql, when there's none
       fixtures =
@@ -366,24 +359,20 @@ let
         # Creates the databases and users in newer NixOS versions
         "postgresql-setup.service"
       ];
+      requires = [
+        "postgresql.service"
+        migrate
+      ];
 
+      # What every program reads
       environment = {
-        IHP_ENV = "Production";
-        IHP_BASEURL = instance.baseUrl;
-        IHP_REQUEST_LOGGER_IP_ADDR_SOURCE = "FromHeader";
         DATABASE_URL = databaseUrl;
-        IHP_SESSION_SECRET_FILE = "${state}/session.aes";
-        PORT = toString instance.port;
-        GHCRTS = instance.rtsFlags;
         APP_LOCALE = instance.locale;
         APP_DEMO = if instance.demo then "1" else "0";
-        # Every program reads it at startup (Config.hs), and a demo refuses
-        # to start without SEND_EMAILS=0
+        # The admin's order pages say when emails are off, and a demo
+        # refuses to send any
         SEND_EMAILS = if instance.sendEmails then "1" else "0";
-        MAIL_FROM = instance.mail.from;
-      }
-      // lib.optionalAttrs (instance.mail.replyTo != null) {
-        MAIL_REPLY_TO = instance.mail.replyTo;
+        RUST_LOG = "info";
       };
 
       serviceConfig = hardening // {
@@ -405,6 +394,11 @@ let
         postgresql = config.services.postgresql.package;
       };
 
+      # Its stylesheet, scripts and images (nix/rust-static.nix), with their
+      # package's hash as the version in their addresses, so a new one isn't
+      # taken from the browser's cache
+      static = instance.flake.packages.${system}.rust-static;
+
       smtpPassword = instance.sendEmails && instance.smtp.passwordFile != null;
     in
     {
@@ -413,8 +407,7 @@ let
         inherit after;
         requires = [ "postgresql.service" ];
         environment = {
-          # SQLx, of bosco-migrate, needs the user; psql takes it either way
-          DATABASE_URL = if instance.rustWeb.enable then rustDatabaseUrl else databaseUrl;
+          DATABASE_URL = databaseUrl;
           IHP_MIGRATION_DIR = "${instance.flake}/Application/Migration/";
           MINIMUM_REVISION = toString instance.minimumRevision;
         }
@@ -428,37 +421,44 @@ let
           # Stays active, so a new version's migrations run on the next switch
           RemainAfterExit = true;
           ExecStartPre = [ keygen ] ++ lib.optional instance.bootstrapSchema (lib.getExe bootstrap);
-          # With the Rust site, its bosco-migrate, which does the same
-          ExecStart =
-            if instance.rustWeb.enable then
-              "${instance.rustWeb.package}/bin/bosco-migrate"
-            else
-              "${instance.migratePackage}/bin/migrate";
+          ExecStart = "${instance.package}/bin/bosco-migrate";
+        };
+      };
+
+      "bosco-${name}" = {
+        description = "Bosco Falconeria site (${name})";
+        wantedBy = [ "multi-user.target" ];
+        after = after ++ [ migrate ];
+        inherit requires;
+        environment = environment // {
+          ADDR = listenAddressOf instance.host instance.port;
+          STATIC_DIR = "${static}";
+          # In the stylesheet's and scripts' addresses, /static/app.css?v=…
+          ASSET_VERSION = lib.substring 0 32 (baseNameOf "${static}");
+          # The admin's login is in a session cookie signed with this key,
+          # as the IHP app's was, so logins carried over
+          IHP_SESSION_SECRET_FILE = "${state}/session.aes";
+          IHP_BASEURL = instance.baseUrl;
+        };
+        serviceConfig = serviceConfig // {
+          ExecStart = lib.getExe instance.package;
+          Restart = "always";
         };
       };
 
       "bosco-${name}-worker" = {
-        description = "Bosco Falconeria email worker${lib.optionalString instance.rustWorker.enable " in Rust"} (${name})";
+        description = "Bosco Falconeria email worker (${name})";
         wantedBy = [ "multi-user.target" ];
         after = after ++ [ migrate ];
-        requires = [
-          "postgresql.service"
-          migrate
-        ];
+        inherit requires;
         environment =
-          (
-            if instance.rustWorker.enable then
-              {
-                DATABASE_URL = rustDatabaseUrl;
-                inherit (environment) APP_LOCALE APP_DEMO SEND_EMAILS MAIL_FROM;
-                RUST_LOG = "info";
-              }
-              // lib.optionalAttrs (environment ? MAIL_REPLY_TO) {
-                inherit (environment) MAIL_REPLY_TO;
-              }
-            else
-              environment
-          )
+          environment
+          // {
+            MAIL_FROM = instance.mail.from;
+          }
+          // lib.optionalAttrs (instance.mail.replyTo != null) {
+            MAIL_REPLY_TO = instance.mail.replyTo;
+          }
           // lib.optionalAttrs instance.sendEmails {
             SMTP_HOST = instance.smtp.host;
             SMTP_PORT = toString instance.smtp.port;
@@ -473,115 +473,26 @@ let
         serviceConfig =
           serviceConfig
           // {
-            ExecStart =
-              if instance.rustWorker.enable then
-                "${instance.rustWeb.package}/bin/bosco-worker"
-              else
-                "${instance.package}/bin/RunJobs";
+            ExecStart = "${instance.package}/bin/bosco-worker";
             Restart = "always";
-          }
-          // lib.optionalAttrs instance.rustWorker.enable {
-            MemoryDenyWriteExecute = true;
           }
           // lib.optionalAttrs smtpPassword {
             LoadCredential = "smtp-password:${instance.smtp.passwordFile}";
           };
       };
     }
-    # The IHP app's web server, unless the Rust site serves the whole site
-    // lib.optionalAttrs (!instance.rustWeb.enable) {
-      "bosco-${name}" = {
-        description = "Bosco Falconeria site (${name})";
-        wantedBy = [ "multi-user.target" ];
-        after = after ++ [ migrate ];
-        requires = [
-          "postgresql.service"
-          migrate
-          "bosco-${name}.socket"
-        ];
-        environment = environment // {
-          IHP_SYSTEMD = "1";
-        };
-        serviceConfig = serviceConfig // {
-          Type = "notify";
-          ExecStart = "${instance.package}/bin/RunProdServer";
-          Restart = "always";
-          KillSignal = "SIGINT";
-          WatchdogSec = "60";
-          Sockets = "bosco-${name}.socket";
-        };
-      };
-    }
-    // lib.optionalAttrs instance.rustWeb.enable {
-      "bosco-${name}-rust-web" =
-        let
-          # Its stylesheet, scripts and images (nix/rust-static.nix), with
-          # their package's hash as the version in their addresses, so a new
-          # one isn't taken from the browser's cache
-          static = instance.flake.packages.${system}.rust-static;
-          assetVersion = lib.substring 0 32 (baseNameOf "${static}");
-        in
-        {
-          description = "Bosco Falconeria public site in Rust (${name})";
-          wantedBy = [ "multi-user.target" ];
-          after = after ++ [ migrate ];
-          requires = [
-            "postgresql.service"
-            migrate
-          ];
-          environment = {
-            DATABASE_URL = rustDatabaseUrl;
-            ADDR = listenAddressOf instance.host instance.rustWeb.port;
-            APP_LOCALE = instance.locale;
-            APP_DEMO = if instance.demo then "1" else "0";
-            # The admin's order pages say when emails are off
-            SEND_EMAILS = if instance.sendEmails then "1" else "0";
-            STATIC_DIR = "${static}";
-            # In the stylesheet's and scripts' addresses, /static/app.css?v=…
-            ASSET_VERSION = assetVersion;
-            # The admin's login is in IHP's session cookie, with its key
-            IHP_SESSION_SECRET_FILE = "${state}/session.aes";
-            IHP_BASEURL = instance.baseUrl;
-            RUST_LOG = "info";
-          };
-          serviceConfig = serviceConfig // {
-            ExecStart = lib.getExe instance.rustWeb.package;
-            Restart = "always";
-            # Unlike the GHC runtime, it needs no executable memory
-            MemoryDenyWriteExecute = true;
-          };
-        };
-    }
     // lib.optionalAttrs instance.demo {
       # Started by its timer, see demoTimers
       "bosco-${name}-reset-demo" = {
         description = "Bosco Falconeria demo data reset (${name})";
         after = after ++ [ migrate ];
-        requires = [
-          "postgresql.service"
-          migrate
-        ];
-        # With the Rust site, the Rust program (bosco-reset-demo), which
-        # makes the same data
-        environment =
-          if instance.rustWeb.enable then
-            {
-              DATABASE_URL = rustDatabaseUrl;
-              APP_DEMO = "1";
-              APP_FIXTURES = fixtures;
-            }
-          else
-            environment
-            // {
-              APP_FIXTURES = fixtures;
-            };
+        inherit requires;
+        environment = environment // {
+          APP_FIXTURES = fixtures;
+        };
         serviceConfig = serviceConfig // {
           Type = "oneshot";
-          ExecStart =
-            if instance.rustWeb.enable then
-              "${instance.rustWeb.package}/bin/bosco-reset-demo"
-            else
-              "${instance.demoReset.package}/bin/ResetDemo";
+          ExecStart = "${instance.package}/bin/bosco-reset-demo";
         };
       };
     };
@@ -600,15 +511,7 @@ let
 
   # Values two instances must not share
   duplicates = values: lib.length values != lib.length (lib.unique values);
-  addresses = lib.concatLists (
-    lib.mapAttrsToList (
-      _: instance:
-      if instance.rustWeb.enable then
-        [ (listenAddressOf instance.host instance.rustWeb.port) ]
-      else
-        [ (listenAddress instance) ]
-    ) instances
-  );
+  addresses = lib.mapAttrsToList (_: listenAddress) instances;
   databases = lib.mapAttrsToList (_: instance: instance.database) instances;
 in
 {
@@ -622,7 +525,7 @@ in
     assertions = [
       {
         assertion = !duplicates addresses;
-        message = "services.bosco.instances: each instance, and its Rust site, needs its own port (${lib.concatStringsSep ", " addresses}).";
+        message = "services.bosco.instances: each instance needs its own port (${lib.concatStringsSep ", " addresses}).";
       }
       {
         assertion = !duplicates databases;
@@ -647,7 +550,24 @@ in
           assertion = instance.smtp.encryption != "none" || instance.smtp.user == null;
           message = "services.bosco.instances.${name}: an SMTP login needs encryption (starttls or tls).";
         }
-      ]) instances
+        {
+          assertion = instance.rustWeb.enable != false && instance.rustWorker.enable != false;
+          message = "services.bosco.instances.${name}: the IHP app is gone, so rustWeb.enable and rustWorker.enable can't be false. Remove them.";
+        }
+      ]
+      ++ lib.mapAttrsToList (option: removed: {
+        assertion = removed.value == null;
+        message = "services.bosco.instances.${name}.${option} is gone with the IHP app: ${removed.instead}.";
+      }) (removedOptions instance)
+      ) instances
+    );
+
+    warnings = lib.concatLists (
+      lib.mapAttrsToList (
+        name: instance:
+        lib.optional (instance.rustWeb.enable == true || instance.rustWorker.enable == true)
+          "services.bosco.instances.${name}: rustWeb.enable and rustWorker.enable are no longer needed, the site is only in Rust now; remove them."
+      ) instances
     );
 
     users.users = lib.mapAttrs' (
@@ -670,23 +590,11 @@ in
       }) databases;
     };
 
-    systemd.sockets = lib.mapAttrs' (
-      name: instance:
-      lib.nameValuePair "bosco-${name}" {
-        description = "Bosco Falconeria site socket (${name})";
-        wantedBy = [ "sockets.target" ];
-        socketConfig = {
-          ListenStream = listenAddress instance;
-          Accept = false;
-        };
-      }
-    ) (lib.filterAttrs (_: instance: !instance.rustWeb.enable) instances);
-
     systemd.services = lib.mkMerge (lib.mapAttrsToList services instances);
     systemd.timers = lib.mapAttrs' demoTimers (lib.filterAttrs (_: instance: instance.demo) instances);
 
     # bosco-<name>-create-user makes a login on the instance's database, as
-    # the instance's user, with bosco-create-user from rustWeb.package:
+    # the instance's user, with bosco-create-user from package:
     #   read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
     #   ADMIN_EMAIL=someone@example.com ROLES=deliverer,promoter bosco-fi-create-user
     environment.systemPackages = lib.mapAttrsToList (
@@ -694,8 +602,8 @@ in
       pkgs.writeShellScriptBin "bosco-${name}-create-user" ''
         exec ${pkgs.util-linux}/bin/runuser -u ${instance.database} -- \
           env DATABASE_URL="postgresql:///${instance.database}?host=/run/postgresql&user=${instance.database}" \
-          ${instance.rustWeb.package}/bin/bosco-create-user
+          ${instance.package}/bin/bosco-create-user
       ''
-    ) (lib.filterAttrs (_: instance: instance.rustWeb.enable) instances);
+    ) instances;
   };
 }

@@ -9,15 +9,12 @@ Each deployed instance serves one language (Finnish, English or French) and
 has its own database, products and orders. A NixOS module (`nix/module.nix`)
 runs any number of them on one server.
 
-The site was built with [IHP](https://ihp.digitallyinduced.com/) (Haskell),
-and is being moved to Rust (`rust-web/`, with axum, maud and SQLx). The Rust
-version now does everything the IHP app does, on the same database: the
-public site, the admin, the email worker, the migrations and the scripts.
-On a server, `rustWeb.enable` and `rustWorker.enable` make an instance run
-the Rust version only (see "The public site in Rust" below). The Rust site
-has its own build of the stylesheet and scripts (`nix/rust-static.nix`). The
-IHP app is still here: it is the default, and its dev environment is the
-project's. It will go once that has a Rust replacement.
+The site was built with [IHP](https://ihp.digitallyinduced.com/) (Haskell)
+and now runs in Rust (`rust-web/`, with axum, maud and SQLx), on the same
+database: the public site, the admin, the email worker, the migrations and
+the scripts. The NixOS module runs only the Rust programs (see "From the IHP
+app" below). The IHP app's code is still here for its dev environment, which
+is the project's until it has a replacement.
 
 ## Development
 
@@ -113,7 +110,7 @@ The addresses below are examples; use the real ones.
       bootstrapSchema = true;
       sendEmails = false;
     };
-    # A public demo in English, its public pages in Rust (see below)
+    # A public demo in English
     demo = {
       baseUrl = "https://demo.tilaus.example.fi";
       port = 3303;
@@ -121,7 +118,6 @@ The addresses below are examples; use the real ones.
       bootstrapSchema = true;
       demo = true;
       sendEmails = false;
-      rustWeb.enable = true; # on port 3403
     };
   };
 
@@ -146,22 +142,17 @@ The addresses below are examples; use the real ones.
       locations."/".proxyPass = "http://127.0.0.1:3302";
       extraConfig = "add_header X-Robots-Tag noindex;";
     };
-    # The whole site, in Rust
+    # The same as locations."/".proxyPass = "http://127.0.0.1:3303"
     virtualHosts."demo.tilaus.example.fi" = {
       enableACME = true;
       forceSSL = true;
-      locations = config.services.bosco.instances.demo.rustWeb.nginxLocations;
+      locations = config.services.bosco.instances.demo.nginxLocations;
     };
   };
   security.acme.acceptTerms = true;
   security.acme.defaults.email = "...";
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
-  # Download IHP and GHC ready-built instead of compiling them on the server
-  nix.settings.extra-substituters = [ "https://digitallyinduced.cachix.org" ];
-  nix.settings.extra-trusted-public-keys = [
-    "digitallyinduced.cachix.org-1:y+wQvrnxQ+PdEsCt91rmvv39qRCYzEgGQaldK26hCKE="
-  ];
   nix.gc.automatic = true;
 
   services.postgresqlBackup = {
@@ -208,9 +199,7 @@ locked by typing wrong passwords, and their passwords can't be changed. Your
 own admin login, made with `CreateUser`, works as usual.
 
 Every night at 03:00 (`demoReset.time`), `bosco-<name>-reset-demo` resets
-the demo's data in one transaction (`Application/DemoData.hs`, or with
-`rustWeb.enable` its Rust port `rust-web/src/demo_data.rs`, which makes the
-same data). It reloads
+the demo's data in one transaction (`rust-web/src/demo_data.rs`). It reloads
 the catalog in the instance's language, `Fixtures.<locale>.sql` (so far
 `Fixtures.en.sql`), or else the Finnish `Fixtures.sql`. The catalogs have
 the same ids and prices, so a change to one belongs in the others too. It
@@ -225,39 +214,25 @@ so run it once after the first deploy:
 systemctl start bosco-demo-reset-demo
 ```
 
-### The public site in Rust
+### From the IHP app
 
-With `rustWeb.enable = true`, an instance runs the public pages, the welcome
-message, the order form, the invoices and the newsletter form, from
-`rust-web/` in Rust, as `bosco-<name>-rust-web` on port `rustWeb.port`
-(`port` + 100 by default), in place of the IHP app's web server
-`bosco-<name>`, which then doesn't run. It uses the instance's database as
-the IHP app did, as the same user, and the IHP app's email worker works as
-before, also for orders made in Rust. It also runs the whole
-admin (`/admin/…`), the demo's one-click logins included. It reads and
-writes IHP's session cookie with the instance's session key and checks and
-makes IHP's password hashes, so a login in either app is a login in the
-other, and logins, lockouts and changed passwords carry over both ways.
-It serves the static files too, so nginx sends it everything with
-`rustWeb.nginxLocations`, as for the demo above. The instance's migrations
-then run with the Rust site's `bosco-migrate`, and a demo's nightly reset
-with its `bosco-reset-demo`. Without it, an instance runs all of these in
-IHP as before. See `rust-web/README.md` for the few differences.
+The module used to run the IHP app, with the Rust site and worker beside it
+behind `rustWeb.enable` and `rustWorker.enable`. Now it runs only the Rust
+programs, so:
 
-Try it on the demo first. `journalctl -u bosco-demo-rust-web` shows its
-requests. To go back, set `rustWeb.enable = false` and point nginx's
-`locations."/"` at the IHP app's port again: the IHP app starts, on the
-same data.
+- the site is `bosco-<name>` (was `bosco-<name>-rust-web`), and listens on
+  `port` (was `rustWeb.port`, `port` + 100). nginx should send everything to
+  it with `nginxLocations`; `rustWeb.nginxLocations` still works and is the
+  same;
+- `rustWeb.enable = true` and `rustWorker.enable = true` only warn, and can
+  be removed;
+- the IHP app's options (`rustWeb.port`, `rustWeb.package`,
+  `migratePackage`, `demoReset.package`, `rtsFlags`) stop the evaluation,
+  saying what to do instead.
 
-With `rustWorker.enable = true`, the instance's email worker,
-`bosco-<name>-worker`, runs `bosco-worker` from `rust-web/` instead of IHP's
-`RunJobs`, with the same SMTP settings. It sends the same order emails from
-the same jobs, with a readable plain-text version and the `Date` and
-`Message-ID` headers IHP's left out. Jobs carry over either way, so
-switching back and forth loses none. `journalctl -u bosco-<name>-worker`
-logs each email sent or failed. It works without `rustWeb.enable`, and
-the other way round. With both, nothing of the IHP app runs on the
-instance: its site, worker, migrations and demo reset are all Rust's.
+Logins carried over: the site reads the session cookie the IHP app made,
+with the same key, and checks the password hashes it made.
+`rust-web/README.md` lists the few ways the Rust site behaves differently.
 
 ### Users and roles
 
@@ -278,19 +253,12 @@ made it, when, and the text before and after (`text_changes`). A product's
 and a producer's page in the admin list them, newest first.
 
 Only an admin marks orders invoiced or paid, cancels them, emails invoices
-again and manages the shop. On an instance with `rustWeb.enable`,
-`bosco-<name>-create-user` makes logins, as root:
+again and manages the shop. `bosco-<name>-create-user` makes logins, as
+root:
 
 ```sh
 read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
 ADMIN_EMAIL=someone@example.com ROLES=deliverer,promoter bosco-fi-create-user
-```
-
-Without it, `CreateUser` does, on the server as the instance's user:
-
-```sh
-read -rs ADMIN_PASSWORD && export ADMIN_PASSWORD
-ADMIN_EMAIL=someone@example.com ROLES=deliverer,promoter run-script Application/Script/CreateUser.hs
 ```
 
 `ROLES` is `admin` when not given. An existing login's roles change in SQL,

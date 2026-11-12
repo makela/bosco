@@ -1,6 +1,5 @@
 # Evaluates nix/module.nix with a Finnish, a French and a staging instance,
-# as in the README, and checks the users, databases, sockets and services it
-# makes. Nothing is built or started, so no virtual machine is needed.
+# as in the README, and checks the users, databases and services it makes. Nothing is built or started, so no virtual machine is needed.
 {
   pkgs,
   nixosSystem,
@@ -87,11 +86,22 @@ let
     };
 
     testInstancesListenLocallyOnTheirOwnPorts = {
-      expr = lib.mapAttrs (_: socket: socket.socketConfig.ListenStream) (ours server.systemd.sockets);
+      expr = lib.genAttrs (map (name: "bosco-${name}") instanceNames) (name: services.${name}.environment.ADDR);
       expected = {
         bosco-fi = "127.0.0.1:3300";
         bosco-fr = "127.0.0.1:3301";
         bosco-staging = "127.0.0.1:3302";
+      };
+    };
+
+    testNginxSendsEverythingToTheSite = {
+      expr = {
+        inherit (server.services.bosco.instances.fr) nginxLocations;
+        sockets = lib.attrNames (ours server.systemd.sockets);
+      };
+      expected = {
+        nginxLocations."/".proxyPass = "http://127.0.0.1:3301";
+        sockets = [ ];
       };
     };
 
@@ -102,26 +112,35 @@ let
             baseUrl = "https://tilaus.example.fi";
             host = "::1";
           };
-        })).systemd.sockets.bosco-fi.socketConfig.ListenStream;
+        })).systemd.services.bosco-fi.environment.ADDR;
       expected = "[::1]:3300";
     };
 
     testWebServerEnvironment = {
-      expr = lib.getAttrs [
-        "IHP_ENV"
-        "IHP_BASEURL"
-        "DATABASE_URL"
-        "IHP_SESSION_SECRET_FILE"
-        "IHP_REQUEST_LOGGER_IP_ADDR_SOURCE"
-        "IHP_SYSTEMD"
-      ] services.bosco-fi.environment;
+      expr =
+        let
+          environment = services.bosco-fi.environment;
+          static = "${self.packages.${system}.rust-static}";
+        in
+        {
+          inherit (environment)
+            IHP_BASEURL
+            DATABASE_URL
+            IHP_SESSION_SECRET_FILE
+            STATIC_DIR
+            SEND_EMAILS
+            ;
+          assetVersion = environment.ASSET_VERSION == lib.substring 0 32 (baseNameOf static);
+          ihpSettings = environment ? IHP_ENV || environment ? GHCRTS || environment ? STYLESHEET;
+        };
       expected = {
-        IHP_ENV = "Production";
         IHP_BASEURL = "https://tilaus.example.fi";
-        DATABASE_URL = "postgresql:///bosco_fi?host=/run/postgresql";
+        DATABASE_URL = "postgresql:///bosco_fi?host=/run/postgresql&user=bosco_fi";
         IHP_SESSION_SECRET_FILE = "/var/lib/bosco-fi/session.aes";
-        IHP_REQUEST_LOGGER_IP_ADDR_SOURCE = "FromHeader";
-        IHP_SYSTEMD = "1";
+        STATIC_DIR = "${self.packages.${system}.rust-static}";
+        SEND_EMAILS = "1";
+        assetVersion = true;
+        ihpSettings = false;
       };
     };
 
@@ -154,9 +173,9 @@ let
         "bosco-fi-migrate"
       ];
       expected = [
-        "${self.packages.${system}.optimized-prod-server}/bin/RunProdServer"
-        "${self.packages.${system}.optimized-prod-server}/bin/RunJobs"
-        "${self.packages.${system}.migrate}/bin/migrate"
+        "${self.packages.${system}.rust-web}/bin/bosco-web"
+        "${self.packages.${system}.rust-web}/bin/bosco-worker"
+        "${self.packages.${system}.rust-web}/bin/bosco-migrate"
       ];
     };
 
@@ -298,6 +317,7 @@ let
           "ProtectSystem"
           "ProtectHome"
           "CapabilityBoundingSet"
+          "MemoryDenyWriteExecute"
           "StateDirectory"
         ] service.serviceConfig
       ) (lib.filterAttrs (name: _: lib.hasPrefix "bosco-fi" name) services);
@@ -306,6 +326,7 @@ let
         ProtectSystem = "strict";
         ProtectHome = true;
         CapabilityBoundingSet = "";
+        MemoryDenyWriteExecute = true;
         StateDirectory = "bosco-fi";
       });
     };
@@ -325,9 +346,9 @@ let
       expected = true;
     };
 
-    # With both the Rust site and the Rust worker, nothing of the IHP app runs:
-    # every service's program is a Rust one
-    testWithBothNoIhpProgramRuns = {
+    # Every service of an instance, a demo's reset too, runs a program of
+    # rust-web/
+    testEveryProgramIsRust = {
       expr =
         let
           config = evaluate {
@@ -336,110 +357,42 @@ let
               port = 3303;
               demo = true;
               sendEmails = false;
-              rustWeb.enable = true;
-              rustWorker.enable = true;
             };
           };
           ours = lib.filterAttrs (name: _: lib.hasPrefix "bosco-demo" name) config.systemd.services;
         in
-        {
-          programs = lib.sort (a: b: a < b) (
-            lib.mapAttrsToList (_: service: baseNameOf service.serviceConfig.ExecStart) ours
-          );
-          sockets = lib.attrNames (lib.filterAttrs (name: _: lib.hasPrefix "bosco-" name) config.systemd.sockets);
-        };
+        lib.sort (a: b: a < b) (lib.mapAttrsToList (_: service: baseNameOf service.serviceConfig.ExecStart) ours);
+      expected = [
+        "bosco-migrate"
+        "bosco-reset-demo"
+        "bosco-web"
+        "bosco-worker"
+      ];
+    };
+
+    # The site's session key is the one the migrations' keygen makes, in the
+    # state directory, so logins outlive a restart
+    testTheSiteUsesTheInstancesSessionKey = {
+      expr = {
+        key = services.bosco-fi.environment.IHP_SESSION_SECRET_FILE;
+        keygen = lib.hasInfix "keygen" (toString (lib.head services.bosco-fi-migrate.serviceConfig.ExecStartPre));
+        state = services.bosco-fi.serviceConfig.StateDirectory;
+      };
       expected = {
-        programs = [
-          "bosco-migrate"
-          "bosco-reset-demo"
-          "bosco-web"
-          "bosco-worker"
-        ];
-        sockets = [ ];
+        key = "/var/lib/bosco-fi/session.aes";
+        keygen = true;
+        state = "bosco-fi";
       };
     };
 
-    # The Rust site in place of the IHP app's web server, on the same
-    # database as the same user; the IHP app's worker stays until
-    # rustWorker.enable
-    testTheRustSiteReplacesTheIhpWebServer = {
+    # The email worker with its instance's SMTP settings and password, as
+    # the instance's user, and nothing of IHP's
+    testTheWorkerHasOnlyWhatItNeeds = {
       expr =
         let
-          demo = evaluate {
-            demo = {
-              baseUrl = "https://demo.example.com";
-              port = 3303;
-              locale = "en";
-              demo = true;
-              sendEmails = false;
-              rustWeb.enable = true;
-            };
-          };
-          rust = demo.systemd.services.bosco-demo-rust-web;
-          static = "${self.packages.${system}.rust-static}";
+          worker = services.bosco-fi-worker;
         in
         {
-          program = lib.hasSuffix "/bin/bosco-web" rust.serviceConfig.ExecStart;
-          inherit (rust.environment)
-            DATABASE_URL
-            ADDR
-            APP_LOCALE
-            APP_DEMO
-            SEND_EMAILS
-            STATIC_DIR
-            IHP_SESSION_SECRET_FILE
-            IHP_BASEURL
-            ;
-          stylesheet = !(rust.environment ? STYLESHEET);
-          assetVersion = rust.environment.ASSET_VERSION == lib.substring 0 32 (baseNameOf static);
-          # The same key as the IHP app's (its worker's here)
-          sessionKey = rust.environment.IHP_SESSION_SECRET_FILE == demo.systemd.services.bosco-demo-worker.environment.IHP_SESSION_SECRET_FILE;
-          user = rust.serviceConfig.User;
-          afterMigrations = lib.elem "bosco-demo-migrate.service" rust.after;
-          ihpWebServer = demo.systemd.services ? bosco-demo || demo.systemd.sockets ? bosco-demo;
-          ihpWorker = demo.systemd.services ? bosco-demo-worker;
-          locations = demo.services.bosco.instances.demo.rustWeb.nginxLocations;
-        };
-      expected = {
-        program = true;
-        DATABASE_URL = "postgresql:///bosco_demo?host=/run/postgresql&user=bosco_demo";
-        ADDR = "127.0.0.1:3403";
-        APP_LOCALE = "en";
-        APP_DEMO = "1";
-        SEND_EMAILS = "0";
-        STATIC_DIR = "${self.packages.${system}.rust-static}";
-        IHP_SESSION_SECRET_FILE = "/var/lib/bosco-demo/session.aes";
-        IHP_BASEURL = "https://demo.example.com";
-        stylesheet = true;
-        assetVersion = true;
-        sessionKey = true;
-        user = "bosco_demo";
-        afterMigrations = true;
-        ihpWebServer = false;
-        ihpWorker = true;
-        locations = {
-          "/".proxyPass = "http://127.0.0.1:3403";
-        };
-      };
-    };
-
-    # The Rust email worker in the same service, with the same SMTP settings
-    # and password, as the same user
-    testTheRustWorkerTakesOverTheWorkerService = {
-      expr =
-        let
-          worker =
-            (evaluate {
-              fi = {
-                baseUrl = "https://tilaus.example.fi";
-                locale = "fi";
-                inherit smtp;
-                rustWorker.enable = true;
-              };
-            }).systemd.services.bosco-fi-worker;
-        in
-        {
-          program = lib.hasSuffix "/bin/bosco-worker" worker.serviceConfig.ExecStart;
           inherit (worker.environment)
             DATABASE_URL
             APP_LOCALE
@@ -448,11 +401,11 @@ let
             SMTP_USER
             SMTP_PASSWORD_FILE
             ;
-          inherit (worker.serviceConfig) LoadCredential User MemoryDenyWriteExecute;
+          inherit (worker.serviceConfig) LoadCredential User;
+          sessionKey = worker.environment ? IHP_SESSION_SECRET_FILE;
           ihpSettings = worker.environment ? IHP_ENV || worker.environment ? GHCRTS;
         };
       expected = {
-        program = true;
         DATABASE_URL = "postgresql:///bosco_fi?host=/run/postgresql&user=bosco_fi";
         APP_LOCALE = "fi";
         SEND_EMAILS = "1";
@@ -461,14 +414,14 @@ let
         SMTP_PASSWORD_FILE = "%d/smtp-password";
         LoadCredential = "smtp-password:/var/lib/secrets/bosco/smtp-password";
         User = "bosco_fi";
-        MemoryDenyWriteExecute = true;
+        sessionKey = false;
         ihpSettings = false;
       };
     };
 
-    # The order emails' sender and reply address reach both workers: the
+    # The order emails' sender and reply address reach the worker: the
     # defaults, and an instance's own
-    testTheMailAddressesReachTheWorkers = {
+    testTheMailAddressesReachTheWorker = {
       expr =
         let
           config = evaluate {
@@ -480,125 +433,98 @@ let
               baseUrl = "https://shop.example.com";
               port = 3310;
               inherit smtp;
-              rustWorker.enable = true;
               mail = {
                 from = "Example Shop <orders@example.com>";
                 replyTo = null;
               };
             };
           };
-          addresses = name: lib.getAttrs (lib.filter (n: lib.hasPrefix "MAIL_" n) (lib.attrNames config.systemd.services."bosco-${name}-worker".environment)) config.systemd.services."bosco-${name}-worker".environment;
+          addresses =
+            name:
+            let
+              environment = config.systemd.services."bosco-${name}-worker".environment;
+            in
+            lib.getAttrs (lib.filter (n: lib.hasPrefix "MAIL_" n) (lib.attrNames environment)) environment;
         in
         {
-          ihp = addresses "fi";
-          rust = addresses "shop";
+          defaults = addresses "fi";
+          own = addresses "shop";
         };
       expected = {
-        ihp = {
+        defaults = {
           MAIL_FROM = "postmaster@boscofalconeria.it";
           MAIL_REPLY_TO = "Olive Oil Bosco Falconeria <oliveoil@boscofalconeria.it>";
         };
-        rust = {
+        own = {
           MAIL_FROM = "Example Shop <orders@example.com>";
         };
       };
     };
 
-    testWorkersStayInIhpUnlessAsked = {
-      expr = map (name: lib.hasSuffix "/bin/RunJobs" services."bosco-${name}-worker".serviceConfig.ExecStart) instanceNames;
-      expected = [
-        true
-        true
-        true
-      ];
-    };
-
-    # bosco-<name>-create-user, for an instance with the Rust site: the Rust
-    # program as the instance's user on its database
-    testAnInstanceWithTheRustSiteHasACreateUserCommand = {
+    # bosco-<name>-create-user for every instance: the Rust program as the
+    # instance's user on its database
+    testEveryInstanceHasACreateUserCommand = {
       expr =
         let
-          config = evaluate {
-            demo = {
-              baseUrl = "https://demo.example.com";
-              port = 3303;
-              demo = true;
-              sendEmails = false;
-              rustWeb.enable = true;
-            };
-            fi.baseUrl = "https://tilaus.example.fi";
-          };
-          commands = lib.filter (p: lib.hasPrefix "bosco-" (p.name or "")) config.environment.systemPackages;
+          commands = lib.filter (p: lib.hasPrefix "bosco-" (p.name or "")) server.environment.systemPackages;
           # Its text, without building it
-          script = (lib.head commands).drvAttrs.text;
+          script = (lib.findFirst (p: p.name == "bosco-fr-create-user") null commands).drvAttrs.text;
         in
         {
-          names = map (p: p.name) commands;
-          asTheUser = lib.hasInfix "runuser -u bosco_demo" script;
+          names = lib.sort (a: b: a < b) (map (p: p.name) commands);
+          asTheUser = lib.hasInfix "runuser -u bosco_fr" script;
           program = lib.hasInfix "/bin/bosco-create-user" script;
-          database = lib.hasInfix "postgresql:///bosco_demo?host=/run/postgresql&user=bosco_demo" script;
+          database = lib.hasInfix "postgresql:///bosco_fr?host=/run/postgresql&user=bosco_fr" script;
         };
       expected = {
-        names = [ "bosco-demo-create-user" ];
+        names = map (name: "bosco-${name}-create-user") instanceNames;
         asTheUser = true;
         program = true;
         database = true;
       };
     };
 
-    # A demo with the Rust site migrates and resets its data with the Rust
-    # programs
-    testTheRustSiteMigratesAndResetsTheDemo = {
+    # A configuration from when the Rust site ran beside the IHP app still
+    # works with rustWeb.enable and rustWorker.enable, with a warning, and
+    # rustWeb.nginxLocations is the same as nginxLocations
+    testTheOldRustSwitchesOnlyWarn = {
       expr =
         let
-          config = evaluate {
-            demo = {
-              baseUrl = "https://demo.example.com";
-              port = 3303;
-              demo = true;
-              sendEmails = false;
+          config = evaluate (quiet {
+            fi = {
+              baseUrl = "https://tilaus.example.fi";
               rustWeb.enable = true;
+              rustWorker.enable = true;
             };
-          };
-          reset = config.systemd.services.bosco-demo-reset-demo;
-          migrate = config.systemd.services.bosco-demo-migrate;
+          });
         in
         {
-          migrates = lib.hasSuffix "/bin/bosco-migrate" migrate.serviceConfig.ExecStart;
-          migratesWithTheUser = migrate.environment.DATABASE_URL == reset.environment.DATABASE_URL;
-          program = lib.hasSuffix "/bin/bosco-reset-demo" reset.serviceConfig.ExecStart;
-          inherit (reset.environment) APP_DEMO DATABASE_URL;
-          fixtures = lib.hasSuffix "Fixtures.sql" reset.environment.APP_FIXTURES;
+          failed = failedAssertions config;
+          warned = anyMessage "no longer needed" config.warnings;
+          locations = config.services.bosco.instances.fi.rustWeb.nginxLocations;
         };
       expected = {
-        migrates = true;
-        migratesWithTheUser = true;
-        program = true;
-        APP_DEMO = "1";
-        DATABASE_URL = "postgresql:///bosco_demo?host=/run/postgresql&user=bosco_demo";
-        fixtures = true;
+        failed = [ ];
+        warned = true;
+        locations."/".proxyPass = "http://127.0.0.1:3300";
       };
     };
 
-    testOnlyAnInstanceThatAsksRunsTheRustSite = {
-      expr = lib.attrNames (lib.filterAttrs (name: _: lib.hasSuffix "-rust-web" name) services);
-      expected = [ ];
-    };
-
-    testTheRustSiteNeedsAPortOfItsOwn = {
-      expr = anyMessage "own port" (
-        failedAssertions (evaluate (quiet {
-          fi = {
-            baseUrl = "https://tilaus.example.fi";
-            rustWeb.enable = true;
-          };
-          fr = {
-            baseUrl = "https://commande.example.fr";
-            port = 3400; # the Rust site's of fi
-          };
-        }))
-      );
-      expected = true;
+    # What can't mean anything any more stops the evaluation, saying what to
+    # do instead
+    testTheIhpAppsOptionsAreRefused = {
+      expr = map (instance: failedAssertions (evaluate (quiet { fi = { baseUrl = "https://tilaus.example.fi"; } // instance; }))) [
+        { rustWeb.enable = false; }
+        { rustWeb.port = 3400; }
+        { rtsFlags = "-N"; }
+        { migratePackage = pkgs.hello; }
+      ];
+      expected = [
+        [ "services.bosco.instances.fi: the IHP app is gone, so rustWeb.enable and rustWorker.enable can't be false. Remove them." ]
+        [ "services.bosco.instances.fi.rustWeb.port is gone with the IHP app: set port, which the site listens on now." ]
+        [ "services.bosco.instances.fi.rtsFlags is gone with the IHP app: remove it: there's no GHC runtime." ]
+        [ "services.bosco.instances.fi.migratePackage is gone with the IHP app: remove it: package has bosco-migrate." ]
+      ];
     };
 
     testTwoInstancesCannotShareADatabase = {
@@ -661,7 +587,7 @@ let
           reset = demo.systemd.services.bosco-demo-reset-demo;
         in
         {
-          program = lib.hasSuffix "/bin/ResetDemo" reset.serviceConfig.ExecStart;
+          program = lib.hasSuffix "/bin/bosco-reset-demo" reset.serviceConfig.ExecStart;
           inherit (reset.environment) APP_DEMO SEND_EMAILS APP_FIXTURES;
           user = reset.serviceConfig.User;
           afterMigrations = lib.elem "bosco-demo-migrate.service" reset.after;
@@ -719,8 +645,8 @@ let
       };
     };
 
-    # Config.hs refuses to start a demo without SEND_EMAILS=0, so every
-    # program of a demo needs both settings, not only the worker
+    # Every program of a demo knows it is one, and that it sends no emails:
+    # the worker refuses to send a demo's
     testEveryDemoProgramKnowsItIsADemoWithoutEmails = {
       expr =
         let
