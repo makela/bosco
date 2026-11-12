@@ -182,6 +182,6 @@ With `rustWeb.enable` and `rustWorker.enable`, nothing of the IHP app runs
 on an instance. Its static files are the Rust site's own,
 `nix/rust-static.nix`: the stylesheet built with Tailwind from
 `tailwind/app.css` for the Rust site's markup only, `static/app.js`,
-`static/admin.js` and the images. IHP is still the source of its base
-schema (`IHPSchema.sql`) and of the dev environment; removing it is a later
-step.
+`static/admin.js` and the images. IHP's base schema, which a new database
+starts with, is a copy in `db/IHPSchema.sql`. IHP is still the source of
+the dev environment; removing it is a later step.

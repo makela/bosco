@@ -419,7 +419,7 @@ let
           MINIMUM_REVISION = toString instance.minimumRevision;
         }
         // lib.optionalAttrs instance.bootstrapSchema {
-          IHP_SCHEMA = "${instance.flake.inputs.ihp}/ihp-schema-compiler/data/IHPSchema.sql";
+          IHP_SCHEMA = "${instance.flake}/db/IHPSchema.sql";
           APP_SCHEMA = "${instance.flake}/Application/Schema.sql";
           APP_FIXTURES = fixtures;
         };

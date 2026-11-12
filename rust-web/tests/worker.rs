@@ -12,10 +12,8 @@ use uuid::Uuid;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const IHP_SCHEMA: &str = r#"
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE TYPE JOB_STATUS AS ENUM ('job_status_not_started', 'job_status_running', 'job_status_failed', 'job_status_timed_out', 'job_status_succeeded', 'job_status_retry');
-"#;
+/// What IHP put in a database before the app's schema
+const IHP_SCHEMA: &str = include_str!("../../db/IHPSchema.sql");
 
 /// The schema, a product and payment instructions
 async fn shop(db: &PgPool) -> Result<Product, Box<dyn std::error::Error>> {

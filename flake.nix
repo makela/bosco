@@ -39,7 +39,7 @@
                             ./Application/Migration
                         ];
                     };
-                    ihpSchema = "${ihp}/ihp-schema-compiler/data/IHPSchema.sql";
+                    ihpSchema = ./db/IHPSchema.sql;
                 };
             in {
                 ihp = {
