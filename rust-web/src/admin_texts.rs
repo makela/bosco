@@ -21,7 +21,7 @@ use maud::{Markup, html};
 use uuid::Uuid;
 
 use crate::admin::{self, Crumb};
-use crate::admin_orders::time_ago;
+use crate::admin_orders::date_time;
 use crate::db::{self, Published, TextKind};
 use crate::permission::Permission;
 use crate::query;
@@ -164,7 +164,7 @@ pub async fn index(
                 tbody {
                     @for row in &rows {
                         tr {
-                            td { a href=(action_path(kind, "Show", row.id)) { (time_ago(row.published_at)) } }
+                            td { a href=(action_path(kind, "Show", row.id)) { (date_time(row.published_at)) } }
                             @if let Some(open) = row.is_ordering_enabled {
                                 td { @if open { "✓" } }
                             }
@@ -299,7 +299,7 @@ pub async fn show(
     let mut crumbs = vec![
         Crumb::link("Home", admin::WELCOME),
         Crumb::link(n.plural, &list),
-        Crumb::text(time_ago(text.published_at)),
+        Crumb::text(date_time(text.published_at)),
     ];
     if !(state.site.demo && refused_on_demo(kind, Change::Edit)) {
         crumbs.push(Crumb::link("Edit", &edit));
@@ -333,7 +333,7 @@ fn edit_page(state: &AppState, kind: TextKind, text: &Published) -> Markup {
     let mut crumbs = vec![
         Crumb::link("Home", admin::WELCOME),
         Crumb::link(n.plural, &list),
-        Crumb::markup_link(time_ago(text.published_at), &show),
+        Crumb::markup_link(date_time(text.published_at), &show),
         Crumb::text("Edit"),
     ];
     if !(state.site.demo && refused_on_demo(kind, Change::Delete)) {
