@@ -23,7 +23,8 @@ pub enum Permission {
     /// The welcome message, which also opens and closes ordering, and the
     /// payment instructions on invoices
     ManageWelcomeAndPayment,
-    /// Products, producers, customers and the shop's texts
+    /// Products, producers, customers, the shop's texts and the privacy
+    /// notice
     ManageShop,
 }
 

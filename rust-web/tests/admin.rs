@@ -504,6 +504,7 @@ async fn the_welcome_page_shows_what_the_roles_allow(db: PgPool) -> TestResult {
         "/admin/EmailsForNewsLetter",
         "/admin/Orders",
         "/admin/PaymentInstructions",
+        "/admin/PrivacyNotices",
         "/admin/Producers",
         "/admin/Products",
         "/admin/WelcomeMessages",
@@ -1410,8 +1411,8 @@ async fn a_demo_keeps_its_texts(db: PgPool) -> TestResult {
     Ok(())
 }
 
-/// Promoters write the welcome messages and payment instructions;
-/// delivery people don't
+/// Promoters write the welcome messages and payment instructions, but not
+/// the privacy notice; delivery people none of them
 #[sqlx::test(migrations = false)]
 async fn promoters_manage_welcome_and_payment_texts(db: PgPool) -> TestResult {
     admin(&db).await?;
@@ -1437,6 +1438,20 @@ async fn promoters_manage_welcome_and_payment_texts(db: PgPool) -> TestResult {
     .fetch_all(&db)
     .await?;
     assert_eq!(texts, ["Uusi", "Uusi"]);
+
+    for uri in ["/admin/PrivacyNotices", "/admin/NewPrivacyNotice"] {
+        let response = send(&app, Method::GET, uri, &promoter, &[]).await?;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{uri}");
+    }
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/CreatePrivacyNotice",
+        &promoter,
+        &[("text", "x")],
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
     let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
     let response = send(&app, Method::GET, "/admin/WelcomeMessages", &driver, &[]).await?;
@@ -2169,5 +2184,54 @@ async fn the_admin_unsubscribes_an_email_and_subscribes_it_again(db: PgPool) -> 
     );
     let response = send(&app, Method::POST, &bad, &boss, &[]).await?;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn a_privacy_notice_starts_from_the_one_shown(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let list = text(send(&app, Method::GET, "/admin/PrivacyNotices", &boss, &[]).await?).await?;
+    assert!(list.contains("for now the default text"), "{list}");
+    // The first starts from the default text, in the site's language
+    let form = text(send(&app, Method::GET, "/admin/NewPrivacyNotice", &boss, &[]).await?).await?;
+    assert!(form.contains("## Rekisterinpitäjä"), "{form}");
+    assert!(form.contains(">Create privacy notice</button>"));
+    send(
+        &app,
+        Method::POST,
+        "/admin/CreatePrivacyNotice",
+        &boss,
+        &[("text", "## Rekisterinpitäjä\n\nBosco Falconeria s.r.l.")],
+    )
+    .await?;
+    // The next starts from that one
+    let form = text(send(&app, Method::GET, "/admin/NewPrivacyNotice", &boss, &[]).await?).await?;
+    assert!(form.contains("Bosco Falconeria s.r.l."), "{form}");
+    let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
+    let response = send(&app, Method::GET, "/admin/PrivacyNotices", &promoter, &[]).await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn a_demos_privacy_notice_is_fixed(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), true);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let response = send(
+        &app,
+        Method::POST,
+        "/admin/CreatePrivacyNotice",
+        &boss,
+        &[("text", "Visitor's own words")],
+    )
+    .await?;
+    assert_eq!(location(&response), "/admin/PrivacyNotices");
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM privacy_notices")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(count, 0);
     Ok(())
 }

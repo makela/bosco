@@ -65,6 +65,7 @@ pub fn layout(site: &Site, flash: Option<Flash>, content: &Markup) -> Markup {
                     (content)
                     footer.site-footer {
                         span { "© 2022–" (chrono::Utc::now().format("%Y")) " Bosco Falconeria" }
+                        a href="/PrivacyNotice" { (t(Text::PrivacyNotice)) }
                     }
                 }
             }
@@ -210,6 +211,7 @@ pub fn order_form(site: &Site, order: &OrderForm) -> Markup {
                     checked[order.form.customer.newsletter];
                 label for="customer_newsletter" { (t(Text::NewsletterOptIn)) }
             }
+            (privacy_note(site))
             (honeypot_field(site))
             input type="submit" value=(t(Text::Submit));
         }
@@ -312,10 +314,37 @@ pub fn subscribe_form(site: &Site, form: &CustomerForm) -> Markup {
                     div.invalid-feedback { (error.text(site.locale)) }
                 }
             }
+            (privacy_note(site))
             p.form-note { a href="/Unsubscribe" { (t(Text::Unsubscribe)) } }
             (honeypot_field(site))
             input type="submit" value=(t(Text::Subscribe));
         }
+    }
+}
+
+/// Above a form's button: where to read how the details are handled
+fn privacy_note(site: &Site) -> Markup {
+    html! {
+        p.form-note {
+            (Text::PrivacyNote.text(site.locale)) " "
+            a href="/PrivacyNotice" { (Text::PrivacyNotice.text(site.locale)) }
+        }
+    }
+}
+
+/// The privacy notice, and when it was published; none for the default
+pub fn privacy_notice(
+    site: &Site,
+    text: &str,
+    published_at: Option<chrono::DateTime<chrono::Utc>>,
+) -> Markup {
+    let t = |text: Text| text.text(site.locale);
+    html! {
+        h1 { (t(Text::PrivacyNotice)) }
+        @if let Some(at) = published_at {
+            p class="text-sm text-gray-600" { (t(Text::PrivacyUpdated)) " " (at.format("%d.%m.%Y")) }
+        }
+        div.privacy-notice { (markdown(text)) }
     }
 }
 

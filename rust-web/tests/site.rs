@@ -854,3 +854,47 @@ async fn every_page_has_the_farms_copyright(db: PgPool) -> TestResult {
     }
     Ok(())
 }
+
+// The privacy notice
+
+#[sqlx::test(migrations = false)]
+async fn every_page_and_form_links_to_the_privacy_notice(db: PgPool) -> TestResult {
+    shop(&db).await?;
+    let app = site(db.clone(), false);
+    for uri in ["/", "/NewOrder", "/NewEmail", "/Unsubscribe"] {
+        let page = body(get(&app, uri).await?).await?;
+        assert!(page.contains(r#"href="/PrivacyNotice""#), "{uri}");
+    }
+    let form = body(get(&app, "/NewOrder").await?).await?;
+    assert!(form.contains("Miten käsittelemme tietojasi:"));
+    let front = body(get(&app, "/").await?).await?;
+    assert!(front.contains(
+        r#" Bosco Falconeria</span><a href="/PrivacyNotice">Tietosuojaseloste</a></footer>"#
+    ));
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn shows_the_newest_privacy_notice_or_else_the_default(db: PgPool) -> TestResult {
+    schema(&db).await?;
+    let app = site(db.clone(), false);
+    let page = body(get(&app, "/PrivacyNotice").await?).await?;
+    assert!(page.contains("<h1>Tietosuojaseloste</h1>"));
+    assert!(page.contains("<h2>Rekisterinpitäjä</h2>"), "{page}");
+    assert!(page.contains(r#"<a href="/Unsubscribe">Peru uutiskirjeen tilaus</a>"#));
+    assert!(!page.contains("Päivitetty"));
+    sqlx::query(
+        "INSERT INTO privacy_notices (text, published_at)
+         VALUES ('Vanha', '2026-01-01 12:00:00+00'), ('**Uusi**', '2026-11-17 12:00:00+00')",
+    )
+    .execute(&db)
+    .await?;
+    let page = body(get(&app, "/PrivacyNotice").await?).await?;
+    assert!(page.contains("Päivitetty 17.11.2026"), "{page}");
+    assert!(page.contains("<strong>Uusi</strong>"));
+    assert!(!page.contains("Vanha"));
+    // A demo shows the default, whatever is stored
+    let demo = body(get(&site(db, true), "/PrivacyNotice").await?).await?;
+    assert!(demo.contains("<h2>Rekisterinpitäjä</h2>"));
+    Ok(())
+}

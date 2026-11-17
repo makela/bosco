@@ -253,7 +253,7 @@ A login has one or more roles, and may do whatever any of them allows
   and packages, producers' subjects and descriptions. Not prices, producer
   names, or which products and producers there are and are shown. They also
   write the welcome messages, which open and close ordering, and the
-  payment instructions on invoices.
+  payment instructions on invoices; the privacy notice is the admins'.
 
 Every change to a product's or producer's texts, by anyone, is kept with who
 made it, when, and the text before and after (`text_changes`). A product's

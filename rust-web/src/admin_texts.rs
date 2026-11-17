@@ -1,10 +1,12 @@
-//! The admin's two published texts, the IHP app's
+//! The admin's published texts, the IHP app's
 //! `Admin/Controller/WelcomeMessages.hs` and `PaymentInstructions.hs`:
 //! the welcome message on the front page, which also opens and closes
-//! ordering, and the payment instructions on invoices. Each has a list, a
+//! ordering, and the payment instructions on invoices; and the privacy
+//! notice, which the IHP app didn't have. Each has a list, a
 //! page, and IHP's generated forms to write a new one, edit one and delete
-//! one. Admins and promoters manage them. The lists are on one page: IHP's
-//! split them into pages of 50, which these never reach.
+//! one. Admins and promoters manage the welcome messages and payment
+//! instructions; the privacy notice is the admins' alone. The lists are on
+//! one page: IHP's split them into pages of 50, which these never reach.
 //!
 //! On a demo, everyone is an admin, so a visitor can't put their own words
 //! or bank account in front of others: only ordering can be opened and
@@ -64,6 +66,14 @@ fn names(kind: TextKind) -> Names {
             form: "paymentInstruction",
             demo_refusal: "The demo's payment details are fixed and can't be changed",
         },
+        TextKind::Privacy => Names {
+            plural: "Privacy notices",
+            one: "privacy notice",
+            model: "PrivacyNotice",
+            id_param: "privacyNoticeId",
+            form: "privacyNotice",
+            demo_refusal: "The demo's privacy notice is the default one and can't be changed",
+        },
     }
 }
 
@@ -87,7 +97,7 @@ enum Change {
 fn refused_on_demo(kind: TextKind, change: Change) -> bool {
     match kind {
         TextKind::Welcome => change != Change::Edit,
-        TextKind::Payment => true,
+        TextKind::Payment | TextKind::Privacy => true,
     }
 }
 
@@ -121,15 +131,24 @@ fn bad_request() -> Response {
     StatusCode::BAD_REQUEST.into_response()
 }
 
-/// A user who may manage the texts, with the session; or the response for
-/// anyone else
+/// Who may manage texts of the kind
+fn permission(kind: TextKind) -> Permission {
+    match kind {
+        TextKind::Welcome | TextKind::Payment => Permission::ManageWelcomeAndPayment,
+        TextKind::Privacy => Permission::ManageShop,
+    }
+}
+
+/// A user who may manage texts of the kind, with the session; or the
+/// response for anyone else
 async fn require_allowed(
+    kind: TextKind,
     state: &AppState,
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<std::result::Result<Session, Response>> {
     Ok(
-        admin::require_permission(state, headers, uri, Permission::ManageWelcomeAndPayment)
+        admin::require_permission(state, headers, uri, permission(kind))
             .await?
             .map(|(_, session)| session),
     )
@@ -141,7 +160,7 @@ pub async fn index(
     headers: HeaderMap,
     uri: Uri,
 ) -> Result<Response> {
-    let session = match require_allowed(&state, &headers, &uri).await? {
+    let session = match require_allowed(kind, &state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
@@ -154,6 +173,17 @@ pub async fn index(
     }
     let content = html! {
         (admin::breadcrumb(&crumbs))
+        @if kind == TextKind::Privacy {
+            p class="my-4" {
+                "The site shows the newest at " a href="/PrivacyNotice" { "/PrivacyNotice" }
+                @if rows.is_empty() {
+                    ": for now the default text, with the farm's details in [brackets] to fill in. "
+                    "Create one: it starts from the default text."
+                } @else {
+                    ". Publish a new one for a change that matters, so the old ones show what the site said when."
+                }
+            }
+        }
         div.table-responsive {
             table.table {
                 thead {
@@ -228,16 +258,24 @@ pub async fn new(
     headers: HeaderMap,
     uri: Uri,
 ) -> Result<Response> {
-    let session = match require_allowed(&state, &headers, &uri).await? {
+    let session = match require_allowed(kind, &state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
     if state.site.demo && refused_on_demo(kind, Change::New) {
         return Ok(refuse(&state, session, kind));
     }
+    // A new privacy notice starts from the one shown
+    let text = match kind {
+        TextKind::Privacy => match db::privacy_notice(&state.db).await? {
+            Some((text, _)) => text,
+            None => crate::privacy::default_text(state.site.locale).to_string(),
+        },
+        _ => String::new(),
+    };
     let blank = Published {
         id: Uuid::nil(),
-        text: String::new(),
+        text,
         published_at: chrono::Utc::now(),
         // A new welcome message opens ordering, unless unticked
         is_ordering_enabled: (kind == TextKind::Welcome).then_some(true),
@@ -266,7 +304,7 @@ async fn find(
     let Some(id) = id_of(kind, uri) else {
         return Ok(Err(bad_request()));
     };
-    let session = match require_allowed(state, headers, uri).await? {
+    let session = match require_allowed(kind, state, headers, uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(Err(response)),
     };
@@ -383,7 +421,7 @@ pub async fn create(
     uri: Uri,
     form: FormResult,
 ) -> Result<Response> {
-    let mut session = match require_allowed(&state, &headers, &uri).await? {
+    let mut session = match require_allowed(kind, &state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
@@ -478,7 +516,7 @@ pub async fn delete_by_post(
 pub fn routes(mut router: axum::Router<Arc<AppState>>) -> axum::Router<Arc<AppState>> {
     use axum::routing::{MethodRouter, delete as delete_, get, post};
     type Page = fn(TextKind, Arc<AppState>, HeaderMap, Uri) -> futures_page::Page;
-    for kind in [TextKind::Welcome, TextKind::Payment] {
+    for kind in [TextKind::Welcome, TextKind::Payment, TextKind::Privacy] {
         let model = names(kind).model;
         // A page any of GET, HEAD or POST shows
         let page = |f: Page| -> MethodRouter<Arc<AppState>> {
@@ -520,7 +558,7 @@ pub fn routes(mut router: axum::Router<Arc<AppState>>) -> axum::Router<Arc<AppSt
 }
 
 mod futures_page {
-    /// A page handler's future, boxed so the four pages share a type
+    /// A page handler's future, boxed so the pages share a type
     pub type Page = std::pin::Pin<
         Box<dyn std::future::Future<Output = crate::Result<axum::response::Response>> + Send>,
     >;

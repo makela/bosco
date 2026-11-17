@@ -72,6 +72,9 @@ pub enum Text {
     Phone,
     Pieces,
     PostalCode,
+    PrivacyNote,
+    PrivacyNotice,
+    PrivacyUpdated,
     SiteDescription,
     SiteTitle,
     StreetAddress,
@@ -279,6 +282,15 @@ impl Text {
             (Text::Unsubscribed, Locale::Fr) => {
                 "La newsletter ne sera plus envoyée à cette adresse."
             }
+            (Text::PrivacyNotice, Locale::Fi) => "Tietosuojaseloste",
+            (Text::PrivacyNotice, Locale::En) => "Privacy notice",
+            (Text::PrivacyNotice, Locale::Fr) => "Politique de confidentialité",
+            (Text::PrivacyNote, Locale::Fi) => "Miten käsittelemme tietojasi:",
+            (Text::PrivacyNote, Locale::En) => "How we handle your details:",
+            (Text::PrivacyNote, Locale::Fr) => "Comment nous traitons vos données\u{a0}:",
+            (Text::PrivacyUpdated, Locale::Fi) => "Päivitetty",
+            (Text::PrivacyUpdated, Locale::En) => "Updated",
+            (Text::PrivacyUpdated, Locale::Fr) => "Mis à jour le",
             (Text::PageNotFoundTitle, Locale::Fi) => "Sivua ei löytynyt",
             (Text::PageNotFoundTitle, Locale::En) => "Page not found",
             (Text::PageNotFoundTitle, Locale::Fr) => "Page introuvable",

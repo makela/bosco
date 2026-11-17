@@ -642,12 +642,22 @@ pub async fn ordered_products(db: &PgPool) -> sqlx::Result<(Vec<Producer>, Vec<P
     Ok((producers, products))
 }
 
-/// The admin's two published texts: the welcome message, which also opens
-/// and closes ordering, and the payment instructions
+/// The admin's published texts: the welcome message, which also opens
+/// and closes ordering, the payment instructions and the privacy notice
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextKind {
     Welcome,
     Payment,
+    Privacy,
+}
+
+/// The privacy notice shown, the newest, and when it was published
+pub async fn privacy_notice(db: &PgPool) -> sqlx::Result<Option<(String, DateTime<Utc>)>> {
+    sqlx::query_as(
+        "SELECT text, published_at FROM privacy_notices ORDER BY published_at DESC, id LIMIT 1",
+    )
+    .fetch_optional(db)
+    .await
 }
 
 /// A welcome message or payment instructions
@@ -672,6 +682,10 @@ pub async fn all_published(db: &PgPool, kind: TextKind) -> sqlx::Result<Vec<Publ
             "SELECT id, text, published_at, NULL::bool AS is_ordering_enabled
              FROM payment_instructions ORDER BY published_at, id"
         }
+        TextKind::Privacy => {
+            "SELECT id, text, published_at, NULL::bool AS is_ordering_enabled
+             FROM privacy_notices ORDER BY published_at DESC, id"
+        }
     };
     sqlx::query_as(sql).fetch_all(db).await
 }
@@ -684,6 +698,10 @@ pub async fn published(db: &PgPool, kind: TextKind, id: Uuid) -> sqlx::Result<Op
         TextKind::Payment => {
             "SELECT id, text, published_at, NULL::bool AS is_ordering_enabled
              FROM payment_instructions WHERE id = $1"
+        }
+        TextKind::Privacy => {
+            "SELECT id, text, published_at, NULL::bool AS is_ordering_enabled
+             FROM privacy_notices WHERE id = $1"
         }
     };
     sqlx::query_as(sql).bind(id).fetch_optional(db).await
@@ -710,6 +728,12 @@ pub async fn create_published(
                 .fetch_one(db)
                 .await
         }
+        TextKind::Privacy => {
+            sqlx::query_scalar("INSERT INTO privacy_notices (text) VALUES ($1) RETURNING id")
+                .bind(text)
+                .fetch_one(db)
+                .await
+        }
     }
 }
 
@@ -729,6 +753,9 @@ pub async fn update_published(
         TextKind::Payment => sqlx::query("UPDATE payment_instructions SET text = $2 WHERE id = $1")
             .bind(changed.id)
             .bind(&changed.text),
+        TextKind::Privacy => sqlx::query("UPDATE privacy_notices SET text = $2 WHERE id = $1")
+            .bind(changed.id)
+            .bind(&changed.text),
     };
     query.execute(db).await.map(drop)
 }
@@ -737,6 +764,7 @@ pub async fn delete_published(db: &PgPool, kind: TextKind, id: Uuid) -> sqlx::Re
     let sql = match kind {
         TextKind::Welcome => "DELETE FROM welcome_messages WHERE id = $1",
         TextKind::Payment => "DELETE FROM payment_instructions WHERE id = $1",
+        TextKind::Privacy => "DELETE FROM privacy_notices WHERE id = $1",
     };
     sqlx::query(sql).bind(id).execute(db).await.map(drop)
 }

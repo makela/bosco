@@ -322,6 +322,11 @@ const MENU: &[(Permission, &str, &str)] = &[
         "Payment instructions",
         "/admin/PaymentInstructions",
     ),
+    (
+        Permission::ManageShop,
+        "Privacy notices",
+        "/admin/PrivacyNotices",
+    ),
     (Permission::EditShopTexts, "Producers", "/admin/Producers"),
     (Permission::EditShopTexts, "Products", "/admin/Products"),
     (

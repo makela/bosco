@@ -20,6 +20,7 @@ pub mod l10n;
 pub mod mail;
 pub mod password;
 pub mod permission;
+pub mod privacy;
 pub mod query;
 pub mod session;
 pub mod settings;
@@ -427,6 +428,23 @@ async fn create_email(
     Ok(redirect_with(Flash::DetailsSaved, "/"))
 }
 
+/// The newest privacy notice the admin published, or the default text
+async fn privacy_notice(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Response> {
+    let notice = if state.site.demo {
+        None
+    } else {
+        db::privacy_notice(&state.db).await?
+    };
+    let content = match &notice {
+        Some((text, published_at)) => views::privacy_notice(&state.site, text, Some(*published_at)),
+        None => views::privacy_notice(&state.site, privacy::default_text(state.site.locale), None),
+    };
+    Ok(page(&state, &headers, StatusCode::OK, &content))
+}
+
 async fn new_unsubscribe(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let content = views::unsubscribe_form(&state.site, "", None);
     page(&state, &headers, StatusCode::OK, &content)
@@ -482,6 +500,7 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/NewEmail", get(new_email))
         .route("/CreateEmail", post(create_email))
         .route("/Unsubscribe", get(new_unsubscribe).post(unsubscribe))
+        .route("/PrivacyNotice", get(privacy_notice))
         // The methods IHP's AutoRoute takes for each
         .route(
             admin::NEW_SESSION,

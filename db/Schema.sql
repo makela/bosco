@@ -75,6 +75,11 @@ CREATE TABLE payment_instructions (
     published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     text TEXT NOT NULL
 );
+CREATE TABLE privacy_notices (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
+    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    text TEXT NOT NULL
+);
 CREATE TABLE email_order_jobs (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
