@@ -74,6 +74,9 @@ pub struct NewCustomer {
     pub street_address: String,
     pub postal_code: String,
     pub city: String,
+    /// Asked for the newsletter: on the newsletter form, or with the order
+    /// form's box. An order without it takes the email off the newsletter.
+    pub newsletter: bool,
 }
 
 impl NewCustomer {
@@ -177,8 +180,9 @@ async fn insert_customer(
 ) -> sqlx::Result<Uuid> {
     sqlx::query_scalar(
         "INSERT INTO customers (first_name, last_name, billing_name, email, phone,
-                                street_address, postal_code, city, reverse_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+                                street_address, postal_code, city, reverse_name, subscribed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $10 THEN NOW() END)
+         RETURNING id",
     )
     .bind(&customer.first_name)
     .bind(&customer.last_name)
@@ -189,6 +193,7 @@ async fn insert_customer(
     .bind(&customer.postal_code)
     .bind(&customer.city)
     .bind(customer.reverse_name())
+    .bind(customer.newsletter)
     .fetch_one(db)
     .await
 }
@@ -205,6 +210,11 @@ pub async fn create_order(
 ) -> sqlx::Result<Uuid> {
     let mut tx = db.begin().await?;
     let customer_id = insert_customer(&mut *tx, customer).await?;
+    // Unticking the box is saying no to the newsletter, also for the email's
+    // earlier orders and sign-ups
+    if !customer.newsletter {
+        unsubscribe_in(&mut tx, &customer.email).await?;
+    }
     let order_id: Uuid =
         sqlx::query_scalar("INSERT INTO orders (customer_id) VALUES ($1) RETURNING id")
             .bind(customer_id)
@@ -741,6 +751,9 @@ pub struct AdminCustomer {
     /// parts (migration 1794227624), to check the parts against
     pub name: String,
     pub address: String,
+    /// Since when they get the newsletter, or when they last left it
+    pub subscribed_at: Option<DateTime<Utc>>,
+    pub unsubscribed_at: Option<DateTime<Utc>>,
 }
 
 /// One customer per name, A to Z by the last name, each name's newest: a
@@ -748,7 +761,7 @@ pub struct AdminCustomer {
 pub async fn customers_by_name(db: &PgPool) -> sqlx::Result<Vec<AdminCustomer>> {
     sqlx::query_as(
         "SELECT DISTINCT ON (reverse_name) id, email, phone, first_name, last_name, street_address,
-                postal_code, city, billing_name, name, address
+                postal_code, city, billing_name, name, address, subscribed_at, unsubscribed_at
          FROM customers ORDER BY reverse_name, created_at DESC, id",
     )
     .fetch_all(db)
@@ -758,7 +771,7 @@ pub async fn customers_by_name(db: &PgPool) -> sqlx::Result<Vec<AdminCustomer>> 
 pub async fn admin_customer(db: &PgPool, id: Uuid) -> sqlx::Result<Option<AdminCustomer>> {
     sqlx::query_as(
         "SELECT id, email, phone, first_name, last_name, street_address, postal_code, city,
-                billing_name, name, address
+                billing_name, name, address, subscribed_at, unsubscribed_at
          FROM customers WHERE id = $1",
     )
     .bind(id)
@@ -831,12 +844,60 @@ pub async fn delivery_emails(db: &PgPool, year: i32) -> sqlx::Result<Vec<String>
     Ok(email_list(emails))
 }
 
-/// Every customer's email, for the newsletter
+/// The emails of those who get the newsletter
 pub async fn newsletter_emails(db: &PgPool) -> sqlx::Result<Vec<String>> {
-    let emails = sqlx::query_scalar("SELECT email FROM customers")
+    let emails = sqlx::query_scalar("SELECT email FROM customers WHERE subscribed_at IS NOT NULL")
         .fetch_all(db)
         .await?;
     Ok(email_list(emails))
+}
+
+/// An email as the lists compare them: trimmed and in lower case, in Rust,
+/// see `email_list`
+fn same_email(a: &str, b: &str) -> bool {
+    a.trim().to_lowercase() == b.trim().to_lowercase()
+}
+
+/// Takes the email off the newsletter: every customer with it, as each
+/// order saves the customer again. The number of customers it was taken
+/// off, 0 when it wasn't on it.
+pub async fn unsubscribe(db: &PgPool, email: &str) -> sqlx::Result<u64> {
+    let mut tx = db.begin().await?;
+    let count = unsubscribe_in(&mut tx, email).await?;
+    tx.commit().await?;
+    Ok(count)
+}
+
+async fn unsubscribe_in(conn: &mut sqlx::PgConnection, email: &str) -> sqlx::Result<u64> {
+    let subscribed: Vec<(Uuid, String)> =
+        sqlx::query_as("SELECT id, email FROM customers WHERE subscribed_at IS NOT NULL")
+            .fetch_all(&mut *conn)
+            .await?;
+    let ids: Vec<Uuid> = subscribed
+        .into_iter()
+        .filter(|(_, other)| same_email(other, email))
+        .map(|(id, _)| id)
+        .collect();
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    sqlx::query(
+        "UPDATE customers SET subscribed_at = NULL, unsubscribed_at = NOW()
+         WHERE id = ANY($1)",
+    )
+    .bind(&ids)
+    .execute(&mut *conn)
+    .await
+    .map(|done| done.rows_affected())
+}
+
+/// Puts the customer on the newsletter again, when they ask the admin to
+pub async fn resubscribe(db: &PgPool, id: Uuid) -> sqlx::Result<()> {
+    sqlx::query("UPDATE customers SET subscribed_at = COALESCE(subscribed_at, NOW()) WHERE id = $1")
+        .bind(id)
+        .execute(db)
+        .await
+        .map(drop)
 }
 
 /// A producer as the admin edits it

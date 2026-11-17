@@ -685,6 +685,7 @@ async fn saves_a_newsletter_subscriber(db: PgPool) -> TestResult {
         (first.as_str(), reverse.as_str(), phone.as_str()),
         ("Uutis", "tilaaja uutis", "")
     );
+    assert_eq!(subscribed(&db, "uutiset@example.com").await?, [true]);
 
     let form = body(
         post(
@@ -741,5 +742,100 @@ async fn ignores_a_flash_cookie_it_did_not_set(db: PgPool) -> TestResult {
     let page = body(get_with_cookie(&app, "/", "flash=<script>").await?).await?;
     assert!(!page.contains("<script>"));
     assert!(!page.contains("bg-green-100"));
+    Ok(())
+}
+
+/// Whether each customer with the email gets the newsletter, oldest first
+async fn subscribed(db: &PgPool, email: &str) -> sqlx::Result<Vec<bool>> {
+    sqlx::query_scalar(
+        "SELECT subscribed_at IS NOT NULL FROM customers WHERE email = $1 ORDER BY created_at",
+    )
+    .bind(email)
+    .fetch_all(db)
+    .await
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_order_forms_newsletter_box_is_ticked_to_begin_with(db: PgPool) -> TestResult {
+    let catalog = shop(&db).await?;
+    let app = site(db.clone(), false);
+    let form = body(get(&app, "/NewOrder").await?).await?;
+    assert!(
+        form.contains(
+            r#"name="newsletter" id="customer_newsletter" value="on" class="mt-1" checked"#
+        ),
+        "{form}"
+    );
+    // Kept as it was sent when the form is shown again
+    let form =
+        body(order(&app, "x@example.com", &[("city", "")], &[(catalog.oil, 1)]).await?).await?;
+    assert!(form.contains(r#"value="on" class="mt-1">"#), "{form}");
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn an_order_subscribes_with_the_box_and_unsubscribes_without_it(db: PgPool) -> TestResult {
+    let catalog = shop(&db).await?;
+    let app = site(db.clone(), false);
+    let email = "maija@example.com";
+    order(&app, email, &[("newsletter", "on")], &[(catalog.oil, 1)]).await?;
+    order(&app, email, &[("newsletter", "on")], &[(catalog.honey, 1)]).await?;
+    assert_eq!(subscribed(&db, email).await?, [true, true]);
+    // Unticked: off the newsletter, also for the earlier orders
+    order(&app, email, &[], &[(catalog.oil, 1)]).await?;
+    assert_eq!(subscribed(&db, email).await?, [false, false, false]);
+    let left: i64 = count(
+        &db,
+        "SELECT count(*) FROM customers WHERE unsubscribed_at IS NOT NULL",
+    )
+    .await?;
+    assert_eq!(left, 2);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn unsubscribes_an_email_whatever_its_case(db: PgPool) -> TestResult {
+    schema(&db).await?;
+    sqlx::query(
+        "INSERT INTO customers (first_name, email, phone, reverse_name, subscribed_at)
+         VALUES ('Maija', 'Maija@Example.com', '040', 'maija', NOW()),
+                ('Maija', 'maija@example.com', '040', 'maija', NOW()),
+                ('Pekka', 'pekka@example.com', '040', 'pekka', NOW())",
+    )
+    .execute(&db)
+    .await?;
+    let app = site(db.clone(), false);
+    let front = body(get(&app, "/").await?).await?;
+    assert!(front.contains(r#"href="/Unsubscribe""#));
+    let form = body(get(&app, "/Unsubscribe").await?).await?;
+    assert!(form.contains(r#"name="contact_me_by_fax_only""#));
+
+    let response = post(&app, "/Unsubscribe", &[("email", " MAIJA@example.com ")]).await?;
+    assert_eq!(location(&response), "/");
+    let front = body(get_with_cookie(&app, "/", &flash_cookie(&response)).await?).await?;
+    assert!(front.contains("Uutiskirjettä ei enää lähetetä tähän osoitteeseen."));
+    let still: Vec<String> =
+        sqlx::query_scalar("SELECT email FROM customers WHERE subscribed_at IS NOT NULL")
+            .fetch_all(&db)
+            .await?;
+    assert_eq!(still, ["pekka@example.com"]);
+
+    // An email not on the list gets the same answer, so the form doesn't
+    // tell who gets the newsletter
+    let response = post(&app, "/Unsubscribe", &[("email", "ketaan@example.com")]).await?;
+    assert_eq!(flash_cookie(&response), "flash=unsubscribed");
+    let form = body(post(&app, "/Unsubscribe", &[("email", "nope")]).await?).await?;
+    assert!(form.contains("Sähköposti on virheellinen"));
+    // A bot changes nothing
+    post(
+        &app,
+        "/Unsubscribe",
+        &[
+            ("email", "pekka@example.com"),
+            ("contact_me_by_fax_only", "x"),
+        ],
+    )
+    .await?;
+    assert_eq!(subscribed(&db, "pekka@example.com").await?, [true]);
     Ok(())
 }

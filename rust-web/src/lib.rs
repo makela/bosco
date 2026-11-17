@@ -1,5 +1,6 @@
 //! Bosco's public site: the IHP app's `Web/` (the welcome message, the order
-//! form, the order's invoice and the newsletter form) in Rust, on the same
+//! form, the order's invoice, the newsletter form and the page to leave the
+//! newsletter) in Rust, on the same
 //! PostgreSQL database. The URLs are IHP's, so links in sent emails and
 //! bookmarks keep working. Of the admin, the login and logout are here
 //! (`admin.rs`), with IHP's session cookie; the rest is the IHP app's. The
@@ -96,16 +97,18 @@ pub enum Flash {
     DetailsSaved,
     OrderingNotOpen,
     OrderingClosed,
+    Unsubscribed,
 }
 
 const FLASH_COOKIE: &str = "flash";
 
 impl Flash {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 5] = [
         Self::OrderSent,
         Self::DetailsSaved,
         Self::OrderingNotOpen,
         Self::OrderingClosed,
+        Self::Unsubscribed,
     ];
 
     fn key(self) -> &'static str {
@@ -114,6 +117,7 @@ impl Flash {
             Self::DetailsSaved => "details-saved",
             Self::OrderingNotOpen => "ordering-not-open",
             Self::OrderingClosed => "ordering-closed",
+            Self::Unsubscribed => "unsubscribed",
         }
     }
 
@@ -123,6 +127,7 @@ impl Flash {
             Self::DetailsSaved => Text::DetailsSaved,
             Self::OrderingNotOpen => Text::OrderingNotOpen,
             Self::OrderingClosed => Text::OrderingClosed,
+            Self::Unsubscribed => Text::Unsubscribed,
         }
     }
 
@@ -207,7 +212,8 @@ fn param(params: &Params, name: &str) -> String {
 }
 
 /// The customer's fields of a form, the name and address trimmed, as the
-/// IHP app does; the email and phone as they were written
+/// IHP app does; the email and phone as they were written. The newsletter
+/// box is sent only when it's ticked.
 pub(crate) fn customer_from(params: &Params) -> NewCustomer {
     let trimmed = |name: &str| param(params, name).trim().to_string();
     NewCustomer {
@@ -219,6 +225,7 @@ pub(crate) fn customer_from(params: &Params) -> NewCustomer {
         street_address: trimmed("streetAddress"),
         postal_code: trimmed("postalCode"),
         city: trimmed("city"),
+        newsletter: params.contains_key("newsletter"),
     }
 }
 
@@ -298,7 +305,7 @@ async fn new_order(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Re
             producers: &producers,
             products: &products,
             quantities: &HashMap::new(),
-            form: &CustomerForm::default(),
+            form: &CustomerForm::new_order(),
             unavailable: &[],
             no_products_selected: false,
         },
@@ -410,13 +417,39 @@ async fn create_email(
         .into_iter()
         .filter(|(name, _)| matches!(name.as_str(), "firstName" | "lastName" | "email"))
         .collect();
-    let form = check(customer_from(&params), SUBSCRIBE_CHECKS);
+    let mut form = check(customer_from(&params), SUBSCRIBE_CHECKS);
+    form.customer.newsletter = true;
     if !form.errors.is_empty() {
         let content = views::subscribe_form(&state.site, &form);
         return Ok(page(&state, &headers, StatusCode::OK, &content));
     }
     db::create_subscriber(&state.db, &form.customer).await?;
     Ok(redirect_with(Flash::DetailsSaved, "/"))
+}
+
+async fn new_unsubscribe(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let content = views::unsubscribe_form(&state.site, "", None);
+    page(&state, &headers, StatusCode::OK, &content)
+}
+
+/// Takes the email off the newsletter. The answer is the same whether it
+/// was on it or not, so the form doesn't tell who gets the newsletter.
+async fn unsubscribe(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Form(params): Form<Params>,
+) -> Result<Response> {
+    if is_spam(&params, "/Unsubscribe") {
+        return Ok(redirect_with(Flash::Unsubscribed, "/"));
+    }
+    let email = param(&params, "email").trim().to_string();
+    if let Err(error) = validate::email(&email) {
+        let content = views::unsubscribe_form(&state.site, &email, Some(error));
+        return Ok(page(&state, &headers, StatusCode::OK, &content));
+    }
+    let count = db::unsubscribe(&state.db, &email).await?;
+    tracing::info!("unsubscribed {count} customers from the newsletter");
+    Ok(redirect_with(Flash::Unsubscribed, "/"))
 }
 
 pub(crate) async fn not_found(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -448,6 +481,7 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/ShowOrder", get(show_order))
         .route("/NewEmail", get(new_email))
         .route("/CreateEmail", post(create_email))
+        .route("/Unsubscribe", get(new_unsubscribe).post(unsubscribe))
         // The methods IHP's AutoRoute takes for each
         .route(
             admin::NEW_SESSION,
@@ -491,6 +525,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/admin/EmailsForNewsLetter",
             get(admin_customers::newsletter_emails).post(admin_customers::newsletter_emails),
+        )
+        .route(
+            "/admin/UpdateNewsletterCustomer",
+            post(admin_customers::update_newsletter),
         )
         .route(
             "/admin/Producers",

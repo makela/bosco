@@ -3,7 +3,9 @@
 //! - a customer's page, and the forms to add one, edit one and delete one
 //!   that has no orders; admins only
 //! - the email lists: the year's customers', to tell them when their order
-//!   is delivered, and everyone's, for the newsletter
+//!   is delivered, and those who get the newsletter's
+//! - taking a customer's email off the newsletter, when they ask the admin,
+//!   or putting them back on it
 //!
 //! Unlike an order, the admin's form may leave the address empty: many
 //! customers from before the address was split have only a street, or
@@ -19,7 +21,7 @@ use maud::{Markup, html};
 use uuid::Uuid;
 
 use crate::admin::{self, Crumb};
-use crate::admin_orders::{Filter, year_select};
+use crate::admin_orders::{Filter, date_time, year_select};
 use crate::db::{self, AdminCustomer, NewCustomer};
 use crate::permission::Permission;
 use crate::session::{FLASH_ERROR, FLASH_SUCCESS, Session};
@@ -148,8 +150,79 @@ pub async fn show(
         p { (customer.email) }
         p { (customer.phone) }
         @for line in customer.address_lines() { p { (line) } }
+        (newsletter_status(&row))
     };
     Ok(admin::page(&state, session, &content))
+}
+
+/// Whether the customer gets the newsletter, since when or since when not,
+/// and the button to change it
+fn newsletter_status(row: &AdminCustomer) -> Markup {
+    let action = |subscribe: bool| {
+        format!(
+            "{}&subscribe={}",
+            path("UpdateNewsletter", row.id),
+            u8::from(subscribe)
+        )
+    };
+    html! {
+        div #newsletter class="my-4" {
+            @match (row.subscribed_at, row.unsubscribed_at) {
+                (Some(since), _) => {
+                    p { "Gets the newsletter since " (date_time(since)) }
+                    form method="POST" action=(action(false)) {
+                        button class="bg-gray-200 hover:bg-gray-300 py-1 px-3 rounded" type="submit" {
+                            "Unsubscribe " (row.customer.email) " from the newsletter"
+                        }
+                    }
+                }
+                (None, left) => {
+                    p {
+                        "Doesn't get the newsletter"
+                        @if let Some(left) = left { ": unsubscribed " (date_time(left)) }
+                    }
+                    form method="POST" action=(action(true)) {
+                        button class="bg-gray-200 hover:bg-gray-300 py-1 px-3 rounded" type="submit" {
+                            "Subscribe to the newsletter, as they asked"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Takes the customer's email off the newsletter, all its customers, or
+/// puts this customer back on it
+pub async fn update_newsletter(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    let (row, mut session) = match find(&state, &headers, &uri, &params).await? {
+        Ok(found) => found,
+        Err(response) => return Ok(response),
+    };
+    let subscribe = match params.iter().find(|(key, _)| key == "subscribe") {
+        Some((_, value)) if value == "1" => true,
+        Some((_, value)) if value == "0" => false,
+        _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
+    };
+    if subscribe {
+        db::resubscribe(&state.db, row.id).await?;
+        tracing::info!(customer = %row.id, "subscribed a customer to the newsletter");
+        session.set_text(FLASH_SUCCESS, "Subscribed to the newsletter");
+    } else {
+        let count = db::unsubscribe(&state.db, &row.customer.email).await?;
+        tracing::info!(customer = %row.id, count, "unsubscribed an email from the newsletter");
+        session.set_text(FLASH_SUCCESS, "Unsubscribed from the newsletter");
+    }
+    Ok(admin::with_session(
+        &state,
+        &session,
+        admin::found(&path("Show", row.id)),
+    ))
 }
 
 /// The form's fields, with IHP's labels and what each needs
@@ -195,6 +268,14 @@ fn form(state: &AppState, form: &CustomerForm, editing: Option<Uuid>) -> Markup 
                     @if let Some(error) = error {
                         div class="text-red-500 text-xs italic" { (error.text(state.site.locale)) }
                     }
+                }
+            }
+            // Whether a customer gets the newsletter is changed on their page
+            @if editing.is_none() {
+                div class="flex items-start my-6 space-x-2" {
+                    input type="checkbox" name="newsletter" id="customer_newsletter" value="on"
+                        class="mt-1" checked[c.newsletter];
+                    label for="customer_newsletter" { "Gets the newsletter: they asked for it" }
                 }
             }
             button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" type="submit" {
@@ -281,6 +362,8 @@ fn as_new(customer: &db::Customer) -> NewCustomer {
         street_address: customer.street_address.clone(),
         postal_code: customer.postal_code.clone(),
         city: customer.city.clone(),
+        // Not on the edit form: see `newsletter_status`
+        newsletter: false,
     }
 }
 
@@ -337,7 +420,8 @@ pub async fn create(
         Err(response) => return Ok(response),
     };
     let fields = form.map(|Form(fields)| fields).unwrap_or_default();
-    let customer = filled(NewCustomer::default(), &fields);
+    let mut customer = filled(NewCustomer::default(), &fields);
+    customer.customer.newsletter = fields.iter().any(|(key, _)| key == "newsletter");
     if !customer.errors.is_empty() {
         let content = new_page(&state, &customer);
         return Ok(admin::page(&state, session, &content));
@@ -469,6 +553,11 @@ pub async fn newsletter_emails(
             Crumb::link("Home", admin::WELCOME),
             Crumb::text("Emails for the newsletter"),
         ]))
+        p { "Those who asked for the newsletter and haven't unsubscribed. Put this at the end of every newsletter:" }
+        blockquote class="my-4 pl-4 border-l-4 text-gray-700" {
+            (crate::l10n::Text::Unsubscribe.text(state.site.locale)) ": "
+            (state.site.base_url.as_deref().unwrap_or("").trim_end_matches('/')) "/Unsubscribe"
+        }
         p { (emails.join(", ")) }
     };
     Ok(admin::page(&state, session, &content))

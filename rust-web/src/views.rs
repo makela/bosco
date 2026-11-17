@@ -121,6 +121,7 @@ pub fn index(site: &Site, message: Option<&WelcomeMessage>) -> Markup {
                 a.btn-small href="/NewOrder" data-turbolinks="false" { (t(Text::FillOrder)) }
             }
             a.link href="/NewEmail" data-turbolinks="false" { (t(Text::SubscribeToNewsLetter)) }
+            a.link href="/Unsubscribe" data-turbolinks="false" { (t(Text::Unsubscribe)) }
         }
     }
 }
@@ -131,6 +132,19 @@ pub fn index(site: &Site, message: Option<&WelcomeMessage>) -> Markup {
 pub struct CustomerForm {
     pub customer: NewCustomer,
     pub errors: HashMap<&'static str, Text>,
+}
+
+impl CustomerForm {
+    /// An empty order form, its newsletter box ticked
+    pub fn new_order() -> Self {
+        Self {
+            customer: NewCustomer {
+                newsletter: true,
+                ..NewCustomer::default()
+            },
+            errors: HashMap::new(),
+        }
+    }
 }
 
 /// The order form, empty or as it was sent when something has to be fixed
@@ -188,6 +202,11 @@ pub fn order_form(site: &Site, order: &OrderForm) -> Markup {
             (customer_field(site, order.form, "streetAddress", Text::StreetAddress, "street-address"))
             (customer_field(site, order.form, "postalCode", Text::PostalCode, "postal-code"))
             (customer_field(site, order.form, "city", Text::City, "address-level2"))
+            div class="flex items-start my-6 space-x-2" {
+                input type="checkbox" name="newsletter" id="customer_newsletter" value="on"
+                    class="mt-1" checked[order.form.customer.newsletter];
+                label for="customer_newsletter" { (t(Text::NewsletterOptIn)) }
+            }
             (honeypot_field(site))
             input type="submit" value=(t(Text::Submit));
         }
@@ -292,6 +311,28 @@ pub fn subscribe_form(site: &Site, form: &CustomerForm) -> Markup {
             }
             (honeypot_field(site))
             input type="submit" value=(t(Text::Subscribe));
+        }
+        p { a.link href="/Unsubscribe" { (t(Text::Unsubscribe)) } }
+    }
+}
+
+/// The form to leave the newsletter: the email, and why it wasn't accepted
+pub fn unsubscribe_form(site: &Site, email: &str, error: Option<Text>) -> Markup {
+    let t = |text: Text| text.text(site.locale);
+    html! {
+        h1 { (t(Text::Unsubscribe)) }
+        p { (t(Text::UnsubscribeHelp)) }
+        form method="POST" action="/Unsubscribe" {
+            div class="flex flex-col my-6 space-y-2" id="form-group-customer_email" {
+                label class="font-medium text-gray-700 " for="customer_email" { (t(Text::Email)) }
+                input type="email" name="email" id="customer_email" required autocomplete="email"
+                    value=(email) class=(field_class(error.is_some()));
+                @if let Some(error) = error {
+                    div.invalid-feedback { (error.text(site.locale)) }
+                }
+            }
+            (honeypot_field(site))
+            input type="submit" value=(t(Text::UnsubscribeButton));
         }
     }
 }

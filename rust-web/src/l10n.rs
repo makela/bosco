@@ -58,6 +58,7 @@ pub enum Text {
     InvoicePaid,
     LastName,
     LeaveEmpty,
+    NewsletterOptIn,
     NoLongerAvailable,
     NoProductsSelected,
     OrderForm,
@@ -78,6 +79,10 @@ pub enum Text {
     Subscribe,
     SubscribeToNewsLetter,
     Total,
+    Unsubscribe,
+    UnsubscribeButton,
+    Unsubscribed,
+    UnsubscribeHelp,
 }
 
 impl Text {
@@ -241,6 +246,39 @@ impl Text {
             (Text::DemoNoEmail, Locale::Fi) => "Esittelyversio ei lähetä laskua sähköpostiin.",
             (Text::DemoNoEmail, Locale::En) => "The demo does not send the invoice to your email.",
             (Text::DemoNoEmail, Locale::Fr) => "La démo n'envoie pas la facture par e-mail.",
+            (Text::NewsletterOptIn, Locale::Fi) => {
+                "Haluan Bosco Falconerian uutiskirjeen sähköpostiini. Tilauksen voi perua milloin tahansa."
+            }
+            (Text::NewsletterOptIn, Locale::En) => {
+                "Send me Bosco Falconeria's newsletter by email. You can unsubscribe at any time."
+            }
+            (Text::NewsletterOptIn, Locale::Fr) => {
+                "Je souhaite recevoir la newsletter de Bosco Falconeria par e-mail. Je peux me désabonner à tout moment."
+            }
+            (Text::Unsubscribe, Locale::Fi) => "Peru uutiskirjeen tilaus",
+            (Text::Unsubscribe, Locale::En) => "Unsubscribe from the newsletter",
+            (Text::Unsubscribe, Locale::Fr) => "Se désabonner de la newsletter",
+            (Text::UnsubscribeButton, Locale::Fi) => "Peru tilaus",
+            (Text::UnsubscribeButton, Locale::En) => "Unsubscribe",
+            (Text::UnsubscribeButton, Locale::Fr) => "Se désabonner",
+            (Text::UnsubscribeHelp, Locale::Fi) => {
+                "Kirjoita sähköpostiosoite, johon uutiskirje tulee, niin emme lähetä sitä sinne enää."
+            }
+            (Text::UnsubscribeHelp, Locale::En) => {
+                "Enter the email address the newsletter comes to, and we won't send it there any more."
+            }
+            (Text::UnsubscribeHelp, Locale::Fr) => {
+                "Saisissez l'adresse e-mail à laquelle vous recevez la newsletter\u{a0}: nous ne l'y enverrons plus."
+            }
+            (Text::Unsubscribed, Locale::Fi) => {
+                "Uutiskirjettä ei enää lähetetä tähän osoitteeseen."
+            }
+            (Text::Unsubscribed, Locale::En) => {
+                "The newsletter will no longer be sent to that address."
+            }
+            (Text::Unsubscribed, Locale::Fr) => {
+                "La newsletter ne sera plus envoyée à cette adresse."
+            }
             (Text::PageNotFoundTitle, Locale::Fi) => "Sivua ei löytynyt",
             (Text::PageNotFoundTitle, Locale::En) => "Page not found",
             (Text::PageNotFoundTitle, Locale::Fr) => "Page introuvable",

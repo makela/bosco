@@ -1617,6 +1617,16 @@ async fn the_email_lists(db: PgPool) -> TestResult {
     )
     .execute(&db)
     .await?;
+    // Everyone so far gets the newsletter, but not one who never asked
+    sqlx::query("UPDATE customers SET subscribed_at = NOW()")
+        .execute(&db)
+        .await?;
+    sqlx::query(
+        "INSERT INTO customers (first_name, email, phone, reverse_name)
+         VALUES ('Ei', 'ei@example.com', '040', 'ei')",
+    )
+    .execute(&db)
+    .await?;
     let app = site(db.clone(), false);
     let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
     // listed_order gives everyone x@example.com: once in each list
@@ -1660,6 +1670,7 @@ async fn the_email_lists(db: PgPool) -> TestResult {
         newsletter.contains("<p>vanha@example.com, x@example.com, ääni@example.fi</p>"),
         "{newsletter}"
     );
+    assert!(newsletter.contains("Peru uutiskirjeen tilaus: /Unsubscribe"));
 
     let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
     for uri in [
@@ -2085,5 +2096,63 @@ async fn a_demo_logins_password_stays(db: PgPool) -> TestResult {
             .fetch_one(&db)
             .await?;
     assert_eq!(before, after);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn the_admin_unsubscribes_an_email_and_subscribes_it_again(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    // The same person ordered twice; another kept the newsletter
+    let ids: Vec<Uuid> = sqlx::query_scalar(
+        "INSERT INTO customers (first_name, email, phone, reverse_name, subscribed_at)
+         VALUES ('Maija', 'maija@example.com', '040', 'maija', NOW()),
+                ('Maija', ' Maija@Example.com', '040', 'maija', NOW()),
+                ('Pekka', 'pekka@example.com', '040', 'pekka', NOW())
+         RETURNING id",
+    )
+    .fetch_all(&db)
+    .await?;
+    let show = format!("/admin/ShowCustomer?customerId={}", ids[0]);
+    let page = text(send(&app, Method::GET, &show, &boss, &[]).await?).await?;
+    assert!(page.contains("Gets the newsletter since"), "{page}");
+
+    let off = format!(
+        "/admin/UpdateNewsletterCustomer?customerId={}&subscribe=0",
+        ids[0]
+    );
+    let response = send(&app, Method::POST, &off, &boss, &[]).await?;
+    assert_eq!(location(&response), show);
+    let subscribed: Vec<bool> = sqlx::query_scalar(
+        "SELECT subscribed_at IS NOT NULL FROM customers ORDER BY first_name, email",
+    )
+    .fetch_all(&db)
+    .await?;
+    assert_eq!(subscribed, [false, false, true]);
+    let page = text(send(&app, Method::GET, &show, &boss, &[]).await?).await?;
+    assert!(
+        page.contains("Doesn't get the newsletter: unsubscribed"),
+        "{page}"
+    );
+
+    let on = format!(
+        "/admin/UpdateNewsletterCustomer?customerId={}&subscribe=1",
+        ids[0]
+    );
+    send(&app, Method::POST, &on, &boss, &[]).await?;
+    let subscribed: bool =
+        sqlx::query_scalar("SELECT subscribed_at IS NOT NULL FROM customers WHERE id = $1")
+            .bind(ids[0])
+            .fetch_one(&db)
+            .await?;
+    assert!(subscribed);
+
+    let bad = format!(
+        "/admin/UpdateNewsletterCustomer?customerId={}&subscribe=x",
+        ids[0]
+    );
+    let response = send(&app, Method::POST, &bad, &boss, &[]).await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     Ok(())
 }

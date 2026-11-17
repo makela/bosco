@@ -342,8 +342,8 @@ async fn create_customer(
     };
     sqlx::query_scalar(
         "INSERT INTO customers (first_name, last_name, reverse_name, email, phone, street_address,
-                                postal_code, city)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+                                postal_code, city, subscribed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING id",
     )
     .bind(&customer.first_name)
     .bind(&customer.last_name)

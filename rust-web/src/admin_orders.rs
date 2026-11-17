@@ -575,7 +575,7 @@ pub async fn new_order(
             producers: &producers,
             products: &products,
             quantities: &Default::default(),
-            form: &CustomerForm::default(),
+            form: &CustomerForm::new_order(),
             no_products_selected: false,
         },
     );

@@ -40,7 +40,9 @@ CREATE TABLE customers (
     street_address TEXT DEFAULT '' NOT NULL,
     postal_code TEXT DEFAULT '' NOT NULL,
     city TEXT DEFAULT '' NOT NULL,
-    billing_name TEXT DEFAULT '' NOT NULL
+    billing_name TEXT DEFAULT '' NOT NULL,
+    subscribed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    unsubscribed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
 CREATE TABLE orders (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
