@@ -63,6 +63,9 @@ pub fn layout(site: &Site, flash: Option<Flash>, content: &Markup) -> Markup {
                         (flash_message(site, flash))
                     }
                     (content)
+                    footer.site-footer {
+                        span { "© 2022–" (chrono::Utc::now().format("%Y")) " Bosco Falconeria" }
+                    }
                 }
             }
         }
@@ -202,9 +205,9 @@ pub fn order_form(site: &Site, order: &OrderForm) -> Markup {
             (customer_field(site, order.form, "streetAddress", Text::StreetAddress, "street-address"))
             (customer_field(site, order.form, "postalCode", Text::PostalCode, "postal-code"))
             (customer_field(site, order.form, "city", Text::City, "address-level2"))
-            div class="flex items-start my-6 space-x-2" {
+            div.form-choice {
                 input type="checkbox" name="newsletter" id="customer_newsletter" value="on"
-                    class="mt-1" checked[order.form.customer.newsletter];
+                    checked[order.form.customer.newsletter];
                 label for="customer_newsletter" { (t(Text::NewsletterOptIn)) }
             }
             (honeypot_field(site))
@@ -309,10 +312,10 @@ pub fn subscribe_form(site: &Site, form: &CustomerForm) -> Markup {
                     div.invalid-feedback { (error.text(site.locale)) }
                 }
             }
+            p.form-note { a href="/Unsubscribe" { (t(Text::Unsubscribe)) } }
             (honeypot_field(site))
             input type="submit" value=(t(Text::Subscribe));
         }
-        p { a.link href="/Unsubscribe" { (t(Text::Unsubscribe)) } }
     }
 }
 

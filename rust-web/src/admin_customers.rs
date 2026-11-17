@@ -272,9 +272,9 @@ fn form(state: &AppState, form: &CustomerForm, editing: Option<Uuid>) -> Markup 
             }
             // Whether a customer gets the newsletter is changed on their page
             @if editing.is_none() {
-                div class="flex items-start my-6 space-x-2" {
+                div.form-choice {
                     input type="checkbox" name="newsletter" id="customer_newsletter" value="on"
-                        class="mt-1" checked[c.newsletter];
+                        checked[c.newsletter];
                     label for="customer_newsletter" { "Gets the newsletter: they asked for it" }
                 }
             }

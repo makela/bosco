@@ -761,15 +761,16 @@ async fn the_order_forms_newsletter_box_is_ticked_to_begin_with(db: PgPool) -> T
     let app = site(db.clone(), false);
     let form = body(get(&app, "/NewOrder").await?).await?;
     assert!(
-        form.contains(
-            r#"name="newsletter" id="customer_newsletter" value="on" class="mt-1" checked"#
-        ),
+        form.contains(r#"name="newsletter" id="customer_newsletter" value="on" checked"#),
         "{form}"
     );
     // Kept as it was sent when the form is shown again
     let form =
         body(order(&app, "x@example.com", &[("city", "")], &[(catalog.oil, 1)]).await?).await?;
-    assert!(form.contains(r#"value="on" class="mt-1">"#), "{form}");
+    assert!(
+        form.contains(r#"id="customer_newsletter" value="on">"#),
+        "{form}"
+    );
     Ok(())
 }
 
@@ -837,5 +838,19 @@ async fn unsubscribes_an_email_whatever_its_case(db: PgPool) -> TestResult {
     )
     .await?;
     assert_eq!(subscribed(&db, "pekka@example.com").await?, [true]);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn every_page_has_the_farms_copyright(db: PgPool) -> TestResult {
+    shop(&db).await?;
+    let app = site(db, false);
+    for uri in ["/", "/NewOrder", "/NewEmail", "/Unsubscribe"] {
+        let page = body(get(&app, uri).await?).await?;
+        assert!(
+            page.contains(r#"<footer class="site-footer"><span>© 2022–"#),
+            "{uri}"
+        );
+    }
     Ok(())
 }

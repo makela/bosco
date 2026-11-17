@@ -233,6 +233,33 @@ a.btn-small.danger, button.btn-small.danger, input[type=submit].btn-small.danger
   @apply ml-0;
 }
 
+/* A checkbox with its text beside it, lined up with the fields, the box
+   with the first line of the text. The rules above, outside Tailwind's
+   layers, beat utilities in the markup, so these are classes here. */
+.form-choice {
+  @apply flex items-start gap-3 my-6;
+}
+
+.form-choice input[type=checkbox] {
+  @apply mt-1 mr-0 shrink-0;
+}
+
+/* A quiet line above a public form's button, lined up with the fields */
+p.form-note {
+  @apply px-0 text-sm text-gray-600;
+}
+
+/* Under every public page, quieter than the page. Below the forms'
+   buttons, which float right. */
+.site-footer {
+  @apply clear-both mt-12 pt-4 border-t border-gray-200 flex flex-wrap justify-center gap-x-6 gap-y-1
+    text-sm text-gray-500;
+}
+
+.site-footer a {
+  @apply text-gray-500 hover:text-blue-600 hover:underline;
+}
+
 /* The field for bots only in public forms, see honeypotField. Off the page
    rather than display: none, which some bots look for. */
 .honeypot {
