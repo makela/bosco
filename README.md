@@ -252,8 +252,9 @@ A login has one or more roles, and may do whatever any of them allows
   the shop's texts, e.g. to translate them: products' names, descriptions
   and packages, producers' subjects and descriptions. Not prices, producer
   names, or which products and producers there are and are shown. They also
-  write the welcome messages, which open and close ordering, and the
-  payment instructions on invoices; the privacy notice is the admins'.
+  write the published texts, e.g. to check their translations: the welcome
+  messages, which open and close ordering, the payment instructions on
+  invoices and the privacy notice.
 
 Every change to a product's or producer's texts, by anyone, is kept with who
 made it, when, and the text before and after (`text_changes`). A product's

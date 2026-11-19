@@ -4,9 +4,9 @@
 //! ordering, and the payment instructions on invoices; and the privacy
 //! notice, which the IHP app didn't have. Each has a list, a
 //! page, and IHP's generated forms to write a new one, edit one and delete
-//! one. Admins and promoters manage the welcome messages and payment
-//! instructions; the privacy notice is the admins' alone. The lists are on
-//! one page: IHP's split them into pages of 50, which these never reach.
+//! one. Admins and promoters manage them, promoters e.g. to check the
+//! translations. The lists are on one page: IHP's split them into pages of
+//! 50, which these never reach.
 //!
 //! On a demo, everyone is an admin, so a visitor can't put their own words
 //! or bank account in front of others: only ordering can be opened and
@@ -131,24 +131,15 @@ fn bad_request() -> Response {
     StatusCode::BAD_REQUEST.into_response()
 }
 
-/// Who may manage texts of the kind
-fn permission(kind: TextKind) -> Permission {
-    match kind {
-        TextKind::Welcome | TextKind::Payment => Permission::ManageWelcomeAndPayment,
-        TextKind::Privacy => Permission::ManageShop,
-    }
-}
-
-/// A user who may manage texts of the kind, with the session; or the
-/// response for anyone else
+/// A user who may manage the texts, with the session; or the response for
+/// anyone else
 async fn require_allowed(
-    kind: TextKind,
     state: &AppState,
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<std::result::Result<Session, Response>> {
     Ok(
-        admin::require_permission(state, headers, uri, permission(kind))
+        admin::require_permission(state, headers, uri, Permission::ManagePublishedTexts)
             .await?
             .map(|(_, session)| session),
     )
@@ -160,7 +151,7 @@ pub async fn index(
     headers: HeaderMap,
     uri: Uri,
 ) -> Result<Response> {
-    let session = match require_allowed(kind, &state, &headers, &uri).await? {
+    let session = match require_allowed(&state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
@@ -258,7 +249,7 @@ pub async fn new(
     headers: HeaderMap,
     uri: Uri,
 ) -> Result<Response> {
-    let session = match require_allowed(kind, &state, &headers, &uri).await? {
+    let session = match require_allowed(&state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
@@ -304,7 +295,7 @@ async fn find(
     let Some(id) = id_of(kind, uri) else {
         return Ok(Err(bad_request()));
     };
-    let session = match require_allowed(kind, state, headers, uri).await? {
+    let session = match require_allowed(state, headers, uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(Err(response)),
     };
@@ -421,7 +412,7 @@ pub async fn create(
     uri: Uri,
     form: FormResult,
 ) -> Result<Response> {
-    let mut session = match require_allowed(kind, &state, &headers, &uri).await? {
+    let mut session = match require_allowed(&state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };

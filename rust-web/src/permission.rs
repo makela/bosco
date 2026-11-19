@@ -20,11 +20,11 @@ pub enum Permission {
     /// Product names, descriptions and packages, producers' subjects and
     /// descriptions: what a translator needs, not prices or the catalog
     EditShopTexts,
-    /// The welcome message, which also opens and closes ordering, and the
-    /// payment instructions on invoices
-    ManageWelcomeAndPayment,
-    /// Products, producers, customers, the shop's texts and the privacy
-    /// notice
+    /// The published texts: the welcome message, which also opens and
+    /// closes ordering, the payment instructions on invoices and the
+    /// privacy notice
+    ManagePublishedTexts,
+    /// Products, producers, customers and the shop's texts
     ManageShop,
 }
 
@@ -36,7 +36,7 @@ const PROMOTER: &[Permission] = &[
     SeeEmailLists,
     SeeOrderedProducts,
     EditShopTexts,
-    ManageWelcomeAndPayment,
+    ManagePublishedTexts,
 ];
 
 impl Roles {

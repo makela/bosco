@@ -318,19 +318,19 @@ const MENU: &[(Permission, &str, &str)] = &[
     ),
     (Permission::SeeOrders, "Orders", "/admin/Orders"),
     (
-        Permission::ManageWelcomeAndPayment,
+        Permission::ManagePublishedTexts,
         "Payment instructions",
         "/admin/PaymentInstructions",
     ),
     (
-        Permission::ManageShop,
+        Permission::ManagePublishedTexts,
         "Privacy notices",
         "/admin/PrivacyNotices",
     ),
     (Permission::EditShopTexts, "Producers", "/admin/Producers"),
     (Permission::EditShopTexts, "Products", "/admin/Products"),
     (
-        Permission::ManageWelcomeAndPayment,
+        Permission::ManagePublishedTexts,
         "Welcome messages",
         "/admin/WelcomeMessages",
     ),
