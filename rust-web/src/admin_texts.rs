@@ -3,8 +3,8 @@
 //! the welcome message on the front page, which also opens and closes
 //! ordering, and the payment instructions on invoices. Each has a list, a
 //! page, and IHP's generated forms to write a new one, edit one and delete
-//! one. Admins only. The lists are on one page: IHP's split them into
-//! pages of 50, which these never reach.
+//! one. Admins and promoters manage them. The lists are on one page: IHP's
+//! split them into pages of 50, which these never reach.
 //!
 //! On a demo, everyone is an admin, so a visitor can't put their own words
 //! or bank account in front of others: only ordering can be opened and
@@ -121,14 +121,15 @@ fn bad_request() -> Response {
     StatusCode::BAD_REQUEST.into_response()
 }
 
-/// An admin, with the session; or the response for anyone else
-async fn require_admin(
+/// A user who may manage the texts, with the session; or the response for
+/// anyone else
+async fn require_allowed(
     state: &AppState,
     headers: &HeaderMap,
     uri: &Uri,
 ) -> Result<std::result::Result<Session, Response>> {
     Ok(
-        admin::require_permission(state, headers, uri, Permission::ManageShop)
+        admin::require_permission(state, headers, uri, Permission::ManageWelcomeAndPayment)
             .await?
             .map(|(_, session)| session),
     )
@@ -140,7 +141,7 @@ pub async fn index(
     headers: HeaderMap,
     uri: Uri,
 ) -> Result<Response> {
-    let session = match require_admin(&state, &headers, &uri).await? {
+    let session = match require_allowed(&state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
@@ -227,7 +228,7 @@ pub async fn new(
     headers: HeaderMap,
     uri: Uri,
 ) -> Result<Response> {
-    let session = match require_admin(&state, &headers, &uri).await? {
+    let session = match require_allowed(&state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };
@@ -254,7 +255,7 @@ pub async fn new(
     Ok(admin::page(&state, session, &content))
 }
 
-/// The text the address is about: its id read, an admin's, and found
+/// The text the address is about: its id read, the user allowed, and found
 async fn find(
     kind: TextKind,
     state: &Arc<AppState>,
@@ -265,7 +266,7 @@ async fn find(
     let Some(id) = id_of(kind, uri) else {
         return Ok(Err(bad_request()));
     };
-    let session = match require_admin(state, headers, uri).await? {
+    let session = match require_allowed(state, headers, uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(Err(response)),
     };
@@ -382,7 +383,7 @@ pub async fn create(
     uri: Uri,
     form: FormResult,
 ) -> Result<Response> {
-    let mut session = match require_admin(&state, &headers, &uri).await? {
+    let mut session = match require_allowed(&state, &headers, &uri).await? {
         Ok(session) => session,
         Err(response) => return Ok(response),
     };

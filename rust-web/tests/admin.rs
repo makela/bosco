@@ -523,8 +523,10 @@ async fn the_welcome_page_shows_what_the_roles_allow(db: PgPool) -> TestResult {
                 "/admin/EmailsForDeliveryInfo",
                 "/admin/EmailsForNewsLetter",
                 "/admin/Orders",
+                "/admin/PaymentInstructions",
                 "/admin/Producers",
                 "/admin/Products",
+                "/admin/WelcomeMessages",
             ][..],
         ),
         ("nobody@example.com", (false, false, false), &[][..]),
@@ -1408,23 +1410,36 @@ async fn a_demo_keeps_its_texts(db: PgPool) -> TestResult {
     Ok(())
 }
 
+/// Promoters write the welcome messages and payment instructions;
+/// delivery people don't
 #[sqlx::test(migrations = false)]
-async fn the_texts_are_for_admins(db: PgPool) -> TestResult {
+async fn promoters_manage_welcome_and_payment_texts(db: PgPool) -> TestResult {
     admin(&db).await?;
     let app = site(db.clone(), false);
     let promoter = user_with(&db, "promo@example.com", (false, false, true)).await?;
     for uri in ["/admin/WelcomeMessages", "/admin/NewPaymentInstruction"] {
         let response = send(&app, Method::GET, uri, &promoter, &[]).await?;
-        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{uri}");
+        assert_eq!(response.status(), StatusCode::OK, "{uri}");
     }
-    let response = send(
-        &app,
-        Method::POST,
-        "/admin/CreatePaymentInstruction",
-        &promoter,
-        &[("text", "x")],
+    for (uri, shown) in [
+        (
+            "/admin/CreatePaymentInstruction",
+            "/admin/ShowPaymentInstruction?",
+        ),
+        ("/admin/CreateWelcomeMessage", "/admin/ShowWelcomeMessage?"),
+    ] {
+        let response = send(&app, Method::POST, uri, &promoter, &[("text", "Uusi")]).await?;
+        assert!(location(&response).starts_with(shown), "{uri}");
+    }
+    let texts: Vec<String> = sqlx::query_scalar(
+        "SELECT text FROM welcome_messages UNION ALL SELECT text FROM payment_instructions",
     )
+    .fetch_all(&db)
     .await?;
+    assert_eq!(texts, ["Uusi", "Uusi"]);
+
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    let response = send(&app, Method::GET, "/admin/WelcomeMessages", &driver, &[]).await?;
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
     let response = send(
         &app,

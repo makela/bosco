@@ -20,15 +20,23 @@ pub enum Permission {
     /// Product names, descriptions and packages, producers' subjects and
     /// descriptions: what a translator needs, not prices or the catalog
     EditShopTexts,
-    /// Products, producers, customers, the shop's texts and payment
-    /// instructions
+    /// The welcome message, which also opens and closes ordering, and the
+    /// payment instructions on invoices
+    ManageWelcomeAndPayment,
+    /// Products, producers, customers and the shop's texts
     ManageShop,
 }
 
 use Permission::*;
 
 const DELIVERER: &[Permission] = &[SeeOrders, CreateOrders, MarkDelivered];
-const PROMOTER: &[Permission] = &[SeeOrders, SeeEmailLists, SeeOrderedProducts, EditShopTexts];
+const PROMOTER: &[Permission] = &[
+    SeeOrders,
+    SeeEmailLists,
+    SeeOrderedProducts,
+    EditShopTexts,
+    ManageWelcomeAndPayment,
+];
 
 impl Roles {
     pub fn can(self, permission: Permission) -> bool {
