@@ -87,8 +87,9 @@ impl Key {
             return None;
         }
         let (iv, data) = authed.split_at(16);
+        let iv: [u8; 16] = iv.try_into().ok()?;
         let mut data = data.to_vec();
-        Aes256Ctr::new(&self.aes.into(), iv.into()).apply_keystream(&mut data);
+        Aes256Ctr::new(&self.aes.into(), &iv.into()).apply_keystream(&mut data);
         Some(data)
     }
 }

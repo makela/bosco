@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn unkeyed_is_the_skein_hash() {
         for message in [&b""[..], b"a", &[7; 64], &[7; 65], &[1; 200]] {
-            let expected = ::skein::Skein512::<::skein::consts::U32>::digest(message);
+            let expected = ::skein::Skein512_256::digest(message);
             assert_eq!(mac_512_256(&[], message), expected[..]);
         }
     }
