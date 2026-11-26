@@ -321,14 +321,22 @@ async fn locks_for_an_hour_after_10_wrong_passwords(db: PgPool) -> TestResult {
         }
     );
 
-    // Even the right password
+    // Even the right password gets the answer of a wrong one, so the page
+    // doesn't tell a guesser that the login is there, and isn't counted
     let response = login(&app, &Session::default(), "admin@example.com", "salasana").await?;
     assert_eq!(response.status(), StatusCode::FOUND);
     let session = session_after(&response, &Session::default());
     assert_eq!(session.user_id(), None);
     assert_eq!(
         session.get_text(FLASH_ERROR).as_deref(),
-        Some("User is locked")
+        Some("Invalid Credentials")
+    );
+    assert_eq!(
+        state_of(&db, user).await?,
+        Login {
+            failed_login_attempts: 10,
+            locked: true
+        }
     );
 
     // An hour later the right one logs in; a wrong one would lock again at
@@ -350,6 +358,36 @@ async fn locks_for_an_hour_after_10_wrong_passwords(db: PgPool) -> TestResult {
     let response = login(&app, &Session::default(), "admin@example.com", "salasana").await?;
     assert_eq!(response.status(), StatusCode::SEE_OTHER);
     assert_eq!(state_of(&db, user).await?.failed_login_attempts, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn counts_guesses_sent_at_once_before_checking_them(db: PgPool) -> TestResult {
+    let user = admin(&db).await?;
+    let app = site(db.clone(), false);
+    let guesses: Vec<_> = (0..15)
+        .map(|i| {
+            let app = app.clone();
+            tokio::spawn(async move {
+                let guess = format!("arvaus{i}");
+                login(&app, &Session::default(), "admin@example.com", &guess)
+                    .await
+                    .map(|response| response.status())
+                    .map_err(|e| e.to_string())
+            })
+        })
+        .collect();
+    for guess in guesses {
+        assert_eq!(guess.await??, StatusCode::FOUND);
+    }
+    assert_eq!(
+        state_of(&db, user).await?,
+        Login {
+            failed_login_attempts: 10,
+            locked: true
+        },
+        "the ones past the tenth weren't checked"
+    );
     Ok(())
 }
 

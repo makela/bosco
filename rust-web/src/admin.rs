@@ -7,7 +7,10 @@
 //! here.
 //!
 //! As in IHP, a login is locked for an hour after 10 wrong passwords in a
-//! row, and the login page is shown even to someone logged in.
+//! row, and the login page is shown even to someone logged in. Unlike IHP,
+//! a locked login, an unknown address and a wrong password get the same
+//! answer, in the same time, so the login page doesn't tell which
+//! addresses have a login.
 
 use std::sync::Arc;
 
@@ -189,7 +192,26 @@ pub async fn new_session(State(state): State<Arc<AppState>>, headers: HeaderMap)
     page(&state, session, &login_form(state.site.demo))
 }
 
-/// Logs in with an email and password, as IHP's `createSessionAction`
+/// The password is right: some 130 000 rounds of SHA-256, off the threads
+/// that answer requests
+async fn verify(given: &str, stored: &str) -> bool {
+    let (given, stored) = (given.to_string(), stored.to_string());
+    tokio::task::spawn_blocking(move || password::verify(&given, &stored))
+        .await
+        .unwrap_or(false)
+}
+
+/// A hash of no one's password, checked for an unknown address or a locked
+/// login, so they take as long as a wrong password
+static NO_ONES: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).expect("the system's random numbers");
+    let password: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    password::hash(&password)
+});
+
+/// Logs in with an email and password, as IHP's `createSessionAction`,
+/// with its message for a wrong password
 pub async fn create_session(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -199,26 +221,22 @@ pub async fn create_session(
         return Ok(StatusCode::BAD_REQUEST.into_response());
     };
     let mut session = Session::from_headers(&state.session_key, &headers);
-    let refuse = |mut session: Session, message: &str| {
-        session.set_text(FLASH_ERROR, message);
+    let refused = |mut session: Session| {
+        session.set_text(FLASH_ERROR, "Invalid Credentials");
         with_session(&state, &session, found(NEW_SESSION))
     };
     let Some(user) = db::user_by_email(&state.db, email).await? else {
-        return Ok(refuse(session, "Invalid Credentials"));
+        verify(given, &NO_ONES).await;
+        return Ok(refused(session));
     };
-    if user.is_locked(chrono::Utc::now()) {
-        return Ok(refuse(session, "User is locked"));
+    if !db::login_attempt(&state.db, user.id).await? {
+        verify(given, &NO_ONES).await;
+        tracing::info!(user = %user.id, "a password to a locked login");
+        return Ok(refused(session));
     }
-    // Some 130 000 rounds of SHA-256, off the threads that answer requests
-    let given = given.clone();
-    let stored = user.password_hash.clone();
-    let right = tokio::task::spawn_blocking(move || password::verify(&given, &stored))
-        .await
-        .unwrap_or(false);
-    if !right {
-        db::login_failed(&state.db, user.id).await?;
+    if !verify(given, &user.password_hash).await {
         tracing::info!(user = %user.id, "a wrong password");
-        return Ok(refuse(session, "Invalid Credentials"));
+        return Ok(refused(session));
     }
     session.login(user.id);
     db::login_succeeded(&state.db, user.id).await?;

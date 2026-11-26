@@ -327,18 +327,9 @@ pub struct User {
     pub failed_login_attempts: i32,
 }
 
-/// After this many wrong passwords in a row a login is locked, IHP's
-/// default
+/// After this many wrong passwords in a row a login is locked, for an
+/// hour: IHP's default and its `lockDuration` (in `login_attempt`)
 pub const MAX_FAILED_LOGINS: i32 = 10;
-
-impl User {
-    /// Locked for an hour after the last of too many wrong passwords, as in
-    /// IHP
-    pub fn is_locked(&self, now: DateTime<Utc>) -> bool {
-        self.locked_at
-            .is_some_and(|locked_at| now - locked_at < chrono::TimeDelta::hours(1))
-    }
-}
 
 /// The login with this email, whatever its case, as IHP finds it
 pub async fn user_by_email(db: &PgPool, email: &str) -> sqlx::Result<Option<User>> {
@@ -351,27 +342,32 @@ pub async fn user_by_email(db: &PgPool, email: &str) -> sqlx::Result<Option<User
     .await
 }
 
+/// The password was right: the attempt wasn't a wrong one after all, nor
+/// are those before it, and a lock it set is lifted
 pub async fn login_succeeded(db: &PgPool, user: Uuid) -> sqlx::Result<()> {
-    sqlx::query("UPDATE users SET failed_login_attempts = 0 WHERE id = $1")
+    sqlx::query("UPDATE users SET failed_login_attempts = 0, locked_at = NULL WHERE id = $1")
         .bind(user)
         .execute(db)
         .await
         .map(drop)
 }
 
-/// Counts a wrong password, and locks the login at the last one allowed
-pub async fn login_failed(db: &PgPool, user: Uuid) -> sqlx::Result<()> {
-    sqlx::query(
+/// A password about to be checked, counted first as a wrong one, so that
+/// guesses sent at once can't get past the lock: the login is locked when
+/// it's the last one allowed, for an hour. False when it's locked already,
+/// and then not counted.
+pub async fn login_attempt(db: &PgPool, user: Uuid) -> sqlx::Result<bool> {
+    let counted = sqlx::query(
         "UPDATE users
          SET failed_login_attempts = failed_login_attempts + 1,
              locked_at = CASE WHEN failed_login_attempts + 1 >= $2 THEN NOW() ELSE locked_at END
-         WHERE id = $1",
+         WHERE id = $1 AND (locked_at IS NULL OR locked_at <= NOW() - INTERVAL '1 hour')",
     )
     .bind(user)
     .bind(MAX_FAILED_LOGINS)
     .execute(db)
-    .await
-    .map(drop)
+    .await?;
+    Ok(counted.rows_affected() == 1)
 }
 
 /// The roles a login has, see the IHP app's `Application/Permission.hs`
