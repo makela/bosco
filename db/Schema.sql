@@ -80,6 +80,12 @@ CREATE TABLE privacy_notices (
     published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     text TEXT NOT NULL
 );
+CREATE TABLE user_sessions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
+    user_id UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+CREATE INDEX user_sessions_user_id_index ON user_sessions (user_id);
 CREATE TABLE email_order_jobs (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -114,3 +120,4 @@ ALTER TABLE products ADD CONSTRAINT products_ref_producer_id FOREIGN KEY (produc
 ALTER TABLE text_changes ADD CONSTRAINT text_changes_ref_producer_id FOREIGN KEY (producer_id) REFERENCES producers (id) ON DELETE CASCADE;
 ALTER TABLE text_changes ADD CONSTRAINT text_changes_ref_product_id FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE;
 ALTER TABLE text_changes ADD CONSTRAINT text_changes_ref_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE NO ACTION;
+ALTER TABLE user_sessions ADD CONSTRAINT user_sessions_ref_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE;

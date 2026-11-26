@@ -11,6 +11,10 @@
 //! a locked login, an unknown address and a wrong password get the same
 //! answer, in the same time, so the login page doesn't tell which
 //! addresses have a login.
+//!
+//! Each login is a row in `user_sessions`, which the cookie names: logging
+//! out deletes it and changing the password deletes the user's others, so
+//! a copied cookie stops working. A session lasts 30 days from the login.
 
 use std::sync::Arc;
 
@@ -247,7 +251,8 @@ pub async fn create_session(
         db::set_password_hash(&state.db, user.id, &hash).await?;
         tracing::info!(user = %user.id, "rehashed their password with bcrypt");
     }
-    session.login(user.id);
+    let session_id = db::start_session(&state.db, user.id).await?;
+    session.login(user.id, session_id);
     db::login_succeeded(&state.db, user.id).await?;
     tracing::info!(user = %user.id, "logged in");
     let to = session
@@ -256,12 +261,19 @@ pub async fn create_session(
     Ok(with_session(&state, &session, see_other(&to)))
 }
 
-/// Logs out. The admin's logout link sends a POST with `_method=DELETE`,
+/// Logs out: the session ends in the database too, so a copy of the cookie
+/// stops working. The admin's logout link sends a POST with `_method=DELETE`,
 /// as IHP's `js-delete` links do, which IHP takes as a DELETE.
-pub async fn delete_session(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+pub async fn delete_session(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Response> {
     let mut session = Session::from_headers(&state.session_key, &headers);
+    if let Some(id) = session.session_id() {
+        db::end_session(&state.db, id).await?;
+    }
     session.logout();
-    with_session(&state, &session, see_other(NEW_SESSION))
+    Ok(with_session(&state, &session, see_other(NEW_SESSION)))
 }
 
 /// A POST that IHP takes as a DELETE: one with `_method=DELETE` in its
@@ -275,11 +287,11 @@ pub async fn delete_session_by_post(
     state: State<Arc<AppState>>,
     headers: HeaderMap,
     form: std::result::Result<Form<Params>, FormRejection>,
-) -> Response {
+) -> Result<Response> {
     if is_delete(form) {
         delete_session(state, headers).await
     } else {
-        StatusCode::METHOD_NOT_ALLOWED.into_response()
+        Ok(StatusCode::METHOD_NOT_ALLOWED.into_response())
     }
 }
 
@@ -303,13 +315,16 @@ pub async fn demo_login(
         password::hash(&bytes.iter().map(|b| format!("{b:02x}")).collect::<String>())
     })
     .await?;
+    let session_id = db::start_session(&state.db, user).await?;
     let mut session = Session::from_headers(&state.session_key, &headers);
-    session.login(user);
+    session.login(user, session_id);
     tracing::info!(user = %user, role = login.role, "logged in to the demo");
     Ok(with_session(&state, &session, found(WELCOME)))
 }
 
-/// The logged-in user, with their session; or, for someone not logged in,
+/// The logged-in user, with their session: one whose session the database
+/// still has, so not one logged out, nor one from before the password was
+/// changed, nor an IHP login. Or, for someone not logged in,
 /// the login page, which will come back here, as IHP's `ensureIsUser`
 pub async fn require_user(
     state: &AppState,
@@ -317,8 +332,8 @@ pub async fn require_user(
     uri: &Uri,
 ) -> Result<std::result::Result<(AdminUser, Session), Response>> {
     let mut session = Session::from_headers(&state.session_key, headers);
-    if let Some(id) = session.user_id()
-        && let Some(user) = db::admin_user(&state.db, id).await?
+    if let (Some(id), Some(session_id)) = (session.user_id(), session.session_id())
+        && let Some(user) = db::admin_user(&state.db, id, session_id).await?
     {
         return Ok(Ok((user, session)));
     }

@@ -114,7 +114,8 @@ pub async fn update(
     let stored = db::password_hash(&state.db, user.id)
         .await?
         .unwrap_or_default();
-    // Some 130 000 rounds of SHA-256, off the threads that answer requests
+    // bcrypt, or the IHP app's 130 000 rounds of SHA-256, off the threads
+    // that answer requests
     let right = tokio::task::spawn_blocking(move || password::verify(&old, &stored))
         .await
         .unwrap_or(false);
@@ -132,7 +133,9 @@ pub async fn update(
     let hash = tokio::task::spawn_blocking(move || password::hash(&new))
         .await
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
-    db::set_password_hash(&state.db, user.id, &hash).await?;
+    // The user's other sessions end; require_user made sure there's this one
+    let this = session.session_id().ok_or(sqlx::Error::RowNotFound)?;
+    db::change_password(&state.db, user.id, &hash, this).await?;
     tracing::info!(user = %user.id, "changed their password");
     session.set_text(FLASH_SUCCESS, "Password changed");
     Ok(admin::with_session(

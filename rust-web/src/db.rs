@@ -342,6 +342,32 @@ pub async fn user_by_email(db: &PgPool, email: &str) -> sqlx::Result<Option<User
     .await
 }
 
+/// A new session for a login, with the user's ended ones cleared away
+pub async fn start_session(db: &PgPool, user: Uuid) -> sqlx::Result<Uuid> {
+    let mut tx = db.begin().await?;
+    sqlx::query(
+        "DELETE FROM user_sessions WHERE user_id = $1 AND created_at <= NOW() - INTERVAL '30 days'",
+    )
+    .bind(user)
+    .execute(&mut *tx)
+    .await?;
+    let id = sqlx::query_scalar("INSERT INTO user_sessions (user_id) VALUES ($1) RETURNING id")
+        .bind(user)
+        .fetch_one(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(id)
+}
+
+/// Logging out: the session ends, whoever has its cookie
+pub async fn end_session(db: &PgPool, session: Uuid) -> sqlx::Result<()> {
+    sqlx::query("DELETE FROM user_sessions WHERE id = $1")
+        .bind(session)
+        .execute(db)
+        .await
+        .map(drop)
+}
+
 /// The password was right: the attempt wasn't a wrong one after all, nor
 /// are those before it, and a lock it set is lifted
 pub async fn login_succeeded(db: &PgPool, user: Uuid) -> sqlx::Result<()> {
@@ -423,12 +449,18 @@ pub struct AdminUser {
     pub roles: Roles,
 }
 
-/// The logged-in user, if their login still exists
-pub async fn admin_user(db: &PgPool, id: Uuid) -> sqlx::Result<Option<AdminUser>> {
+/// The logged-in user, if their login and its session still exist: the
+/// session for 30 days from the login, as long as the cookie
+pub async fn admin_user(db: &PgPool, id: Uuid, session: Uuid) -> sqlx::Result<Option<AdminUser>> {
     let row: Option<(String, bool, bool, bool)> = sqlx::query_as(
-        "SELECT email, is_admin, is_deliverer, is_promoter FROM users WHERE id = $1",
+        "SELECT email, is_admin, is_deliverer, is_promoter FROM users
+         WHERE id = $1 AND EXISTS (
+             SELECT 1 FROM user_sessions
+             WHERE id = $2 AND user_id = $1 AND created_at > NOW() - INTERVAL '30 days'
+         )",
     )
     .bind(id)
+    .bind(session)
     .fetch_optional(db)
     .await?;
     Ok(row.map(|(email, admin, deliverer, promoter)| AdminUser {
@@ -1181,6 +1213,8 @@ pub async fn password_hash(db: &PgPool, user: Uuid) -> sqlx::Result<Option<Strin
         .await
 }
 
+/// The same password's new hash, e.g. bcrypt in place of the IHP app's:
+/// the user's sessions go on
 pub async fn set_password_hash(db: &PgPool, user: Uuid, hash: &str) -> sqlx::Result<()> {
     sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
         .bind(user)
@@ -1188,6 +1222,27 @@ pub async fn set_password_hash(db: &PgPool, user: Uuid, hash: &str) -> sqlx::Res
         .execute(db)
         .await
         .map(drop)
+}
+
+/// Changes the password: the user's other sessions end, this one goes on
+pub async fn change_password(
+    db: &PgPool,
+    user: Uuid,
+    hash: &str,
+    session: Uuid,
+) -> sqlx::Result<()> {
+    let mut tx = db.begin().await?;
+    sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+        .bind(user)
+        .bind(hash)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM user_sessions WHERE user_id = $1 AND id <> $2")
+        .bind(user)
+        .bind(session)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await
 }
 
 /// Whether a login with this email exists, as written

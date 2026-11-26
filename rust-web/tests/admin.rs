@@ -137,6 +137,24 @@ async fn state_of(db: &PgPool, user: Uuid) -> sqlx::Result<Login> {
     .await
 }
 
+/// A login as the user, with a session in the database, as a login with
+/// the password makes
+async fn logged_in(db: &PgPool, user: Uuid) -> sqlx::Result<Session> {
+    let id = sqlx::query_scalar("INSERT INTO user_sessions (user_id) VALUES ($1) RETURNING id")
+        .bind(user)
+        .fetch_one(db)
+        .await?;
+    let mut session = Session::default();
+    session.login(user, id);
+    Ok(session)
+}
+
+/// Whether the session gets into the admin
+async fn gets_in(app: &Router, session: &Session) -> Result<bool, Box<dyn std::error::Error>> {
+    let response = send(app, Method::GET, "/admin/Welcome", session, &[]).await?;
+    Ok(response.status() == StatusCode::OK)
+}
+
 #[sqlx::test(migrations = false)]
 async fn the_login_page(db: PgPool) -> TestResult {
     admin(&db).await?;
@@ -411,9 +429,8 @@ async fn without_a_password_is_a_bad_request(db: PgPool) -> TestResult {
 #[sqlx::test(migrations = false)]
 async fn logs_out(db: PgPool) -> TestResult {
     let user = admin(&db).await?;
-    let app = site(db, false);
-    let mut session = Session::default();
-    session.login(user);
+    let app = site(db.clone(), false);
+    let mut session = logged_in(&db, user).await?;
     session.set_text(b"other", "kept");
     for (method, form) in [
         (Method::POST, &[("_method", "DELETE")][..]),
@@ -426,6 +443,8 @@ async fn logs_out(db: PgPool) -> TestResult {
         assert_eq!(after.user_id(), None);
         assert_eq!(after.get_text(b"other").as_deref(), Some("kept"));
     }
+    // A copy of the cookie from before is no login any more
+    assert!(!gets_in(&app, &session).await?);
     for method in [Method::GET, Method::POST] {
         let response = send(&app, method, "/admin/DeleteSession", &session, &[]).await?;
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
@@ -530,9 +549,7 @@ async fn user_with(
     .bind(roles.2)
     .fetch_one(db)
     .await?;
-    let mut session = Session::default();
-    session.login(id);
-    Ok(session)
+    Ok(logged_in(db, id).await?)
 }
 
 /// The menu's links on the welcome page
@@ -650,7 +667,7 @@ async fn the_welcome_page_needs_a_login(db: PgPool) -> TestResult {
 
     // A login that was deleted since is no login
     let mut gone = Session::default();
-    gone.login(Uuid::from_u128(7));
+    gone.login(Uuid::from_u128(7), Uuid::from_u128(8));
     let response = send(&app, Method::GET, "/admin/", &gone, &[]).await?;
     assert_eq!(response.status(), StatusCode::FOUND);
     assert_eq!(location(&response), "/admin/NewSession");
@@ -2054,8 +2071,9 @@ async fn an_ordered_product_stays(db: PgPool) -> TestResult {
 async fn changing_ones_password(db: PgPool) -> TestResult {
     let user = admin(&db).await?;
     let app = site(db.clone(), false);
-    let mut session = Session::default();
-    session.login(user);
+    let session = logged_in(&db, user).await?;
+    // The same login elsewhere, which the new password logs out
+    let elsewhere = logged_in(&db, user).await?;
 
     let form = text(send(&app, Method::GET, "/admin/NewPassword", &session, &[]).await?).await?;
     assert!(form.contains(r#"<form method="POST" action="/admin/UpdatePassword">"#));
@@ -2113,6 +2131,10 @@ async fn changing_ones_password(db: PgPool) -> TestResult {
     )
     .await?;
     assert_eq!(location(&response), "/admin/Welcome");
+    // This session goes on, the other ends
+    let session = session_after(&response, &session);
+    assert!(gets_in(&app, &session).await?);
+    assert!(!gets_in(&app, &elsewhere).await?);
     // The new one logs in, the old one doesn't
     let response = login(
         &app,
@@ -2298,4 +2320,53 @@ async fn replaces_an_ihp_apps_hash_with_bcrypt_at_the_next_login(db: PgPool) -> 
     assert_eq!(response.status(), StatusCode::SEE_OTHER);
     assert_eq!(stored().await?, bcrypt, "not again");
     Ok(())
+}
+
+/// The cookie alone isn't the login: it names a session the database must
+/// have, for 30 days from the login
+#[sqlx::test(migrations = false)]
+async fn a_login_is_a_session_in_the_database(db: PgPool) -> TestResult {
+    let user = admin(&db).await?;
+    let app = site(db.clone(), false);
+    let response = login(&app, &Session::default(), "admin@example.com", "salasana").await?;
+    let session = session_after(&response, &Session::default());
+    assert!(gets_in(&app, &session).await?);
+    let id = session.session_id().expect("a session");
+    let stored: Uuid = sqlx::query_scalar("SELECT user_id FROM user_sessions WHERE id = $1")
+        .bind(id)
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(stored, user);
+
+    // An IHP login, the user's id alone
+    let mut ihp = Session::default();
+    ihp.set_text(session::LOGIN, &user.to_string());
+    assert!(!gets_in(&app, &ihp).await?);
+    // Another user's session
+    let other = logged_in(&db, another_login(&db).await?).await?;
+    let mut mixed = Session::default();
+    mixed.login(user, other.session_id().expect("a session"));
+    assert!(!gets_in(&app, &mixed).await?);
+
+    // 30 days on it ends, and the next login clears it away
+    sqlx::query("UPDATE user_sessions SET created_at = NOW() - INTERVAL '30 days 1 minute'")
+        .execute(&db)
+        .await?;
+    assert!(!gets_in(&app, &session).await?);
+    login(&app, &Session::default(), "admin@example.com", "salasana").await?;
+    let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM user_sessions WHERE user_id = $1")
+        .bind(user)
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(left, 1);
+    Ok(())
+}
+
+/// Another login, with no roles
+async fn another_login(db: &PgPool) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO users (email, password_hash) VALUES ('toinen@example.com', 'x') RETURNING id",
+    )
+    .fetch_one(db)
+    .await
 }

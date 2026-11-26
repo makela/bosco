@@ -1,6 +1,6 @@
-//! IHP's session, the `SESSION` cookie, read and written as IHP does, so
-//! that a login here is a login in the IHP app's admin and the other way
-//! round, and the flash messages of one show on the other's next page.
+//! IHP's session, the `SESSION` cookie, read and written as IHP does, as
+//! it was while both apps ran. A login is the user's id and their session's
+//! (`LOGIN_SESSION`), which the database must still have (`admin::require_user`).
 //!
 //! The cookie is the clientsession library's: base64 of a Skein-MAC-512-256
 //! (32 bytes), a random IV (16 bytes) and the session encrypted with
@@ -27,6 +27,8 @@ const MAX_AGE: u32 = 60 * 60 * 24 * 30;
 
 /// Where IHP keeps the logged-in user's id, as its 36 characters
 pub const LOGIN: &[u8] = b"login.User";
+/// The login's session, its row in `user_sessions`, as its 36 characters
+pub const LOGIN_SESSION: &[u8] = b"login.Session";
 /// Where IHP keeps the page a login should go back to, as a Text
 pub const REDIRECT_AFTER_LOGIN: &[u8] = b"IHP.LoginSupport.redirectAfterLogin";
 pub const FLASH_SUCCESS: &[u8] = b"flashSuccessMessage";
@@ -167,12 +169,23 @@ impl Session {
         uuid::Uuid::try_parse_ascii(ascii).ok()
     }
 
-    pub fn login(&mut self, user_id: uuid::Uuid) {
+    /// The login's session, which the database must still have for the
+    /// login to count; IHP's sessions have none
+    pub fn session_id(&self) -> Option<uuid::Uuid> {
+        uuid::Uuid::try_parse_ascii(self.get(LOGIN_SESSION)?).ok()
+    }
+
+    pub fn login(&mut self, user_id: uuid::Uuid, session_id: uuid::Uuid) {
         self.insert(LOGIN, user_id.hyphenated().to_string().into_bytes());
+        self.insert(
+            LOGIN_SESSION,
+            session_id.hyphenated().to_string().into_bytes(),
+        );
     }
 
     pub fn logout(&mut self) {
         self.remove(LOGIN);
+        self.remove(LOGIN_SESSION);
     }
 
     /// The cookie value, encrypted with a new IV
@@ -298,7 +311,7 @@ mod tests {
     #[test]
     fn writes_the_same_cookie_as_ihp() {
         let mut session = Session::default();
-        session.login(USER.parse().unwrap());
+        session.insert(LOGIN, USER.as_bytes().to_vec());
         session.set_text(FLASH_ERROR, "Invalid Credentials");
         let iv: [u8; 16] = std::array::from_fn(|i| 100 + i as u8);
         assert_eq!(key().encrypt(iv, &encode(&session.pairs)), IHP_COOKIE);
@@ -325,6 +338,7 @@ mod tests {
             .unwrap();
         let read = Session::from_headers(&key(), &headers(value));
         assert_eq!(read.user_id(), None);
+        assert_eq!(read.session_id(), None);
         assert_eq!(read.get(LOGIN), Some(&b""[..]));
         assert_eq!(read.get_text(FLASH_ERROR), None);
         assert_eq!(read.get_text(FLASH_SUCCESS).as_deref(), Some("Päivitetty"));
@@ -337,6 +351,18 @@ mod tests {
         assert_eq!(session.user_id(), Some(USER.parse().unwrap()));
         session.insert(LOGIN, b"not a uuid".to_vec());
         assert_eq!(session.user_id(), None);
+    }
+
+    #[test]
+    fn keeps_the_logins_session() {
+        let mut session = Session::default();
+        let id = uuid::Uuid::from_u128(42);
+        session.login(USER.parse().unwrap(), id);
+        assert_eq!(session.user_id(), Some(USER.parse().unwrap()));
+        assert_eq!(session.session_id(), Some(id));
+        // IHP's has none
+        let ihp = Session::from_headers(&key(), &headers(IHP_COOKIE));
+        assert_eq!(ihp.session_id(), None);
     }
 
     #[test]
