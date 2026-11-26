@@ -2598,3 +2598,102 @@ async fn a_customer_who_asks_is_erased(db: PgPool) -> TestResult {
     assert!(details(&db, other).await?.is_some());
     Ok(())
 }
+
+#[sqlx::test(migrations = false)]
+async fn everything_we_have_of_a_customer(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let first = customer_ordering(
+        &db,
+        "Eeva",
+        "eeva@example.com",
+        "subscribed",
+        Some("'2024-03-01 10:00:00+00'"),
+    )
+    .await?;
+    // The same person ordering again, written otherwise
+    let again = customer_ordering(
+        &db,
+        "Eeva",
+        " EEVA@example.com",
+        "",
+        Some("'2025-03-01 10:00:00+00'"),
+    )
+    .await?;
+    customer_ordering(&db, "Ilkka", "ilkka@example.com", "", Some("NOW()")).await?;
+    let producer: Uuid = sqlx::query_scalar(
+        "INSERT INTO producers (name, subject, description) VALUES ('P', '', '') RETURNING id",
+    )
+    .fetch_one(&db)
+    .await?;
+    sqlx::query(
+        "WITH p AS (INSERT INTO products (producer_id, name, description, package, price)
+                    VALUES ($1, 'Oliiviöljy', '', '3 l', 5100) RETURNING id)
+         INSERT INTO ordered_products (order_id, product_id, quantity, unit_price)
+         SELECT orders.id, p.id, 2, 5000 FROM orders, p WHERE customer_id = $2",
+    )
+    .bind(producer)
+    .bind(again)
+    .execute(&db)
+    .await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+
+    let show = format!("/admin/ShowCustomer?customerId={first}");
+    let data = format!("/admin/CustomerData?customerId={first}");
+    let page = text(send(&app, Method::GET, &show, &boss, &[]).await?).await?;
+    assert!(page.contains(&format!(
+        r#"<a href="{data}">Everything we have of them</a>"#
+    )));
+    let page = text(send(&app, Method::GET, &data, &boss, &[]).await?).await?;
+    assert!(
+        page.contains("Details 1 of 2") && page.contains("Details 2 of 2"),
+        "{page}"
+    );
+    assert!(page.contains("eeva@example.com") && !page.contains("ilkka"));
+    assert!(page.contains("2024-03-01 10:00 UTC") && page.contains("2025-03-01 10:00 UTC"));
+    assert!(page.contains("subscribed since"));
+    assert!(
+        page.contains("2 × Oliiviöljy (3 l), 50\u{a0}€ each"),
+        "{page}"
+    );
+    assert!(page.contains("<td>100\u{a0}€</td>"));
+    assert!(page.contains("failed, ") && page.contains("no such address: eeva@example.com"));
+    assert!(page.contains(&format!("{data}&amp;format=text")));
+
+    let response = send(
+        &app,
+        Method::GET,
+        &format!("{data}&format=text"),
+        &boss,
+        &[],
+    )
+    .await?;
+    assert_eq!(
+        response.headers()[header::CONTENT_TYPE],
+        "text/plain; charset=utf-8"
+    );
+    let disposition = response.headers()[header::CONTENT_DISPOSITION]
+        .to_str()?
+        .to_string();
+    assert!(
+        disposition.starts_with("attachment; filename=\"customer-data-"),
+        "{disposition}"
+    );
+    let file = text(response).await?;
+    assert!(file.starts_with("What we have of Eeva Aalto, "), "{file}");
+    assert!(
+        file.contains("\nDetails 2 of 2\n  Saved: 2025-03-01 10:00 UTC\n"),
+        "{file}"
+    );
+    assert!(file.contains("  Phone: 040 123\n"));
+    assert!(
+        file.contains("  Product: 2 × Oliiviöljy (3 l), 50\u{a0}€ each\n  Total: 100\u{a0}€\n")
+    );
+    assert!(file.contains("Not in the database, so not here: the server's technical logs"));
+
+    // Only for those who manage the shop
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    let response = send(&app, Method::GET, &data, &driver, &[]).await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    Ok(())
+}

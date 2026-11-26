@@ -256,6 +256,12 @@ their amounts stay. Run it by hand with:
 systemctl start bosco-fi-anonymize
 ```
 
+For someone who asks what we have of them, a customer's page has
+*Everything we have of them*: every saved copy of the details with their
+email (each order saves the customer again), with its newsletter status,
+and their orders with their products, totals, steps and emails. It
+downloads as a text file to send them.
+
 For someone who asks to be erased sooner, a customer's page in the admin
 has *Erase their details*: it deletes their rows without orders (every row
 with their email) and clears the email and phone of those with orders,

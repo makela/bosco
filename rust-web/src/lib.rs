@@ -573,6 +573,10 @@ pub fn app(state: Arc<AppState>) -> Router {
             delete(admin_customers::delete).post(admin_customers::delete_by_post),
         )
         .route(
+            "/admin/CustomerData",
+            get(admin_customers::data).post(admin_customers::data),
+        )
+        .route(
             "/admin/EraseCustomer",
             get(admin_customers::erase_form).post(admin_customers::erase),
         )

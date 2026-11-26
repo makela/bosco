@@ -1431,3 +1431,111 @@ pub async fn erase_customer(db: &PgPool, id: Uuid) -> sqlx::Result<Erasure> {
         deleted: deleted.len(),
     })
 }
+
+/// A saved copy of the customer's details, as an order or a form saved it
+#[derive(Debug, FromRow)]
+pub struct CustomerRecord {
+    pub id: Uuid,
+    #[sqlx(flatten)]
+    pub customer: Customer,
+    /// As written before the name and address were split into their parts
+    pub name: String,
+    pub address: String,
+    pub created_at: DateTime<Utc>,
+    pub last_modified_at: DateTime<Utc>,
+    pub subscribed_at: Option<DateTime<Utc>>,
+    pub unsubscribed_at: Option<DateTime<Utc>>,
+}
+
+/// An order of theirs, with what was in it and its emails
+#[derive(Debug)]
+pub struct PersonOrder {
+    pub id: Uuid,
+    pub customer_id: Uuid,
+    pub ordered_at: DateTime<Utc>,
+    pub invoiced_at: Option<DateTime<Utc>>,
+    pub paid_at: Option<DateTime<Utc>>,
+    pub delivered_at: Option<DateTime<Utc>>,
+    pub cancelled_at: Option<DateTime<Utc>>,
+    /// Product, package, quantity and unit price in cents
+    pub lines: Vec<(String, String, i32, i32)>,
+    pub emails: Vec<EmailJob>,
+}
+
+impl PersonOrder {
+    pub fn total(&self) -> i64 {
+        self.lines
+            .iter()
+            .map(|(_, _, quantity, price)| i64::from(*quantity) * i64::from(*price))
+            .sum()
+    }
+}
+
+/// Everything the database has of a person, for a request to see it
+/// (GDPR art. 15): every customer row with their email (`same_person`),
+/// oldest first, and their orders, oldest first
+#[derive(Debug)]
+pub struct PersonData {
+    pub records: Vec<CustomerRecord>,
+    pub orders: Vec<PersonOrder>,
+}
+
+pub async fn person_data(db: &PgPool, id: Uuid) -> sqlx::Result<PersonData> {
+    let mut conn = db.acquire().await?;
+    let ids = same_person(&mut conn, id).await?;
+    let records: Vec<CustomerRecord> = sqlx::query_as(
+        "SELECT id, email, phone, first_name, last_name, street_address, postal_code, city,
+                billing_name, name, address, created_at, last_modified_at, subscribed_at,
+                unsubscribed_at
+         FROM customers WHERE id = ANY($1) ORDER BY created_at, id",
+    )
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    type OrderRow = (
+        Uuid,
+        Uuid,
+        DateTime<Utc>,
+        Option<DateTime<Utc>>,
+        Option<DateTime<Utc>>,
+        Option<DateTime<Utc>>,
+        Option<DateTime<Utc>>,
+    );
+    let rows: Vec<OrderRow> = sqlx::query_as(
+        "SELECT id, customer_id, ordered_at, invoiced_at, paid_at, delivered_at, cancelled_at
+         FROM orders WHERE customer_id = ANY($1) ORDER BY ordered_at, id",
+    )
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut orders = Vec::new();
+    for (id, customer_id, ordered_at, invoiced_at, paid_at, delivered_at, cancelled_at) in rows {
+        let lines = sqlx::query_as(
+            "SELECT products.name, products.package, quantity, unit_price
+             FROM ordered_products JOIN products ON products.id = product_id
+             WHERE order_id = $1 ORDER BY products.name, ordered_products.id",
+        )
+        .bind(id)
+        .fetch_all(&mut *conn)
+        .await?;
+        let emails = sqlx::query_as(
+            "SELECT status::text, created_at, updated_at, last_error FROM email_order_jobs
+             WHERE order_id = $1 ORDER BY created_at",
+        )
+        .bind(id)
+        .fetch_all(&mut *conn)
+        .await?;
+        orders.push(PersonOrder {
+            id,
+            customer_id,
+            ordered_at,
+            invoiced_at,
+            paid_at,
+            delivered_at,
+            cancelled_at,
+            lines,
+            emails,
+        });
+    }
+    Ok(PersonData { records, orders })
+}

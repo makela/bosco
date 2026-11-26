@@ -6,6 +6,8 @@
 //!   is delivered, and those who get the newsletter's
 //! - taking a customer's email off the newsletter, when they ask the admin,
 //!   or putting them back on it
+//! - everything the database has of a customer, for a request to see it
+//!   (GDPR art. 15), as a page and a text file to send them
 //! - erasing a customer who asks for it (`db::erase_customer`): their
 //!   email and phone, and the rows without orders; what the invoices need
 //!   stays for the accounts, until the nightly `bosco-anonymize`
@@ -154,6 +156,9 @@ pub async fn show(
         p { (customer.phone) }
         @for line in customer.address_lines() { p { (line) } }
         (newsletter_status(&row))
+        p class="my-4" {
+            a href=(data_path(row.id, false)) { "Everything we have of them" }
+        }
         p class="my-4" {
             a href=(path("Erase", row.id)) { "Erase their details, as they asked…" }
         }
@@ -636,6 +641,189 @@ pub async fn newsletter_emails(
             (state.site.base_url.as_deref().unwrap_or("").trim_end_matches('/')) "/Unsubscribe"
         }
         p { (emails.join(", ")) }
+    };
+    Ok(admin::page(&state, session, &content))
+}
+
+fn data_path(id: Uuid, text: bool) -> String {
+    let path = format!("/admin/CustomerData?customerId={id}");
+    if text {
+        format!("{path}&format=text")
+    } else {
+        path
+    }
+}
+
+/// A time as the copy for the customer shows it, in UTC as stored
+fn utc(at: chrono::DateTime<chrono::Utc>) -> String {
+    at.format("%Y-%m-%d %H:%M UTC").to_string()
+}
+
+/// A section of what we have of them: a heading, and labelled values
+type Section = (String, Vec<(&'static str, String)>);
+
+/// What the database has of the person, in sections, the same for the
+/// page and the text file: the copies of their details, their newsletter
+/// status in each, and their orders with their lines and emails
+fn data_sections(locale: crate::l10n::Locale, data: &db::PersonData) -> Vec<Section> {
+    let optional =
+        |at: Option<chrono::DateTime<chrono::Utc>>| at.map(utc).unwrap_or_else(|| "–".into());
+    let mut sections = Vec::new();
+    for (i, record) in data.records.iter().enumerate() {
+        let c = &record.customer;
+        let newsletter = match (record.subscribed_at, record.unsubscribed_at) {
+            (Some(since), _) => format!("subscribed since {}", utc(since)),
+            (None, Some(left)) => format!("unsubscribed {}", utc(left)),
+            (None, None) => "not subscribed".into(),
+        };
+        let mut fields = vec![
+            ("Saved", utc(record.created_at)),
+            ("Last changed", utc(record.last_modified_at)),
+            ("First name", c.first_name.clone()),
+            ("Last name", c.last_name.clone()),
+            ("Name on the invoice", c.billing_name.clone()),
+            ("Email", c.email.clone()),
+            ("Phone", c.phone.clone()),
+            ("Street address", c.street_address.clone()),
+            ("Postal code", c.postal_code.clone()),
+            ("City", c.city.clone()),
+        ];
+        // As written before they were split, when it's still there
+        if !record.name.is_empty() {
+            fields.push(("Name, as first written", record.name.clone()));
+        }
+        if !record.address.is_empty() {
+            fields.push(("Address, as first written", record.address.clone()));
+        }
+        fields.push(("Newsletter", newsletter));
+        let orders = data
+            .orders
+            .iter()
+            .filter(|order| order.customer_id == record.id)
+            .count();
+        fields.push(("Orders with these details", orders.to_string()));
+        sections.push((
+            format!("Details {} of {}", i + 1, data.records.len()),
+            fields,
+        ));
+    }
+    for order in &data.orders {
+        let mut fields = vec![
+            ("Ordered", utc(order.ordered_at)),
+            ("Invoiced", optional(order.invoiced_at)),
+            ("Paid", optional(order.paid_at)),
+            ("Delivered", optional(order.delivered_at)),
+            ("Cancelled", optional(order.cancelled_at)),
+        ];
+        for (name, package, quantity, price) in &order.lines {
+            fields.push((
+                "Product",
+                format!(
+                    "{quantity} × {name} ({package}), {} each",
+                    crate::views::money(locale, i64::from(*price))
+                ),
+            ));
+        }
+        fields.push(("Total", crate::views::money(locale, order.total())));
+        for email in &order.emails {
+            let status = match email.status.as_str() {
+                "job_status_succeeded" => "sent",
+                "job_status_failed" | "job_status_retry" => "failed",
+                "job_status_timed_out" => "timed out",
+                _ => "waiting to be sent",
+            };
+            let error = email
+                .last_error
+                .as_deref()
+                .map(|error| format!(": {error}"))
+                .unwrap_or_default();
+            fields.push((
+                "Order email",
+                format!("{status}, {}{error}", utc(email.updated_at)),
+            ));
+        }
+        sections.push((format!("Order {}", order.id), fields));
+    }
+    sections
+}
+
+/// What the database doesn't have, for the answer to say
+const ELSEWHERE: &str = "Not in the database, so not here: the server's technical logs, kept for a short time, and the order emails as sent, in the sending mailbox.";
+
+/// The sections as plain text, to attach to the answer
+fn data_text(name: &str, sections: &[Section]) -> String {
+    let mut text = format!("What we have of {name}, {}\n", utc(chrono::Utc::now()));
+    for (heading, fields) in sections {
+        text.push_str(&format!("\n{heading}\n"));
+        for (label, value) in fields {
+            text.push_str(&format!("  {label}: {value}\n"));
+        }
+    }
+    text.push_str(&format!("\n{ELSEWHERE}\n"));
+    text
+}
+
+/// Everything the database has of the customer and the others with their
+/// email: the page, or with `format=text` a text file to send them
+pub async fn data(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    let (row, session) = match find(&state, &headers, &uri, &params).await? {
+        Ok(found) => found,
+        Err(response) => return Ok(response),
+    };
+    let data = db::person_data(&state.db, row.id).await?;
+    let sections = data_sections(state.site.locale, &data);
+    let name = full_name(&row.customer);
+    tracing::info!(customer = %row.id, "looked up everything of a customer");
+    if params
+        .iter()
+        .any(|(key, value)| key == "format" && value == "text")
+    {
+        let file = format!(
+            "attachment; filename=\"customer-data-{}.txt\"",
+            chrono::Utc::now().format("%Y-%m-%d")
+        );
+        return Ok((
+            [
+                (
+                    axum::http::header::CONTENT_TYPE,
+                    "text/plain; charset=utf-8".to_string(),
+                ),
+                (axum::http::header::CONTENT_DISPOSITION, file),
+            ],
+            data_text(&name, &sections),
+        )
+            .into_response());
+    }
+    let show = path("Show", row.id);
+    let content = html! {
+        (admin::breadcrumb(&[
+            Crumb::link("Home", admin::WELCOME),
+            Crumb::link("Customers", LIST),
+            Crumb::link(&name, &show),
+            Crumb::text("Everything we have"),
+        ]))
+        p class="my-4" {
+            "Every saved copy of the details with this email, and their orders. "
+            a href=(data_path(row.id, true)) { "Download it as a text file" }
+            " to send them."
+        }
+        @for (heading, fields) in &sections {
+            h2 class="text-lg font-semibold mt-6 mb-2" { (heading) }
+            table class="mb-4" {
+                @for (label, value) in fields {
+                    tr {
+                        th class="text-left font-normal text-gray-600 pr-4 align-top" { (label) }
+                        td { (value) }
+                    }
+                }
+            }
+        }
+        p class="my-4 text-gray-600" { (ELSEWHERE) }
     };
     Ok(admin::page(&state, session, &content))
 }
