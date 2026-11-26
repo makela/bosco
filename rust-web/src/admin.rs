@@ -192,8 +192,8 @@ pub async fn new_session(State(state): State<Arc<AppState>>, headers: HeaderMap)
     page(&state, session, &login_form(state.site.demo))
 }
 
-/// The password is right: some 130 000 rounds of SHA-256, off the threads
-/// that answer requests
+/// The password is right: bcrypt, or the IHP app's 130 000 rounds of
+/// SHA-256, off the threads that answer requests
 async fn verify(given: &str, stored: &str) -> bool {
     let (given, stored) = (given.to_string(), stored.to_string());
     tokio::task::spawn_blocking(move || password::verify(&given, &stored))
@@ -237,6 +237,15 @@ pub async fn create_session(
     if !verify(given, &user.password_hash).await {
         tracing::info!(user = %user.id, "a wrong password");
         return Ok(refused(session));
+    }
+    // An IHP app's hash becomes bcrypt now that the password is at hand
+    if password::needs_rehash(&user.password_hash) {
+        let given = given.clone();
+        let hash = tokio::task::spawn_blocking(move || password::hash(&given))
+            .await
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+        db::set_password_hash(&state.db, user.id, &hash).await?;
+        tracing::info!(user = %user.id, "rehashed their password with bcrypt");
     }
     session.login(user.id);
     db::login_succeeded(&state.db, user.id).await?;

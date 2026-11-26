@@ -454,7 +454,7 @@ async fn a_demo_logs_in_with_a_button(db: PgPool) -> TestResult {
     .fetch_one(&db)
     .await?;
     assert_eq!(session.user_id(), Some(id));
-    assert!(hash.starts_with("sha256|17|"));
+    assert!(hash.starts_with("$2b$12$"));
     assert!(!admin && deliverer);
 
     // Its roles back, and unlocked, whatever was done to it
@@ -2273,5 +2273,29 @@ async fn a_demos_privacy_notice_is_fixed(db: PgPool) -> TestResult {
         .fetch_one(&db)
         .await?;
     assert_eq!(count, 0);
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn replaces_an_ihp_apps_hash_with_bcrypt_at_the_next_login(db: PgPool) -> TestResult {
+    let user = admin(&db).await?;
+    let app = site(db.clone(), false);
+    let stored = || {
+        sqlx::query_scalar::<_, String>("SELECT password_hash FROM users WHERE id = $1")
+            .bind(user)
+            .fetch_one(&db)
+    };
+    // A wrong password leaves it be
+    login(&app, &Session::default(), "admin@example.com", "väärin").await?;
+    assert_eq!(stored().await?, SALASANA);
+    let response = login(&app, &Session::default(), "admin@example.com", "salasana").await?;
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    let bcrypt = stored().await?;
+    assert!(bcrypt.starts_with("$2b$12$"), "{bcrypt}");
+    assert!(bosco_web::password::verify("salasana", &bcrypt));
+    // The password logs in as before
+    let response = login(&app, &Session::default(), "admin@example.com", "salasana").await?;
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(stored().await?, bcrypt, "not again");
     Ok(())
 }
