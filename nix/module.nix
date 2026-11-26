@@ -37,7 +37,7 @@
 #     };
 #   };
 #
-# Each instance <name> has three services, the programs of rust-web/, all
+# Each instance <name> has these services, the programs of rust-web/, all
 # running as the system user that owns the instance's PostgreSQL database
 # (bosco_<name> by default):
 #
@@ -47,8 +47,11 @@
 #   everything to it (nginxLocations)
 # - bosco-<name>-worker sends the order emails (bosco-worker)
 #
-# A demo has a fourth, bosco-<name>-reset-demo, started every night by its
-# timer. Their state, the session key, is in /var/lib/bosco-<name>.
+# Each also has bosco-<name>-anonymize, started every night by its timer,
+# which clears the customers past the accounting period, as the privacy
+# notice promises (bosco-anonymize). A demo has bosco-<name>-reset-demo too,
+# started every night by its timer. Their state, the session key, is in
+# /var/lib/bosco-<name>.
 {
   config,
   lib,
@@ -192,6 +195,20 @@ let
           };
 
           package = removed;
+        };
+
+        anonymize.time = lib.mkOption {
+          type = lib.types.str;
+          default = "*-*-* 02:30:00";
+          example = "*-*-* 04:00:00";
+          description = ''
+            When the customers past the accounting period are cleared (systemd
+            OnCalendar, the server's time zone): those whose newest order is from a
+            year that ended over 10 years ago lose their phone, address and invoice
+            name, and their name and email unless the newsletter needs them, as the
+            privacy notice says. Run it now with
+            systemctl start bosco-<name>-anonymize.
+          '';
         };
 
         mail = {
@@ -480,9 +497,21 @@ let
             LoadCredential = "smtp-password:${instance.smtp.passwordFile}";
           };
       };
+
+      # Started by its timer, see timers
+      "bosco-${name}-anonymize" = {
+        description = "Bosco Falconeria clearing of customers past the accounting period (${name})";
+        after = after ++ [ migrate ];
+        inherit requires;
+        inherit environment;
+        serviceConfig = serviceConfig // {
+          Type = "oneshot";
+          ExecStart = "${instance.package}/bin/bosco-anonymize";
+        };
+      };
     }
     // lib.optionalAttrs instance.demo {
-      # Started by its timer, see demoTimers
+      # Started by its timer, see timers
       "bosco-${name}-reset-demo" = {
         description = "Bosco Falconeria demo data reset (${name})";
         after = after ++ [ migrate ];
@@ -497,15 +526,28 @@ let
       };
     };
 
-  demoTimers =
+  timers =
     name: instance:
-    lib.nameValuePair "bosco-${name}-reset-demo" {
-      description = "Nightly Bosco Falconeria demo data reset (${name})";
-      wantedBy = [ "timers.target" ];
-      timerConfig = {
-        OnCalendar = instance.demoReset.time;
-        # Catches up on a reset missed while the server was off
-        Persistent = true;
+    {
+      "bosco-${name}-anonymize" = {
+        description = "Nightly Bosco Falconeria clearing of customers past the accounting period (${name})";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = instance.anonymize.time;
+          # Catches up on a run missed while the server was off
+          Persistent = true;
+        };
+      };
+    }
+    // lib.optionalAttrs instance.demo {
+      "bosco-${name}-reset-demo" = {
+        description = "Nightly Bosco Falconeria demo data reset (${name})";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = instance.demoReset.time;
+          # Catches up on a reset missed while the server was off
+          Persistent = true;
+        };
       };
     };
 
@@ -591,7 +633,7 @@ in
     };
 
     systemd.services = lib.mkMerge (lib.mapAttrsToList services instances);
-    systemd.timers = lib.mapAttrs' demoTimers (lib.filterAttrs (_: instance: instance.demo) instances);
+    systemd.timers = lib.mkMerge (lib.mapAttrsToList timers instances);
 
     # bosco-<name>-create-user makes a login on the instance's database, as
     # the instance's user, with bosco-create-user from package:

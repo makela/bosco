@@ -6,6 +6,9 @@
 //!   is delivered, and those who get the newsletter's
 //! - taking a customer's email off the newsletter, when they ask the admin,
 //!   or putting them back on it
+//! - erasing a customer who asks for it (`db::erase_customer`): their
+//!   email and phone, and the rows without orders; what the invoices need
+//!   stays for the accounts, until the nightly `bosco-anonymize`
 //!
 //! Unlike an order, the admin's form may leave the address empty: many
 //! customers from before the address was split have only a street, or
@@ -151,8 +154,82 @@ pub async fn show(
         p { (customer.phone) }
         @for line in customer.address_lines() { p { (line) } }
         (newsletter_status(&row))
+        p class="my-4" {
+            a href=(path("Erase", row.id)) { "Erase their details, as they asked…" }
+        }
     };
     Ok(admin::page(&state, session, &content))
+}
+
+/// What erasing the customer does, and the button to do it
+pub async fn erase_form(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    let (row, session) = match find(&state, &headers, &uri, &params).await? {
+        Ok(found) => found,
+        Err(response) => return Ok(response),
+    };
+    let erasure = db::erasure(&state.db, row.id).await?;
+    let customer = &row.customer;
+    let show = path("Show", row.id);
+    let content = html! {
+        (admin::breadcrumb(&[
+            Crumb::link("Home", admin::WELCOME),
+            Crumb::link("Customers", LIST),
+            Crumb::link(&full_name(customer), &show),
+            Crumb::text("Erase"),
+        ]))
+        div class="max-w-prose" {
+            p {
+                "Erasing " (full_name(customer))
+                @if !customer.email.is_empty() { " (" (customer.email) ")" }
+                ", as they asked:"
+            }
+            ul class="list-disc ml-6 my-4" {
+                @if erasure.deleted > 0 {
+                    li { (erasure.deleted) " without orders: deleted" }
+                }
+                @if erasure.cleared > 0 {
+                    li {
+                        (erasure.cleared) " with orders: their email and phone are cleared and they leave the newsletter. "
+                        "The names and address stay on the invoices for the accounts, 10 years from the end of the order's year, and are cleared after that."
+                    }
+                }
+            }
+            p { "This can't be undone." }
+            form method="POST" action=(path("Erase", row.id)) {
+                button class="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded" type="submit" {
+                    "Erase"
+                }
+            }
+        }
+    };
+    Ok(admin::page(&state, session, &content))
+}
+
+/// Erases the customer and the other rows with their email
+pub async fn erase(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    uri: Uri,
+    Query(params): Query<Vec<(String, String)>>,
+) -> Result<Response> {
+    let (row, mut session) = match find(&state, &headers, &uri, &params).await? {
+        Ok(found) => found,
+        Err(response) => return Ok(response),
+    };
+    let erasure = db::erase_customer(&state.db, row.id).await?;
+    tracing::info!(
+        customer = %row.id,
+        cleared = erasure.cleared,
+        deleted = erasure.deleted,
+        "erased a customer"
+    );
+    session.set_text(FLASH_SUCCESS, "Customer erased");
+    Ok(admin::with_session(&state, &session, admin::found(LIST)))
 }
 
 /// Whether the customer gets the newsletter, since when or since when not,

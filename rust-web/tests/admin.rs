@@ -2370,3 +2370,231 @@ async fn another_login(db: &PgPool) -> sqlx::Result<Uuid> {
     .fetch_one(db)
     .await
 }
+
+/// A customer with all their details, and an order at `ordered_at` (SQL)
+/// unless it's None, with a failed email job naming their address
+async fn customer_ordering(
+    db: &PgPool,
+    first_name: &str,
+    email: &str,
+    newsletter: &str,
+    ordered_at: Option<&str>,
+) -> sqlx::Result<Uuid> {
+    let (subscribed, unsubscribed) = match newsletter {
+        "subscribed" => ("NOW()", "NULL"),
+        "unsubscribed" => ("NULL", "NOW()"),
+        _ => ("NULL", "NULL"),
+    };
+    let sql = format!(
+        "INSERT INTO customers (first_name, last_name, name, reverse_name, billing_name, email,
+                                phone, address, street_address, postal_code, city, created_at,
+                                subscribed_at, unsubscribed_at)
+         VALUES ($1, 'Aalto', $1 || ' Aalto', 'aalto ' || lower($1), 'Firma Oy', $2,
+                 '040 123', 'Katu 1, Helsinki', 'Katu 1', '00100', 'Helsinki',
+                 COALESCE({}, NOW()), {subscribed}, {unsubscribed})
+         RETURNING id",
+        ordered_at.unwrap_or("NULL")
+    );
+    let customer: Uuid = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+        .bind(first_name)
+        .bind(email)
+        .fetch_one(db)
+        .await?;
+    if let Some(ordered_at) = ordered_at {
+        let sql = format!(
+            "WITH o AS (INSERT INTO orders (customer_id, ordered_at, paid_at)
+                        VALUES ($1, {ordered_at}, {ordered_at}) RETURNING id)
+             INSERT INTO email_order_jobs (order_id, status, last_error)
+             SELECT id, 'job_status_failed', 'no such address: ' || $2 FROM o"
+        );
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .bind(customer)
+            .bind(email)
+            .execute(db)
+            .await?;
+    }
+    Ok(customer)
+}
+
+/// The customer's details, as the clearing leaves them
+async fn details(db: &PgPool, id: Uuid) -> sqlx::Result<Option<Vec<String>>> {
+    sqlx::query_scalar(
+        "SELECT ARRAY[first_name, last_name, name, reverse_name, billing_name, email, phone,
+                      address, street_address, postal_code, city]
+         FROM customers WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+async fn job_errors(db: &PgPool, customer: Uuid) -> sqlx::Result<Vec<Option<String>>> {
+    sqlx::query_scalar(
+        "SELECT last_error FROM email_order_jobs JOIN orders ON orders.id = order_id
+         WHERE customer_id = $1",
+    )
+    .bind(customer)
+    .fetch_all(db)
+    .await
+}
+
+/// The last day of the year that ended over 10 years ago, and the first of
+/// the year after, which is still kept
+const LAST_DUE: &str = "date_trunc('year', NOW()) - INTERVAL '10 years' - INTERVAL '1 day'";
+const FIRST_KEPT: &str = "date_trunc('year', NOW()) - INTERVAL '10 years' + INTERVAL '1 hour'";
+
+#[sqlx::test(migrations = false)]
+async fn customers_past_the_accounting_period_are_cleared(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let old = customer_ordering(&db, "Olli", "olli@example.com", "", Some(LAST_DUE)).await?;
+    let kept = customer_ordering(&db, "Kaisa", "kaisa@example.com", "", Some(FIRST_KEPT)).await?;
+    let reader = customer_ordering(
+        &db,
+        "Lauri",
+        "lauri@example.com",
+        "subscribed",
+        Some(LAST_DUE),
+    )
+    .await?;
+    let left = customer_ordering(
+        &db,
+        "Leena",
+        "leena@example.com",
+        "unsubscribed",
+        Some(LAST_DUE),
+    )
+    .await?;
+    // A row from before, and a newer order of the same customer: the row of
+    // the old order is cleared, the new one's isn't
+    let newer = customer_ordering(&db, "Olli", "olli@example.com", "", Some("NOW()")).await?;
+    // Without orders, by when it was made
+    let signed_up = customer_ordering(&db, "Sari", "sari@example.com", "", None).await?;
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "UPDATE customers SET created_at = {LAST_DUE} WHERE id = $1"
+    )))
+    .bind(signed_up)
+    .execute(&db)
+    .await?;
+
+    assert_eq!(bosco_web::db::anonymize_due(&db).await?, 4);
+    let empty = vec![String::new(); 11];
+    assert_eq!(details(&db, old).await?, Some(empty.clone()));
+    assert_eq!(details(&db, signed_up).await?, Some(empty.clone()));
+    // The newsletter keeps the name and email, until they leave it
+    let mut named = empty.clone();
+    named[..4].clone_from_slice(&[
+        "Lauri".into(),
+        "Aalto".into(),
+        "Lauri Aalto".into(),
+        "aalto lauri".into(),
+    ]);
+    named[5] = "lauri@example.com".into();
+    assert_eq!(details(&db, reader).await?, Some(named));
+    // The record that it left keeps the email
+    let mut marked = empty.clone();
+    marked[5] = "leena@example.com".into();
+    assert_eq!(details(&db, left).await?, Some(marked));
+    for untouched in [kept, newer] {
+        assert_eq!(details(&db, untouched).await?.unwrap()[6], "040 123");
+    }
+    assert_eq!(job_errors(&db, old).await?, [None]);
+    assert_eq!(
+        job_errors(&db, kept).await?,
+        [Some("no such address: kaisa@example.com".to_string())]
+    );
+    // The orders and their amounts stay
+    let orders: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM orders")
+        .fetch_one(&db)
+        .await?;
+    assert_eq!(orders, 5);
+    // The newsletter still has the reader; the delivery list no empties
+    assert!(
+        bosco_web::db::newsletter_emails(&db)
+            .await?
+            .contains(&"lauri@example.com".to_string())
+    );
+
+    // Again, nothing is left to clear
+    assert_eq!(bosco_web::db::anonymize_due(&db).await?, 0);
+    // ...until the reader leaves the newsletter
+    bosco_web::db::unsubscribe(&db, "lauri@example.com").await?;
+    assert_eq!(bosco_web::db::anonymize_due(&db).await?, 1);
+    assert_eq!(details(&db, reader).await?.unwrap()[0], "");
+
+    // The cleared ones without a name aren't in the admin's list
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+    let list = text(send(&app, Method::GET, "/admin/Customers", &boss, &[]).await?).await?;
+    assert!(list.contains(">Olli Aalto</a>") && list.contains(">Kaisa Aalto</a>"));
+    assert!(!list.contains("leena@example.com"), "{list}");
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn a_customer_who_asks_is_erased(db: PgPool) -> TestResult {
+    admin(&db).await?;
+    let ordered =
+        customer_ordering(&db, "Eeva", "eeva@example.com", "subscribed", Some("NOW()")).await?;
+    // The same person, written otherwise, on the newsletter form
+    let signed_up = customer_ordering(&db, "Eeva", " EEVA@example.com", "subscribed", None).await?;
+    let other = customer_ordering(&db, "Ilkka", "ilkka@example.com", "subscribed", None).await?;
+    let app = site(db.clone(), false);
+    let boss = user_with(&db, "boss@example.com", (true, false, false)).await?;
+
+    let show = format!("/admin/ShowCustomer?customerId={ordered}");
+    let page = text(send(&app, Method::GET, &show, &boss, &[]).await?).await?;
+    let erase = format!("/admin/EraseCustomer?customerId={ordered}");
+    assert!(page.contains(&format!(r#"href="{}""#, erase.replace('&', "&amp;"))));
+    let form = text(send(&app, Method::GET, &erase, &boss, &[]).await?).await?;
+    assert!(form.contains("1 without orders: deleted"), "{form}");
+    assert!(form.contains("1 with orders: their email and phone are cleared"));
+    assert!(form.contains(&format!(r#"<form method="POST" action="{erase}">"#)));
+    // Nothing yet
+    assert!(details(&db, signed_up).await?.is_some());
+
+    let response = send(&app, Method::POST, &erase, &boss, &[]).await?;
+    assert_eq!(location(&response), "/admin/Customers");
+    assert_eq!(
+        session_after(&response, &boss)
+            .get_text(FLASH_SUCCESS)
+            .as_deref(),
+        Some("Customer erased")
+    );
+    assert_eq!(details(&db, signed_up).await?, None);
+    // The invoice's names and address stay for the accounts
+    let left = details(&db, ordered).await?.unwrap();
+    assert_eq!(
+        &left[..5],
+        ["Eeva", "Aalto", "Eeva Aalto", "aalto eeva", "Firma Oy"]
+    );
+    assert_eq!(&left[5..7], ["", ""]);
+    assert_eq!(&left[8..], ["Katu 1", "00100", "Helsinki"]);
+    let (subscribed, unsubscribed): (bool, bool) = sqlx::query_as(
+        "SELECT subscribed_at IS NOT NULL, unsubscribed_at IS NOT NULL FROM customers WHERE id = $1",
+    )
+    .bind(ordered)
+    .fetch_one(&db)
+    .await?;
+    assert!(!subscribed && unsubscribed);
+    assert_eq!(job_errors(&db, ordered).await?, [None]);
+    assert_eq!(
+        bosco_web::db::newsletter_emails(&db).await?,
+        ["ilkka@example.com"]
+    );
+    assert!(details(&db, other).await?.is_some());
+
+    // Erasing again only touches this row, the email being gone
+    let response = send(&app, Method::POST, &erase, &boss, &[]).await?;
+    assert_eq!(location(&response), "/admin/Customers");
+    assert!(details(&db, other).await?.is_some());
+
+    // Only for those who manage the shop
+    let driver = user_with(&db, "driver@example.com", (false, true, false)).await?;
+    let erase_other = format!("/admin/EraseCustomer?customerId={other}");
+    for method in [Method::GET, Method::POST] {
+        let response = send(&app, method, &erase_other, &driver, &[]).await?;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+    assert!(details(&db, other).await?.is_some());
+    Ok(())
+}

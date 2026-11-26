@@ -818,7 +818,10 @@ pub async fn customers_by_name(db: &PgPool) -> sqlx::Result<Vec<AdminCustomer>> 
     sqlx::query_as(
         "SELECT DISTINCT ON (reverse_name) id, email, phone, first_name, last_name, street_address,
                 postal_code, city, billing_name, name, address, subscribed_at, unsubscribed_at
-         FROM customers ORDER BY reverse_name, created_at DESC, id",
+         FROM customers
+         -- Not those whose names were cleared after the accounting period
+         WHERE NOT (name = '' AND first_name = '' AND last_name = '')
+         ORDER BY reverse_name, created_at DESC, id",
     )
     .fetch_all(db)
     .await
@@ -879,7 +882,12 @@ pub async fn delete_customer(db: &PgPool, id: Uuid) -> sqlx::Result<bool> {
 /// lists: lower-cased here, as PostgreSQL leaves ä and the like alone in a
 /// database without a locale
 fn email_list(emails: Vec<String>) -> Vec<String> {
-    let mut emails: Vec<String> = emails.iter().map(|email| email.to_lowercase()).collect();
+    // An erased customer's email is empty
+    let mut emails: Vec<String> = emails
+        .iter()
+        .filter(|email| !email.trim().is_empty())
+        .map(|email| email.to_lowercase())
+        .collect();
     emails.sort();
     emails.dedup();
     emails
@@ -1271,4 +1279,155 @@ pub async fn create_login(
     .bind(roles.promoter)
     .fetch_one(db)
     .await
+}
+
+/// A customer row is due for clearing when its newest order, or its
+/// creation if it has none, is from a year that ended over 10 years ago:
+/// the accounts are kept for 10 years from the end of the order's year
+/// (art. 2220 of the Italian Civil Code), as the privacy notice says
+const DUE: &str = "COALESCE(
+        (SELECT MAX(ordered_at) FROM orders WHERE orders.customer_id = customers.id),
+        customers.created_at
+    ) < date_trunc('year', NOW()) - INTERVAL '10 years'";
+
+/// Clears what the privacy notice promises to clear of customers past the
+/// accounting period: the phone, address and invoice name always; the name
+/// too unless they get the newsletter, which lasts until they leave it; and
+/// the email too unless it's on the newsletter or the record that it left
+/// it. Their orders' email jobs lose their errors, which may name the
+/// address. Order amounts stay. The number of customers changed; again
+/// it's 0, as what's left isn't due.
+pub async fn anonymize_due(db: &PgPool) -> sqlx::Result<u64> {
+    let mut tx = db.begin().await?;
+    let keep_name = "subscribed_at IS NOT NULL";
+    let keep_email = "(subscribed_at IS NOT NULL OR unsubscribed_at IS NOT NULL)";
+    let sql = format!(
+        "UPDATE customers SET
+             phone = '', address = '', street_address = '', postal_code = '', city = '',
+             billing_name = '',
+             name = CASE WHEN {keep_name} THEN name ELSE '' END,
+             first_name = CASE WHEN {keep_name} THEN first_name ELSE '' END,
+             last_name = CASE WHEN {keep_name} THEN last_name ELSE '' END,
+             reverse_name = CASE WHEN {keep_name} THEN reverse_name ELSE '' END,
+             email = CASE WHEN {keep_email} THEN email ELSE '' END,
+             last_modified_at = NOW()
+         WHERE {DUE}
+           AND (phone <> '' OR address <> '' OR street_address <> '' OR postal_code <> ''
+                OR city <> '' OR billing_name <> ''
+                OR (NOT {keep_name}
+                    AND (name <> '' OR first_name <> '' OR last_name <> '' OR reverse_name <> ''))
+                OR (NOT {keep_email} AND email <> ''))
+         RETURNING id"
+    );
+    let ids: Vec<Uuid> = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+        .fetch_all(&mut *tx)
+        .await?;
+    clear_job_errors(&mut tx, &ids).await?;
+    tx.commit().await?;
+    Ok(ids.len() as u64)
+}
+
+/// The email jobs' errors of the customers' orders, which may name their
+/// address
+async fn clear_job_errors(conn: &mut sqlx::PgConnection, customers: &[Uuid]) -> sqlx::Result<()> {
+    sqlx::query(
+        "UPDATE email_order_jobs SET last_error = NULL
+         WHERE last_error IS NOT NULL
+           AND order_id IN (SELECT id FROM orders WHERE customer_id = ANY($1))",
+    )
+    .bind(customers)
+    .execute(conn)
+    .await
+    .map(drop)
+}
+
+/// The customer rows a request to erase this customer is about: theirs and
+/// every other with the same email, as each order saves the customer again
+async fn same_person(conn: &mut sqlx::PgConnection, id: Uuid) -> sqlx::Result<Vec<Uuid>> {
+    let rows: Vec<(Uuid, String)> = sqlx::query_as("SELECT id, email FROM customers")
+        .fetch_all(&mut *conn)
+        .await?;
+    let Some(email) = rows
+        .iter()
+        .find(|(row, _)| *row == id)
+        .map(|(_, email)| email.clone())
+    else {
+        return Ok(Vec::new());
+    };
+    Ok(rows
+        .into_iter()
+        .filter(|(row, other)| {
+            *row == id || (!email.trim().is_empty() && same_email(other, &email))
+        })
+        .map(|(row, _)| row)
+        .collect())
+}
+
+/// What erasing a customer would do: how many of the same person's rows
+/// have orders (and are cleared) and how many have none (and go)
+#[derive(Debug, PartialEq, Eq)]
+pub struct Erasure {
+    pub cleared: usize,
+    pub deleted: usize,
+}
+
+async fn erasure_in(
+    conn: &mut sqlx::PgConnection,
+    ids: &[Uuid],
+) -> sqlx::Result<(Vec<Uuid>, Vec<Uuid>)> {
+    let with_orders: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM customers WHERE id = ANY($1)
+           AND EXISTS (SELECT 1 FROM orders WHERE customer_id = customers.id)",
+    )
+    .bind(ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let without = ids
+        .iter()
+        .copied()
+        .filter(|id| !with_orders.contains(id))
+        .collect();
+    Ok((with_orders, without))
+}
+
+pub async fn erasure(db: &PgPool, id: Uuid) -> sqlx::Result<Erasure> {
+    let mut conn = db.acquire().await?;
+    let ids = same_person(&mut conn, id).await?;
+    let (cleared, deleted) = erasure_in(&mut conn, &ids).await?;
+    Ok(Erasure {
+        cleared: cleared.len(),
+        deleted: deleted.len(),
+    })
+}
+
+/// Erases a customer who asked for it, before the accounting period is
+/// over: of them and every other row with their email, those without
+/// orders go; those with orders lose the email and phone and leave the
+/// newsletter (when it was), keeping what the invoices need for the
+/// accounts: the names and address. Their orders' email jobs lose their
+/// errors.
+pub async fn erase_customer(db: &PgPool, id: Uuid) -> sqlx::Result<Erasure> {
+    let mut tx = db.begin().await?;
+    let ids = same_person(&mut tx, id).await?;
+    let (cleared, deleted) = erasure_in(&mut tx, &ids).await?;
+    sqlx::query("DELETE FROM customers WHERE id = ANY($1)")
+        .bind(&deleted)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "UPDATE customers SET email = '', phone = '',
+             unsubscribed_at = CASE WHEN subscribed_at IS NOT NULL THEN NOW() ELSE unsubscribed_at END,
+             subscribed_at = NULL,
+             last_modified_at = NOW()
+         WHERE id = ANY($1)",
+    )
+    .bind(&cleared)
+    .execute(&mut *tx)
+    .await?;
+    clear_job_errors(&mut tx, &cleared).await?;
+    tx.commit().await?;
+    Ok(Erasure {
+        cleared: cleared.len(),
+        deleted: deleted.len(),
+    })
 }

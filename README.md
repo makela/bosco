@@ -240,6 +240,28 @@ database still starts from IHP's base schema (`db/IHPSchema.sql`), and the
 email jobs keep its `JOB_STATUS`.
 `rust-web/README.md` lists the few ways the Rust site behaves differently.
 
+### Customers' data
+
+The privacy notice keeps orders for 10 years from the end of the order's
+year, as the Italian Civil Code wants the accounts kept (art. 2220).
+Every night at 02:30 (`anonymize.time`), `bosco-<name>-anonymize` clears
+the customer rows whose newest order (or, without orders, whose making) is
+older than that (`db::anonymize_due` in `rust-web/src/db.rs`): the phone,
+address and invoice name always, the name too unless they still get the
+newsletter, and the email too unless it's on the newsletter or the record
+that it left it. Their orders' email jobs lose their errors. The orders and
+their amounts stay. Run it by hand with:
+
+```sh
+systemctl start bosco-fi-anonymize
+```
+
+For someone who asks to be erased sooner, a customer's page in the admin
+has *Erase their details*: it deletes their rows without orders (every row
+with their email) and clears the email and phone of those with orders,
+taking them off the newsletter. The names and address stay on the invoices
+until the nightly clearing.
+
 ### Users and roles
 
 A login has one or more roles, and may do whatever any of them allows

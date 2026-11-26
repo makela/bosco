@@ -61,7 +61,7 @@ let
     "fr"
     "staging"
   ];
-  servicesOf = names: lib.concatMap (name: [ "bosco-${name}" "bosco-${name}-migrate" "bosco-${name}-worker" ]) names;
+  servicesOf = names: lib.concatMap (name: [ "bosco-${name}" "bosco-${name}-anonymize" "bosco-${name}-migrate" "bosco-${name}-worker" ]) names;
 
   failedAssertions =
     config:
@@ -80,7 +80,7 @@ let
   fails = instance: !(builtins.tryEval (builtins.deepSeq (evaluate (quiet { fi = instance; })).systemd.services.bosco-fi.environment true)).success;
 
   tests = {
-    testEachInstanceHasThreeServices = {
+    testEachInstanceHasFourServices = {
       expr = lib.attrNames (ours services);
       expected = lib.sort lib.lessThan (servicesOf instanceNames);
     };
@@ -145,7 +145,7 @@ let
     };
 
     testEachInstanceHasItsLanguage = {
-      expr = lib.genAttrs (lib.filter (name: !lib.hasSuffix "-migrate" name) (servicesOf instanceNames)) (
+      expr = lib.genAttrs (lib.filter (name: !lib.hasSuffix "-migrate" name && !lib.hasSuffix "-anonymize" name) (servicesOf instanceNames)) (
         name: services.${name}.environment.APP_LOCALE
       );
       expected = {
@@ -302,6 +302,7 @@ let
           name:
           map (service: lib.nameValuePair service "bosco_${name}") [
             "bosco-${name}"
+            "bosco-${name}-anonymize"
             "bosco-${name}-migrate"
             "bosco-${name}-worker"
           ]
@@ -321,7 +322,7 @@ let
           "StateDirectory"
         ] service.serviceConfig
       ) (lib.filterAttrs (name: _: lib.hasPrefix "bosco-fi" name) services);
-      expected = lib.genAttrs [ "bosco-fi" "bosco-fi-migrate" "bosco-fi-worker" ] (_: {
+      expected = lib.genAttrs [ "bosco-fi" "bosco-fi-anonymize" "bosco-fi-migrate" "bosco-fi-worker" ] (_: {
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = true;
@@ -363,6 +364,7 @@ let
         in
         lib.sort (a: b: a < b) (lib.mapAttrsToList (_: service: baseNameOf service.serviceConfig.ExecStart) ours);
       expected = [
+        "bosco-anonymize"
         "bosco-migrate"
         "bosco-reset-demo"
         "bosco-web"
@@ -593,7 +595,9 @@ let
           afterMigrations = lib.elem "bosco-demo-migrate.service" reset.after;
           timer = demo.systemd.timers.bosco-demo-reset-demo.timerConfig.OnCalendar;
           othersHaveNoReset = lib.attrNames (lib.filterAttrs (name: _: lib.hasSuffix "reset-demo" name) (ours services)) == [ ];
-          othersHaveNoTimer = lib.attrNames (ours server.systemd.timers) == [ ];
+          othersHaveOnlyTheAnonymizeTimer = lib.all (lib.hasSuffix "-anonymize") (
+            lib.attrNames (ours server.systemd.timers)
+          );
         };
       expected = {
         program = true;
@@ -604,7 +608,35 @@ let
         afterMigrations = true;
         timer = "*-*-* 03:00:00";
         othersHaveNoReset = true;
-        othersHaveNoTimer = true;
+        othersHaveOnlyTheAnonymizeTimer = true;
+      };
+    };
+
+    # Every instance clears its customers past the accounting period every
+    # night, as the privacy notice promises
+    testEveryInstanceAnonymizesEveryNight = {
+      expr =
+        let
+          anonymize = server.systemd.services.bosco-fi-anonymize;
+        in
+        {
+          program = lib.hasSuffix "/bin/bosco-anonymize" anonymize.serviceConfig.ExecStart;
+          inherit (anonymize.environment) DATABASE_URL;
+          user = anonymize.serviceConfig.User;
+          oneshot = anonymize.serviceConfig.Type;
+          afterMigrations = lib.elem "bosco-fi-migrate.service" anonymize.after;
+          timer = server.systemd.timers.bosco-fi-anonymize.timerConfig;
+        };
+      expected = {
+        program = true;
+        DATABASE_URL = (server.systemd.services.bosco-fi.environment).DATABASE_URL;
+        user = "bosco_fi";
+        oneshot = "oneshot";
+        afterMigrations = true;
+        timer = {
+          OnCalendar = "*-*-* 02:30:00";
+          Persistent = true;
+        };
       };
     };
 
