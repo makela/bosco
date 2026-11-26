@@ -7,6 +7,11 @@
     # Builds the site with its dependencies in a derivation of their own,
     # which is reused until rust-web/Cargo.lock changes
     crane.url = "github:ipetkov/crane/v0.24.0";
+    # The Rust of rust-toolchain.toml, for crane and the dev shell
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -14,6 +19,7 @@
       self,
       nixpkgs,
       crane,
+      rust-overlay,
     }:
     let
       systems = [
@@ -22,7 +28,22 @@
         "x86_64-darwin"
         "aarch64-darwin"
       ];
-      forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+      forAll =
+        f:
+        nixpkgs.lib.genAttrs systems (
+          system:
+          f (
+            import nixpkgs {
+              inherit system;
+              overlays = [ rust-overlay.overlays.default ];
+            }
+          )
+        );
+
+      # rust-toolchain.toml's Rust: rustc, cargo, clippy, rustfmt and
+      # rust-analyzer
+      rustOf = pkgs: pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+      craneOf = pkgs: (crane.mkLib pkgs).overrideToolchain rustOf;
     in
     {
       # Runs the site on a NixOS server, see nix/module.nix and the README
@@ -31,7 +52,7 @@
       packages = forAll (
         pkgs:
         let
-          craneLib = crane.mkLib pkgs;
+          craneLib = craneOf pkgs;
         in
         rec {
           # The programs: the site, the worker, the migrations and the scripts
@@ -50,7 +71,7 @@
         {
           # The Rust tests, against a throwaway PostgreSQL
           rust-web-tests = pkgs.callPackage ./nix/rust-web.nix {
-            craneLib = crane.mkLib pkgs;
+            craneLib = craneOf pkgs;
             runTests = true;
           };
 
@@ -86,11 +107,7 @@
       devShells = forAll (pkgs: {
         default = pkgs.mkShell {
           packages = [
-            pkgs.cargo
-            pkgs.rustc
-            pkgs.clippy
-            pkgs.rustfmt
-            pkgs.rust-analyzer
+            (rustOf pkgs)
             pkgs.postgresql
             pkgs.tailwindcss_4
             pkgs.watchexec
