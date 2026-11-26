@@ -494,6 +494,34 @@ async fn static_or_not_found(
     }
 }
 
+/// Headers for every response, unless it has its own: no page of the site
+/// in another's frame, where a visitor could be made to click the admin's
+/// buttons unseen (`frame-ancestors`, and `X-Frame-Options` for older
+/// browsers); content only of the type it says; only the site's address,
+/// not the page's, to other sites; and, over HTTPS, HTTPS only from then on
+/// (this host only: not its subdomains, which may be other servers)
+async fn security_headers(
+    State(state): State<Arc<AppState>>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    let mut set = |name, value| {
+        headers
+            .entry(name)
+            .or_insert(HeaderValue::from_static(value));
+    };
+    set(header::CONTENT_SECURITY_POLICY, "frame-ancestors 'none'");
+    set(header::X_FRAME_OPTIONS, "DENY");
+    set(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
+    set(header::REFERRER_POLICY, "strict-origin-when-cross-origin");
+    if state.secure_cookies {
+        set(header::STRICT_TRANSPORT_SECURITY, "max-age=31536000");
+    }
+    response
+}
+
 /// All the site's routes. Other addresses are the IHP app's static files,
 /// the logo, the stylesheets and the scripts, there and under /static/ as
 /// IHP serves them, or else not found.
@@ -663,6 +691,10 @@ pub fn app(state: Arc<AppState>) -> Router {
     };
     admin_texts::routes(router)
         .fallback(static_or_not_found)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            security_headers,
+        ))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

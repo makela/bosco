@@ -32,6 +32,11 @@ async fn schema(db: &PgPool) -> TestResult {
 }
 
 fn site(db: PgPool, demo: bool) -> Router {
+    site_with(db, demo, false)
+}
+
+/// `secure_cookies` as with an https base URL
+fn site_with(db: PgPool, demo: bool, secure_cookies: bool) -> Router {
     app(Arc::new(AppState {
         db,
         site: Site {
@@ -42,7 +47,7 @@ fn site(db: PgPool, demo: bool) -> Router {
         },
         static_dir: PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../static")),
         session_key: bosco_web::session::Key::from_bytes(&[0; 96]).unwrap(),
-        secure_cookies: false,
+        secure_cookies,
         emails_enabled: true,
     }))
 }
@@ -912,5 +917,55 @@ async fn shows_the_newest_privacy_notice_or_else_the_default(db: PgPool) -> Test
     // A demo shows the default, whatever is stored
     let demo = body(get(&site(db, true), "/PrivacyNotice").await?).await?;
     assert!(demo.contains("<h2>Rekisterinpitäjä</h2>"));
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn keeps_every_page_out_of_other_sites_frames(db: PgPool) -> TestResult {
+    schema(&db).await?;
+    let app = site(db, false);
+    for path in ["/", "/admin/NewSession", "/static/app.css", "/ei-ole"] {
+        let page = get(&app, path).await?;
+        let header = |name| {
+            page.headers()
+                .get(name)
+                .map(|value| value.to_str().unwrap())
+        };
+        assert_eq!(
+            header(header::CONTENT_SECURITY_POLICY),
+            Some("frame-ancestors 'none'"),
+            "{path}"
+        );
+        assert_eq!(header(header::X_FRAME_OPTIONS), Some("DENY"), "{path}");
+        assert_eq!(
+            header(header::X_CONTENT_TYPE_OPTIONS),
+            Some("nosniff"),
+            "{path}"
+        );
+        assert_eq!(
+            header(header::REFERRER_POLICY),
+            Some("strict-origin-when-cross-origin"),
+            "{path}"
+        );
+        assert_eq!(header(header::STRICT_TRANSPORT_SECURITY), None, "over http");
+    }
+    Ok(())
+}
+
+#[sqlx::test(migrations = false)]
+async fn asks_for_https_only_over_https(db: PgPool) -> TestResult {
+    schema(&db).await?;
+    let page = get(&site_with(db, false, true), "/").await?;
+    assert_eq!(
+        page.headers()[header::STRICT_TRANSPORT_SECURITY],
+        "max-age=31536000"
+    );
+    assert_eq!(
+        page.headers()
+            .get_all(header::X_CONTENT_TYPE_OPTIONS)
+            .iter()
+            .count(),
+        1
+    );
     Ok(())
 }
