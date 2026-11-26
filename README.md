@@ -31,7 +31,8 @@ just          # the other recipes, e.g. psql, db-reset, check-all
 the session key and the logs. A new database gets the schema, the Finnish
 catalog and the migrations, as a new staging instance does. The site and the
 worker are rebuilt and restarted when their code changes, and the
-stylesheet when the markup does. The worker only logs the emails it would
+stylesheet when the markup does; the pages then reload themselves
+(`rust-web/src/dev_reload.rs`). The worker only logs the emails it would
 send (`SEND_EMAILS=0`).
 
 The dev site is in Finnish. To try another language, set `APP_LOCALE=fr` (or

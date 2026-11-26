@@ -121,6 +121,9 @@ pub(crate) fn page(state: &AppState, mut session: Session, content: &Markup) -> 
                 // External links in a new tab; the js-delete links and local times
                 script src=(asset("/static/app.js")) defer {}
                 script src=(asset("/static/admin.js")) defer {}
+                @if site.development() {
+                    script src="/static/dev-reload.js" defer {}
+                }
                 title { (title) }
             }
             body {

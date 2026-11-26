@@ -266,8 +266,10 @@ async fn front_page_shows_the_welcome_message_and_the_order_button(db: PgPool) -
     assert!(page.contains(r#"<html lang="fi">"#));
     assert!(page.contains("<title>Bosco Falconeria Öljytilaus</title>"));
     // In development, without a version; no scripts on the public pages
+    // but the one that reloads them on changes (dev_reload)
     assert!(page.contains(r#"<link rel="stylesheet" href="/static/app.css">"#));
-    assert!(!page.contains("<script"), "{page}");
+    assert_eq!(page.matches("<script").count(), 1, "{page}");
+    assert!(page.contains(r#"<script src="/static/dev-reload.js" defer>"#));
     // Only a demo invites everyone to its admin
     assert!(!page.contains("/admin/NewSession"), "{page}");
 
@@ -640,6 +642,20 @@ async fn an_unknown_order_or_page_is_not_found(db: PgPool) -> TestResult {
     // No public way to cancel an order
     let response = post(&app, "/UpdateCancelOrder", &[]).await?;
     assert_ne!(response.status(), StatusCode::OK);
+    Ok(())
+}
+
+/// In development the pages reload themselves when the site restarts or a
+/// static file changes (dev_reload)
+#[sqlx::test(migrations = false)]
+async fn answers_the_dev_pages_reload_check(db: PgPool) -> TestResult {
+    schema(&db).await?;
+    let app = site(db, false);
+    let first = get(&app, "/dev/reload").await?;
+    assert_eq!(first.status(), StatusCode::OK);
+    assert_eq!(first.headers()[header::CACHE_CONTROL], "no-store");
+    let first = body(first).await?;
+    assert_eq!(body(get(&app, "/dev/reload").await?).await?, first);
     Ok(())
 }
 

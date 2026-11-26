@@ -42,6 +42,9 @@ pub fn layout(site: &Site, flash: Option<Flash>, content: &Markup) -> Markup {
                     meta name="robots" content="noindex, nofollow";
                 }
                 link rel="stylesheet" href=(site.asset("/static/app.css"));
+                @if site.development() {
+                    script src="/static/dev-reload.js" defer {}
+                }
                 title { (title) }
             }
             body {

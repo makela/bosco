@@ -140,6 +140,7 @@ async fn state_of(db: &PgPool, user: Uuid) -> sqlx::Result<Login> {
 #[sqlx::test(migrations = false)]
 async fn the_login_page(db: PgPool) -> TestResult {
     admin(&db).await?;
+    let db2 = db.clone();
     let response = send(
         &site(db, false),
         Method::GET,
@@ -156,11 +157,22 @@ async fn the_login_page(db: PgPool) -> TestResult {
     assert!(page.contains(r#"<script src="/static/app.js?v=v1" defer></script>"#));
     assert!(page.contains(r#"<script src="/static/admin.js?v=v1" defer></script>"#));
     assert!(!page.contains("prod.js"), "{page}");
+    // With a version, as in production: no reloading on changes (dev_reload)
+    assert!(!page.contains("dev-reload"), "{page}");
     assert!(page.contains(r#"<form method="POST" action="/admin/CreateSession">"#));
     assert!(page.contains(
         r#"<input name="email" value="" type="email" class="form-control" placeholder="Email" aria-label="Email" required autofocus>"#
     ));
     assert!(!page.contains("demo"), "{page}");
+    let reload = send(
+        &site(db2, false),
+        Method::GET,
+        "/dev/reload",
+        &Session::default(),
+        &[],
+    )
+    .await?;
+    assert_eq!(reload.status(), StatusCode::NOT_FOUND);
     Ok(())
 }
 

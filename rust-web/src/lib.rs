@@ -16,6 +16,7 @@ pub mod admin_products;
 pub mod admin_texts;
 pub mod db;
 pub mod demo_data;
+pub mod dev_reload;
 pub mod l10n;
 pub mod mail;
 pub mod password;
@@ -64,6 +65,12 @@ pub struct Site {
 }
 
 impl Site {
+    /// Development has no asset version: production's module always sets
+    /// one. Its pages reload themselves on changes (`dev_reload`).
+    pub fn development(&self) -> bool {
+        self.asset_version.is_none()
+    }
+
     /// A static file's address, with the version when there's one, e.g.
     /// `/static/app.css?v=…`, which browsers may then keep for a year
     pub fn asset(&self, path: &str) -> String {
@@ -649,6 +656,11 @@ pub fn app(state: Arc<AppState>) -> Router {
             "/admin/DemoLogin",
             get(admin::demo_login).post(admin::demo_login),
         );
+    let router = if state.site.development() {
+        router.merge(dev_reload::routes())
+    } else {
+        router
+    };
     admin_texts::routes(router)
         .fallback(static_or_not_found)
         .layer(TraceLayer::new_for_http())
