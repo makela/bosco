@@ -680,6 +680,13 @@ pub enum TextKind {
 }
 
 /// The privacy notice shown, the newest, and when it was published
+/// Whether the admin has published a privacy notice
+pub async fn privacy_notice_published(db: &PgPool) -> sqlx::Result<bool> {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM privacy_notices)")
+        .fetch_one(db)
+        .await
+}
+
 pub async fn privacy_notice(db: &PgPool) -> sqlx::Result<Option<(String, DateTime<Utc>)>> {
     sqlx::query_as(
         "SELECT text, published_at FROM privacy_notices ORDER BY published_at DESC, id LIMIT 1",

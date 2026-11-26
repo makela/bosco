@@ -169,6 +169,7 @@ pub async fn index(
                 "The site shows the newest at " a href="/PrivacyNotice" { "/PrivacyNotice" }
                 @if rows.is_empty() {
                     ": for now the default text, with the farm's details in [brackets] to fill in. "
+                    "No page links to it until one is published. "
                     "Create one: it starts from the default text."
                 } @else {
                     ". Publish a new one for a change that matters, so the old ones show what the site said when."

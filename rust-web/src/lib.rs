@@ -62,6 +62,10 @@ pub struct Site {
     /// The static files' version in production, in the stylesheet's and
     /// scripts' addresses (`/static/app.css?v=…`); none in development
     pub asset_version: Option<String>,
+    /// Whether the pages link to the privacy notice: once the admin has
+    /// published one, or always in a demo. Set for each page
+    /// (`public_site`); false in the instance's settings.
+    pub privacy_link: bool,
 }
 
 impl Site {
@@ -175,11 +179,27 @@ pub(crate) type Params = HashMap<String, String>;
 /// A form field's name and its check
 type FieldCheck = (&'static str, fn(&str) -> validate::Check);
 
+/// The site as a public page shows it: with links to the privacy notice
+/// once the admin has published one (a demo always shows its fixed one).
+/// Until then /PrivacyNotice shows the default text, for the admin to start
+/// from, but no page links to it.
+async fn public_site(state: &AppState) -> Site {
+    let mut site = state.site.clone();
+    site.privacy_link = site.demo
+        || db::privacy_notice_published(&state.db)
+            .await
+            .unwrap_or_else(|error| {
+                tracing::error!("database: {error}");
+                false
+            });
+    site
+}
+
 /// A page in the layout, with the notice the previous request left, which
 /// it then clears
-fn page(state: &AppState, headers: &HeaderMap, status: StatusCode, content: &Markup) -> Response {
+fn page(site: &Site, headers: &HeaderMap, status: StatusCode, content: &Markup) -> Response {
     let flash = Flash::from_headers(headers);
-    let mut response = (status, views::layout(&state.site, flash, content)).into_response();
+    let mut response = (status, views::layout(site, flash, content)).into_response();
     if flash.is_some() {
         response.headers_mut().append(
             header::SET_COOKIE,
@@ -289,9 +309,10 @@ const SUBSCRIBE_CHECKS: &[FieldCheck] = &[
 ];
 
 async fn index(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Result<Response> {
+    let site = public_site(&state).await;
     let message = db::last_welcome_message(&state.db).await?;
-    let content = views::index(&state.site, message.as_ref());
-    Ok(page(&state, &headers, StatusCode::OK, &content))
+    let content = views::index(&site, message.as_ref());
+    Ok(page(&site, &headers, StatusCode::OK, &content))
 }
 
 async fn ordering_open(state: &AppState) -> Result<bool> {
@@ -301,13 +322,14 @@ async fn ordering_open(state: &AppState) -> Result<bool> {
 }
 
 async fn new_order(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Result<Response> {
+    let site = public_site(&state).await;
     // Old links to the order form keep working after ordering closes
     if !ordering_open(&state).await? {
         return Ok(redirect_with(Flash::OrderingNotOpen, "/"));
     }
     let (producers, products) = db::catalog(&state.db).await?;
     let content = views::order_form(
-        &state.site,
+        &site,
         &OrderForm {
             action: "/CreateOrder",
             producers: &producers,
@@ -318,7 +340,7 @@ async fn new_order(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Re
             no_products_selected: false,
         },
     );
-    Ok(page(&state, &headers, StatusCode::OK, &content))
+    Ok(page(&site, &headers, StatusCode::OK, &content))
 }
 
 /// Saves the order and shows its invoice. If any of the products ordered
@@ -330,6 +352,7 @@ async fn create_order(
     headers: HeaderMap,
     Form(params): Form<Params>,
 ) -> Result<Response> {
+    let site = public_site(&state).await;
     // A bot's order can't be shown like a person's, which has an invoice, so
     // it is thanked on the front page
     if is_spam(&params, "/CreateOrder") {
@@ -363,7 +386,7 @@ async fn create_order(
     if !form.errors.is_empty() || !unavailable.is_empty() || no_products_selected {
         let shown: HashMap<Uuid, i64> = lines.iter().map(|(p, q)| (p.id, *q)).collect();
         let content = views::order_form(
-            &state.site,
+            &site,
             &OrderForm {
                 action: "/CreateOrder",
                 producers: &producers,
@@ -374,7 +397,7 @@ async fn create_order(
                 no_products_selected,
             },
         );
-        return Ok(page(&state, &headers, StatusCode::OK, &content));
+        return Ok(page(&site, &headers, StatusCode::OK, &content));
     }
     let order_id = db::create_order(&state.db, &form.customer, &lines, true).await?;
     Ok(redirect_with(
@@ -388,6 +411,7 @@ async fn show_order(
     headers: HeaderMap,
     Query(params): Query<Params>,
 ) -> Result<Response> {
+    let site = public_site(&state).await;
     let order_id = params
         .get("orderId")
         .and_then(|id| Uuid::parse_str(id).ok());
@@ -404,13 +428,14 @@ async fn show_order(
     } else {
         db::payment_instruction(&state.db).await?
     };
-    let content = views::invoice(&state.site, &invoice, instruction.as_deref());
-    Ok(page(&state, &headers, StatusCode::OK, &content))
+    let content = views::invoice(&site, &invoice, instruction.as_deref());
+    Ok(page(&site, &headers, StatusCode::OK, &content))
 }
 
 async fn new_email(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let content = views::subscribe_form(&state.site, &CustomerForm::default());
-    page(&state, &headers, StatusCode::OK, &content)
+    let site = public_site(&state).await;
+    let content = views::subscribe_form(&site, &CustomerForm::default());
+    page(&site, &headers, StatusCode::OK, &content)
 }
 
 async fn create_email(
@@ -418,6 +443,7 @@ async fn create_email(
     headers: HeaderMap,
     Form(params): Form<Params>,
 ) -> Result<Response> {
+    let site = public_site(&state).await;
     if is_spam(&params, "/CreateEmail") {
         return Ok(redirect_with(Flash::DetailsSaved, "/"));
     }
@@ -428,8 +454,8 @@ async fn create_email(
     let mut form = check(customer_from(&params), SUBSCRIBE_CHECKS);
     form.customer.newsletter = true;
     if !form.errors.is_empty() {
-        let content = views::subscribe_form(&state.site, &form);
-        return Ok(page(&state, &headers, StatusCode::OK, &content));
+        let content = views::subscribe_form(&site, &form);
+        return Ok(page(&site, &headers, StatusCode::OK, &content));
     }
     db::create_subscriber(&state.db, &form.customer).await?;
     Ok(redirect_with(Flash::DetailsSaved, "/"))
@@ -440,21 +466,23 @@ async fn privacy_notice(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Response> {
+    let site = public_site(&state).await;
     let notice = if state.site.demo {
         None
     } else {
         db::privacy_notice(&state.db).await?
     };
     let content = match &notice {
-        Some((text, published_at)) => views::privacy_notice(&state.site, text, Some(*published_at)),
-        None => views::privacy_notice(&state.site, privacy::default_text(state.site.locale), None),
+        Some((text, published_at)) => views::privacy_notice(&site, text, Some(*published_at)),
+        None => views::privacy_notice(&site, privacy::default_text(site.locale), None),
     };
-    Ok(page(&state, &headers, StatusCode::OK, &content))
+    Ok(page(&site, &headers, StatusCode::OK, &content))
 }
 
 async fn new_unsubscribe(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let content = views::unsubscribe_form(&state.site, "", None);
-    page(&state, &headers, StatusCode::OK, &content)
+    let site = public_site(&state).await;
+    let content = views::unsubscribe_form(&site, "", None);
+    page(&site, &headers, StatusCode::OK, &content)
 }
 
 /// Takes the email off the newsletter. The answer is the same whether it
@@ -464,13 +492,14 @@ async fn unsubscribe(
     headers: HeaderMap,
     Form(params): Form<Params>,
 ) -> Result<Response> {
+    let site = public_site(&state).await;
     if is_spam(&params, "/Unsubscribe") {
         return Ok(redirect_with(Flash::Unsubscribed, "/"));
     }
     let email = param(&params, "email").trim().to_string();
     if let Err(error) = validate::email(&email) {
-        let content = views::unsubscribe_form(&state.site, &email, Some(error));
-        return Ok(page(&state, &headers, StatusCode::OK, &content));
+        let content = views::unsubscribe_form(&site, &email, Some(error));
+        return Ok(page(&site, &headers, StatusCode::OK, &content));
     }
     let count = db::unsubscribe(&state.db, &email).await?;
     tracing::info!("unsubscribed {count} customers from the newsletter");
@@ -478,8 +507,9 @@ async fn unsubscribe(
 }
 
 pub(crate) async fn not_found(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let content = views::not_found(&state.site);
-    page(&state, &headers, StatusCode::NOT_FOUND, &content)
+    let site = public_site(&state).await;
+    let content = views::not_found(&site);
+    page(&site, &headers, StatusCode::NOT_FOUND, &content)
 }
 
 /// A static file (`static_files.rs`), or else not found

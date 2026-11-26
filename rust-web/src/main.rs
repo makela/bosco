@@ -59,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             demo,
             asset_version,
             base_url: Some(setting("IHP_BASEURL", "")).filter(|url| !url.is_empty()),
+            privacy_link: false,
         },
         static_dir: setting("STATIC_DIR", "../static").into(),
         session_key,

@@ -44,6 +44,7 @@ fn site_with(db: PgPool, demo: bool, secure_cookies: bool) -> Router {
             demo,
             asset_version: None,
             base_url: None,
+            privacy_link: false,
         },
         static_dir: PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../static")),
         session_key: bosco_web::session::Key::from_bytes(&[0; 96]).unwrap(),
@@ -878,11 +879,27 @@ async fn every_page_has_the_farms_copyright(db: PgPool) -> TestResult {
 
 // The privacy notice
 
+/// Once the admin has published a privacy notice, every page and form
+/// links to it; before, none does, though /PrivacyNotice shows the default
+/// text for the admin to start from
 #[sqlx::test(migrations = false)]
-async fn every_page_and_form_links_to_the_privacy_notice(db: PgPool) -> TestResult {
+async fn every_page_and_form_links_to_a_published_privacy_notice(db: PgPool) -> TestResult {
     shop(&db).await?;
     let app = site(db.clone(), false);
-    for uri in ["/", "/NewOrder", "/NewEmail", "/Unsubscribe"] {
+    let pages = ["/", "/NewOrder", "/NewEmail", "/Unsubscribe", "/ei-ole"];
+    for uri in pages {
+        let page = body(get(&app, uri).await?).await?;
+        assert!(!page.contains("/PrivacyNotice"), "{uri}");
+    }
+    let form = body(get(&app, "/NewOrder").await?).await?;
+    assert!(!form.contains("Miten käsittelemme tietojasi:"));
+    let front = body(get(&app, "/").await?).await?;
+    assert!(front.contains(" Bosco Falconeria</span></footer>"));
+
+    sqlx::query("INSERT INTO privacy_notices (text) VALUES ('Näin')")
+        .execute(&db)
+        .await?;
+    for uri in pages {
         let page = body(get(&app, uri).await?).await?;
         assert!(page.contains(r#"href="/PrivacyNotice""#), "{uri}");
     }
@@ -892,6 +909,15 @@ async fn every_page_and_form_links_to_the_privacy_notice(db: PgPool) -> TestResu
     assert!(front.contains(
         r#" Bosco Falconeria</span><a href="/PrivacyNotice">Tietosuojaseloste</a></footer>"#
     ));
+    Ok(())
+}
+
+/// A demo shows its fixed notice, so it always links to it
+#[sqlx::test(migrations = false)]
+async fn a_demo_links_to_its_privacy_notice(db: PgPool) -> TestResult {
+    shop(&db).await?;
+    let front = body(get(&site(db, true), "/").await?).await?;
+    assert!(front.contains(r#"<a href="/PrivacyNotice">Tietosuojaseloste</a></footer>"#));
     Ok(())
 }
 

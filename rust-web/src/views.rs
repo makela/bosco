@@ -68,7 +68,9 @@ pub fn layout(site: &Site, flash: Option<Flash>, content: &Markup) -> Markup {
                     (content)
                     footer.site-footer {
                         span { "© 2022–" (chrono::Utc::now().format("%Y")) " Bosco Falconeria" }
-                        a href="/PrivacyNotice" { (t(Text::PrivacyNotice)) }
+                        @if site.privacy_link {
+                            a href="/PrivacyNotice" { (t(Text::PrivacyNotice)) }
+                        }
                     }
                 }
             }
@@ -325,12 +327,15 @@ pub fn subscribe_form(site: &Site, form: &CustomerForm) -> Markup {
     }
 }
 
-/// Above a form's button: where to read how the details are handled
+/// Above a form's button: where to read how the details are handled, once
+/// there's a notice to read
 fn privacy_note(site: &Site) -> Markup {
     html! {
-        p.form-note {
-            (Text::PrivacyNote.text(site.locale)) " "
-            a href="/PrivacyNotice" { (Text::PrivacyNotice.text(site.locale)) }
+        @if site.privacy_link {
+            p.form-note {
+                (Text::PrivacyNote.text(site.locale)) " "
+                a href="/PrivacyNotice" { (Text::PrivacyNotice.text(site.locale)) }
+            }
         }
     }
 }

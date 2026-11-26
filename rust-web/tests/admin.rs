@@ -52,6 +52,7 @@ fn site(db: PgPool, demo: bool) -> Router {
             demo,
             asset_version: Some("v1".into()),
             base_url: None,
+            privacy_link: false,
         },
         static_dir: PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../static")),
         session_key: key(),
