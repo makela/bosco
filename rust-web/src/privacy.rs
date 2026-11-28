@@ -104,7 +104,7 @@ Contact pour la protection des données : [adresse e-mail de l'exploitation]
 
 **Newsletter.** Votre nom et votre e-mail. Si vous vous inscrivez avec le formulaire de la newsletter, sur la base de votre consentement (article 6, paragraphe 1, point a). Si vous commandez en laissant cochée la case de la newsletter, nous vous envoyons des nouvelles de nos propres produits semblables à ceux que vous avez achetés (article 130, paragraphe 4, du Code italien de la protection des données, et intérêt légitime, article 6, paragraphe 1, point f). Vous pouvez décocher la case en commandant et vous désabonner à tout moment.
 
-**Utilisation du site.** Le serveur conserve brièvement des journaux techniques (adresse IP, pages ouvertes) pour la sécurité et la correction des pannes (intérêt légitime). Le site n'utilise aucun cookie de suivi ni de mesure d'audience. Après l'envoi d'un formulaire, un cookie technique affiche une fois un message.
+**Utilisation du site.** Le serveur conserve des journaux techniques (adresse IP, pages ouvertes) pour la sécurité et la correction des pannes (intérêt légitime), pendant 30 jours au plus. Le site n'utilise aucun cookie de suivi ni de mesure d'audience. Après l'envoi d'un formulaire, un cookie technique affiche une fois un message.
 
 ## Qui voit vos données
 

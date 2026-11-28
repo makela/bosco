@@ -748,7 +748,7 @@ fn data_sections(locale: crate::l10n::Locale, data: &db::PersonData) -> Vec<Sect
 }
 
 /// What the database doesn't have, for the answer to say
-const ELSEWHERE: &str = "Not in the database, so not here: the server's technical logs, kept for a short time, and the order emails as sent, in the sending mailbox.";
+const ELSEWHERE: &str = "Not in the database, so not here: the server's technical logs, kept for at most 30 days, and the order emails as sent, in the sending mailbox.";
 
 /// The sections as plain text, to attach to the answer
 fn data_text(name: &str, sections: &[Section]) -> String {
