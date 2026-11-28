@@ -28,7 +28,7 @@ Tietosuoja-asiat: [tilan sähköpostiosoite]
 
 **Uutiskirje.** Nimi ja sähköposti. Jos tilaat uutiskirjeen sen lomakkeella, perusteena on suostumuksesi (6 artiklan 1 kohdan a alakohta). Jos jätät tilauslomakkeen uutiskirjeruudun rastitetuksi, lähetämme sinulle uutisia omista tuotteistamme, jotka ovat samankaltaisia kuin tilaamasi (Italian tietosuojalain 130 §:n 4 momentti ja oikeutettu etu, 6 artiklan 1 kohdan f alakohta). Voit poistaa rastin tilatessasi ja perua uutiskirjeen milloin tahansa.
 
-**Sivuston käyttö.** Palvelin pitää lyhyen aikaa teknistä lokia (IP-osoite, avatut sivut) tietoturvan ja vikojen korjaamisen vuoksi (oikeutettu etu). Sivusto ei käytä seuranta- eikä analytiikkaevästeitä. Lomakkeen lähettämisen jälkeen yksi tekninen eväste näyttää ilmoituksen kerran.
+**Sivuston käyttö.** Palvelin pitää teknistä lokia (IP-osoite, avatut sivut) tietoturvan ja vikojen korjaamisen vuoksi (oikeutettu etu); lokit säilytetään enintään 30 päivää. Sivusto ei käytä seuranta- eikä analytiikkaevästeitä. Lomakkeen lähettämisen jälkeen yksi tekninen eväste näyttää ilmoituksen kerran.
 
 ## Kuka näkee tietosi
 
@@ -66,7 +66,7 @@ Privacy contact: [the farm's email address]
 
 **Newsletter.** Your name and email. If you sign up on the newsletter form, on the basis of your consent (Article 6(1)(a)). If you order with the newsletter box ticked, we send you news about our own products similar to those you bought (Article 130(4) of the Italian Privacy Code, and legitimate interest, Article 6(1)(f)). You can untick the box when you order, and unsubscribe at any time.
 
-**Using the site.** The server keeps technical logs (IP address, pages opened) for a short time, for security and to fix faults (legitimate interest). The site uses no tracking or analytics cookies. After you send a form, one technical cookie shows a notice once.
+**Using the site.** The server keeps technical logs (IP address, pages opened) for security and to fix faults (legitimate interest), for at most 30 days. The site uses no tracking or analytics cookies. After you send a form, one technical cookie shows a notice once.
 
 ## Who sees your details
 
